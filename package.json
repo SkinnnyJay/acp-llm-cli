@@ -64,7 +64,7 @@
     "@simpill/logger.utils": "^1.0.0",
     "@simpill/protocols.utils": "^1.0.0",
     "eventemitter3": "^5.0.1",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
