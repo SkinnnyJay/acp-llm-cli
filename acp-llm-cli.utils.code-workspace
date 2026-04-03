@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "acp-llm-cli"
+    }
+  ],
+  "settings": {
+    "git.autoRepositoryDetection": false,
+    "git.openRepositoryInParentFolders": "never",
+    "git.ignoredRepositories": ["${workspaceFolder}/../.."]
+  }
+}
