@@ -1,0 +1,76 @@
+{
+  "name": "@simpill/acp-llm-cli",
+  "version": "0.1.0",
+  "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor)",
+  "license": "ISC",
+  "author": "SkinnnyJay",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./runtime": {
+      "import": "./dist/runtime/index.js",
+      "types": "./dist/runtime/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/runtime/index.js",
+      "types": "./dist/runtime/index.d.ts"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "acp",
+    "agent-client-protocol",
+    "llm",
+    "cli",
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "anthropic",
+    "openai",
+    "stdio"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simpill/acp-llm-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/simpill/acp-llm-cli/issues"
+  },
+  "homepage": "https://github.com/simpill/acp-llm-cli#readme",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run typecheck && npm run build && npm test",
+    "prepublishOnly": "npm run verify",
+    "update-models": "bun run scripts/update-models.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.12.0",
+    "@simpill/async.utils": "^1.0.0",
+    "@simpill/env.utils": "^1.0.0",
+    "@simpill/patterns.utils": "^1.0.0",
+    "@simpill/errors.utils": "^1.0.0",
+    "@simpill/logger.utils": "^1.0.0",
+    "@simpill/protocols.utils": "^1.0.0",
+    "eventemitter3": "^5.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.2"
+  },
+  "files": ["dist"]
+}
