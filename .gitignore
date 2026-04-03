@@ -6,3 +6,16 @@ dist/
 .DS_Store
 coverage/
 tmp/
+
+# npm is canonical for CI (`npm ci`); do not commit other package managers' locks
+bun.lock
+pnpm-lock.yaml
+yarn.lock
+
+# Tooling / editor / build caches
+*.tsbuildinfo
+.vitest/
+.idea/
+*.swp
+*.tmp
+README.md.tmp
