@@ -1,7 +1,9 @@
 # @simpill/acp-llm-cli
 
-[![CI](https://github.com/simpill/acp-llm-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/simpill/acp-llm-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/SkinnnyJay/acp-llm-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/SkinnnyJay/acp-llm-cli/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@simpill/acp-llm-cli)](https://www.npmjs.com/package/@simpill/acp-llm-cli)
+
+Source: **[github.com/SkinnnyJay/acp-llm-cli](https://github.com/SkinnnyJay/acp-llm-cli)**. Optional local path next to [simpill-utils](https://github.com/SkinnnyJay/simpill-utils): `utils/@simpill-acp-llm-cli.utils/`.
 
 Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor). Interface-first and Zod-driven: **Factory** and **Provider** classes driven by **interfaces** (common + extended), **Zod** for validation and clear error messages, **common metrics and logging**, and no magic numbers or strings. CLI research (commands/args, common vs provider-unique) is in the repo scratchpad and linked from implementation.
 
