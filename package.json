@@ -56,7 +56,7 @@
     "update-models": "bun run scripts/update-models.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.12.0",
+    "@agentclientprotocol/sdk": "^1.0.0",
     "@simpill/async.utils": "^1.0.0",
     "@simpill/env.utils": "^1.0.0",
     "@simpill/patterns.utils": "^1.0.0",
