@@ -39,6 +39,7 @@ export function wrapAgentPortWithStream(
     [PORT_CAPABILITY.STREAM_PROMPT]: true,
     [PORT_CAPABILITY.RESTART]: true,
     [PORT_CAPABILITY.OPEN_CLOSE]: true,
+    [PORT_CAPABILITY.CANCEL]: typeof inner.cancel === "function",
   };
 
   const wrapped = new (class WrappedPort
@@ -78,6 +79,10 @@ export function wrapAgentPortWithStream(
     get setSessionModel() {
       return inner.setSessionModel;
     }
+    get cancel() {
+      const innerCancel = inner.cancel;
+      return innerCancel ? innerCancel.bind(inner) : undefined;
+    }
 
     async *streamPrompt(
       params: PromptRequest,
@@ -89,26 +94,53 @@ export function wrapAgentPortWithStream(
       inner.on(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
 
       const promptPromise = inner.prompt(params);
-      promptPromise.finally(() => {
-        inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
-        queue.close();
-      });
+      let promptError: Error | undefined;
+      let promptSettled = false;
+      // Route rejection into the queue (delivered in order, after queued
+      // updates) and swallow it on this chain: a bare promptPromise.finally()
+      // chain re-raises the rejection with no handler attached, which is an
+      // unhandledRejection — a process crash under Node defaults — even
+      // though the generator awaits promptPromise later.
+      const settled = promptPromise.then(
+        () => {
+          promptSettled = true;
+          queue.close();
+        },
+        (err: unknown) => {
+          promptSettled = true;
+          promptError = err instanceof Error ? err : new Error(String(err));
+          queue.pushError(promptError);
+        }
+      );
 
+      let finished = false;
       try {
         for await (const update of queue.consume()) {
           const envelopes = sessionUpdateToEnvelopes(update, mode, { modelId });
           for (const env of envelopes) yield env;
         }
-        await promptPromise;
+        await settled;
+        if (promptError) throw promptError;
+        finished = true;
         if (mode === ENVELOPE_MODE.OPENAI || mode === ENVELOPE_MODE.BOTH) {
           yield createOpenAIFinishEnvelope({
             modelId,
             finishReason: OPENAI_COMPAT.FINISH_REASON_STOP,
           });
         }
-      } catch (err) {
-        queue.pushError(err instanceof Error ? err : new Error(String(err)));
-        throw err;
+      } finally {
+        // Runs on normal completion, on error, AND on early consumer break —
+        // the frozen version only detached the listener when the prompt
+        // settled, and never stopped the turn for a consumer that walked away.
+        inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
+        queue.close();
+        if (!finished && !promptSettled && inner.cancel) {
+          void inner
+            .cancel({ sessionId: params.sessionId })
+            .catch(() => {
+              /* best-effort turn cancellation */
+            });
+        }
       }
     }
 

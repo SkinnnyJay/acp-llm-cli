@@ -21,6 +21,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import type {
   AuthenticateRequest,
+  CancelNotification,
   AuthenticateResponse,
   InitializeRequest,
   InitializeResponse,
@@ -62,11 +63,28 @@ export interface IACPConnectionLike {
   ): void;
 }
 
+/**
+ * Decision policy used when no permissionHandler is configured.
+ * - "fail-closed" (default): select a reject-kind option if one exists,
+ *   otherwise answer "cancelled". Never auto-approves. Agents commonly order
+ *   allow_always FIRST in the options array, so selecting options[0] silently
+ *   grants standing approval for tool execution.
+ * - "first-option": legacy behavior — select options[0] whatever it is.
+ */
+export type PermissionMode = "fail-closed" | "first-option";
+
 export interface ACPClientOptions {
   clientCapabilities?: ClientCapabilities;
   permissionHandler?: IPermissionHandler;
   toolHost?: IToolHost;
+  /** Policy when no permissionHandler is set. Default: "fail-closed". */
+  permissionMode?: PermissionMode;
 }
+
+const PERMISSION_OPTION_KIND = {
+  REJECT_ONCE: "reject_once",
+  REJECT_ALWAYS: "reject_always",
+} as const;
 
 export function createAcpAgentPort(
   connection: IACPConnectionLike,
@@ -82,6 +100,10 @@ class ACPClient
   private clientConnection: ClientSideConnection | undefined;
   private readonly toolHost: IToolHost | undefined;
   private readonly clientCapabilities: ClientCapabilities;
+  private readonly pendingPermissions = new Map<
+    symbol,
+    { sessionId: string; cancel: () => void }
+  >();
 
   constructor(
     private readonly connection: IACPConnectionLike,
@@ -146,16 +168,66 @@ class ACPClient
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
     this.emit(AGENT_PORT_EVENT.PERMISSION_REQUEST, params);
-    if (this.options.permissionHandler) {
-      return this.options.permissionHandler(params);
+    const decision: Promise<RequestPermissionResponse> = this.options.permissionHandler
+      ? Promise.resolve(this.options.permissionHandler(params))
+      : Promise.resolve(this.defaultPermissionDecision(params));
+
+    // Track in-flight requests so cancel(sessionId) can answer them with
+    // outcome "cancelled" — the spec REQUIRES cancelling clients to respond
+    // to pending session/request_permission with cancelled.
+    return new Promise<RequestPermissionResponse>((resolve, reject) => {
+      const key = Symbol("permission");
+      this.pendingPermissions.set(key, {
+        sessionId: params.sessionId,
+        cancel: () => {
+          this.pendingPermissions.delete(key);
+          resolve({ outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } });
+        },
+      });
+      decision.then(
+        (response) => {
+          if (!this.pendingPermissions.delete(key)) return;
+          resolve(response);
+        },
+        (error: unknown) => {
+          if (!this.pendingPermissions.delete(key)) return;
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      );
+    });
+  }
+
+  /** Fail-closed by default: never auto-approve when nobody is watching. */
+  private defaultPermissionDecision(
+    params: RequestPermissionRequest
+  ): RequestPermissionResponse {
+    const mode = this.options.permissionMode ?? "fail-closed";
+    const options = params.options ?? [];
+    if (mode === "first-option") {
+      const firstOption = options[0];
+      if (!firstOption) {
+        return { outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } };
+      }
+      return {
+        outcome: { outcome: PERMISSION_OUTCOME.SELECTED, optionId: firstOption.optionId },
+      };
     }
-    const firstOption = params.options?.[0];
-    if (!firstOption) {
-      return { outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } };
+    const rejectOption =
+      options.find((option) => option.kind === PERMISSION_OPTION_KIND.REJECT_ONCE) ??
+      options.find((option) => option.kind === PERMISSION_OPTION_KIND.REJECT_ALWAYS);
+    if (rejectOption) {
+      return {
+        outcome: { outcome: PERMISSION_OUTCOME.SELECTED, optionId: rejectOption.optionId },
+      };
     }
-    return {
-      outcome: { outcome: PERMISSION_OUTCOME.SELECTED, optionId: firstOption.optionId },
-    };
+    return { outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } };
+  }
+
+  async cancel(params: CancelNotification): Promise<void> {
+    for (const pending of [...this.pendingPermissions.values()]) {
+      if (pending.sessionId === params.sessionId) pending.cancel();
+    }
+    return this.requireConnection().cancel(params);
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {

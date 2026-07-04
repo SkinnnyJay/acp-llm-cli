@@ -39,7 +39,13 @@ describe("ACPClient permission handling", () => {
     expect(result).toEqual({ outcome: { outcome: "selected", optionId: "deny" } });
   });
 
-  it("emits permissionRequest then returns first option when no handler", async () => {
+  // The frozen default selected options[0] whatever it was. The options array
+  // is AGENT-controlled and real agents order allow_always first (see the ACP
+  // session-modes example) — an unconfigured harness silently granted standing
+  // approval for tool execution. Default is now fail-closed: prefer a
+  // reject-kind option, else cancelled. The frozen behavior is available
+  // explicitly via permissionMode: "first-option".
+  it("emits permissionRequest then fails closed (reject option) when no handler", async () => {
     const connection = createMockConnection();
     const port = createAcpAgentPort(connection);
 
@@ -47,6 +53,7 @@ describe("ACPClient permission handling", () => {
       sessionId: "s1",
       toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
       options: [
+        { optionId: "always", kind: "allow_always", name: "Always allow" },
         { optionId: "allow", kind: "allow_once", name: "Allow" },
         { optionId: "deny", kind: "reject_once", name: "Deny" },
       ],
@@ -59,7 +66,86 @@ describe("ACPClient permission handling", () => {
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual(request);
+    expect(result).toEqual({ outcome: { outcome: "selected", optionId: "deny" } });
+  });
+
+  it("fails closed to cancelled when only allow options are offered", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+
+    const result = await (port as PortWithClient).requestPermission!({
+      sessionId: "s1",
+      toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
+      options: [
+        { optionId: "always", kind: "allow_always", name: "Always allow" },
+        { optionId: "allow", kind: "allow_once", name: "Allow" },
+      ],
+    });
+
+    expect(result).toEqual({ outcome: { outcome: "cancelled" } });
+  });
+
+  it("prefers reject_once over reject_always when failing closed", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+
+    const result = await (port as PortWithClient).requestPermission!({
+      sessionId: "s1",
+      toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
+      options: [
+        { optionId: "never", kind: "reject_always", name: "Never" },
+        { optionId: "deny", kind: "reject_once", name: "Deny" },
+        { optionId: "allow", kind: "allow_once", name: "Allow" },
+      ],
+    });
+
+    expect(result).toEqual({ outcome: { outcome: "selected", optionId: "deny" } });
+  });
+
+  it('permissionMode: "first-option" restores the legacy behavior explicitly', async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection, { permissionMode: "first-option" });
+
+    const result = await (port as PortWithClient).requestPermission!({
+      sessionId: "s1",
+      toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
+      options: [
+        { optionId: "allow", kind: "allow_once", name: "Allow" },
+        { optionId: "deny", kind: "reject_once", name: "Deny" },
+      ],
+    });
+
     expect(result).toEqual({ outcome: { outcome: "selected", optionId: "allow" } });
+  });
+
+  it("cancel(sessionId) answers a pending permission request with cancelled", async () => {
+    const connection = createMockConnection();
+    // Handler that never resolves — models a UI waiting on the user.
+    let resolveHandler: ((r: unknown) => void) | undefined;
+    const handler = vi.fn().mockImplementation(
+      () => new Promise((resolve) => { resolveHandler = resolve; })
+    );
+    const port = createAcpAgentPort(connection, {
+      permissionHandler: handler as never,
+    });
+
+    const pending = (port as PortWithClient).requestPermission!({
+      sessionId: "s1",
+      toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
+      options: [{ optionId: "allow", kind: "allow_once", name: "Allow" }],
+    });
+
+    // cancel() must answer the pending request with cancelled per spec, even
+    // though the underlying connection is absent (throws) in this mock.
+    const cancelable = port as PortWithClient & {
+      cancel?(p: { sessionId: string }): Promise<void>;
+    };
+    await expect(cancelable.cancel!({ sessionId: "s1" })).rejects.toThrow();
+    await expect(pending).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+
+    // A late handler answer must not double-settle or override cancelled.
+    resolveHandler?.({ outcome: { outcome: "selected", optionId: "allow" } });
+    await expect(pending).resolves.toEqual({ outcome: { outcome: "cancelled" } });
   });
 
   it("returns cancelled when no handler and no options", async () => {
