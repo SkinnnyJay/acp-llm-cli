@@ -77,6 +77,16 @@ export function wrapAgentPortWithLifecycle(
     [PORT_CAPABILITY.SESSION_PERSISTENCE]: !!sessionPersistence,
   };
 
+  // Every ACP session notification carries the sessionId — persisting on each
+  // one issues a persistence write PER STREAMED CHUNK. Only persist when the
+  // active session actually changes.
+  let lastPersistedSessionId: string | undefined;
+  const persistIfChanged = async (sessionId: string): Promise<void> => {
+    if (!sessionPersistence || sessionId === lastPersistedSessionId) return;
+    lastPersistedSessionId = sessionId;
+    await persistActiveSession(sessionPersistence, providerId, workspace, sessionId);
+  };
+
   const wrapped = new (class LifecycleSupervisedPort
     extends EventEmitter<{
       state: (status: ConnectionStatus) => void;
@@ -105,8 +115,8 @@ export function wrapAgentPortWithLifecycle(
     async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
       const response = await inner.newSession(params);
       const sessionId = response.sessionId;
-      if (sessionPersistence && sessionId) {
-        await persistActiveSession(sessionPersistence, providerId, workspace, sessionId);
+      if (sessionId) {
+        await persistIfChanged(sessionId);
       }
       return response;
     }
@@ -129,8 +139,8 @@ export function wrapAgentPortWithLifecycle(
     }
     async sessionUpdate(params: SessionNotification): Promise<void> {
       const sessionId = extractSessionIdFromNotification(params);
-      if (sessionPersistence && sessionId) {
-        await persistActiveSession(sessionPersistence, providerId, workspace, sessionId);
+      if (sessionId) {
+        await persistIfChanged(sessionId);
       }
       return inner.sessionUpdate(params);
     }
@@ -139,6 +149,10 @@ export function wrapAgentPortWithLifecycle(
     }
     get setSessionModel() {
       return inner.setSessionModel;
+    }
+    get cancel() {
+      const innerCancel = inner.cancel;
+      return innerCancel ? innerCancel.bind(inner) : undefined;
     }
 
     async restart(): Promise<void> {
@@ -157,6 +171,7 @@ export function wrapAgentPortWithLifecycle(
         };
         await inner.newSession(resumeParams as unknown as NewSessionRequest);
         if (sessionPersistence) {
+          lastPersistedSessionId = sessionToResume.sessionId;
           await sessionPersistence.saveSession({
             ...sessionToResume,
             updatedAt: Date.now(),

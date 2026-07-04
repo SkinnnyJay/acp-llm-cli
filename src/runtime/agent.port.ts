@@ -1,5 +1,6 @@
 import type {
   AuthenticateRequest,
+  CancelNotification,
   AuthenticateResponse,
   InitializeRequest,
   InitializeResponse,
@@ -32,6 +33,7 @@ export interface AgentPortCapabilities {
   readonly restart?: boolean;
   readonly openClose?: boolean;
   readonly sessionPersistence?: boolean;
+  readonly cancel?: boolean;
 }
 
 export interface StreamPromptOptions {
@@ -56,6 +58,10 @@ export interface IAgentPort extends EventEmitter<AgentPortEvents> {
     params: PromptRequest,
     options?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope>;
+  /** Optional: cancel an ongoing prompt turn (ACP session/cancel). Pending
+   * permission requests for the session are answered with outcome "cancelled",
+   * as the spec requires of cancelling clients. */
+  cancel?(params: CancelNotification): Promise<void>;
   /** Optional: restart connection (disconnect + connect + reinitialize). */
   restart?(): Promise<void>;
   /** Optional: alias for connect(). */

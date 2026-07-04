@@ -17,6 +17,7 @@ export * from "./provider.factory";
 export * from "./provider.client";
 export * from "./provider.client.factory";
 export * from "./registry";
+export * from "./restart.with.backoff";
 export * from "./session.persistence.memory";
 export * from "./stdio.connection";
 export * from "./stdio.connection.factory";

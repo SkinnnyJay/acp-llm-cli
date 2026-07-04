@@ -77,6 +77,21 @@ const metrics = factory.getMetrics?.(PROVIDER_IDS.CLAUDE_CLI_ID); // invocations
 
 Custom adapter: `registry.register(myAdapter); createHarness(registry, myId, config)` with id from a constant.
 
+## Permissions and cancellation
+
+When no `permissionHandler` is configured, the port **fails closed**: it selects a
+`reject_once` (or `reject_always`) option when the agent offers one, and answers
+`cancelled` otherwise. It never auto-approves — the options array is agent-controlled
+and agents commonly order `allow_always` first, so blindly selecting `options[0]`
+grants standing approval for tool execution. Pass `permissionMode: "first-option"`
+to `createAcpAgentPort` options to restore the previous select-the-first-option
+behavior explicitly.
+
+Ports expose `cancel({ sessionId })` (ACP `session/cancel`). Cancelling also answers
+any pending `session/request_permission` for that session with `cancelled`, as the
+spec requires of cancelling clients. Breaking out of a `streamPrompt` loop cancels
+the in-flight turn automatically.
+
 ## Simpill integration
 
 This package uses [**@simpill** scoped packages](https://www.npmjs.com/search?q=scope%3Asimpill) on npm for shared patterns:

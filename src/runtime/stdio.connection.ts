@@ -81,28 +81,58 @@ export class StdioConnection
   }
 
   async disconnect(): Promise<void> {
-    if (!this.child) {
+    const child = this.child;
+    if (!child) {
       this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       return;
     }
     this.isDisconnecting = true;
+    let forceKilled = false;
     await new Promise<void>((resolve) => {
-      this.child?.once(NODE_EVENT.CLOSE, () => resolve());
-      this.child?.kill(SIGNAL.TERM);
-      setTimeout(() => {
-        if (this.child?.kill) this.child.kill(SIGNAL.KILL);
+      let settled = false;
+      const onClose = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(forceKillTimer);
         resolve();
-      }, TIMEOUT.DISCONNECT_FORCE_MS).unref();
+      };
+      // Capture THIS child and clear the timer on close. The frozen version
+      // read `this.child` inside an uncleared timer: after a fast
+      // disconnect→connect (exactly what restart does), the stale timer fired
+      // DISCONNECT_FORCE_MS later and SIGKILLed the freshly spawned
+      // replacement process.
+      const forceKillTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        forceKilled = true;
+        child.removeListener(NODE_EVENT.CLOSE, onClose);
+        child.kill(SIGNAL.KILL);
+        resolve();
+      }, TIMEOUT.DISCONNECT_FORCE_MS);
+      forceKillTimer.unref();
+      child.once(NODE_EVENT.CLOSE, onClose);
+      child.kill(SIGNAL.TERM);
     });
-    this.child = undefined;
-    this.stream = undefined;
-    this.isDisconnecting = false;
+    if (this.child === child) {
+      this.child = undefined;
+      this.stream = undefined;
+    }
+    // On the force-kill path the close event has not fired yet; leave
+    // isDisconnecting set so the late SIGKILL close is treated as an
+    // intentional shutdown instead of an error.
+    if (!forceKilled) this.isDisconnecting = false;
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
 
   private bindStderrCapture(child: ChildProcessWithoutNullStreams): void {
     child.stderr.setEncoding(ENCODING.UTF8);
     child.stderr.on(NODE_EVENT.DATA, (chunk: string) => this.captureStderr(chunk));
+    // Writing to a dead child's stdin raises 'error' (EPIPE); with no listener
+    // Node throws it as an uncaught exception. Capture it as a diagnostic —
+    // the close handler reports the real exit error.
+    child.stdin.on(NODE_EVENT.ERROR, (error: Error) => {
+      this.captureStderr(`stdin: ${error.message}`);
+    });
   }
 
   private createNdjsonStream(child: ChildProcessWithoutNullStreams): Stream {
@@ -126,14 +156,23 @@ export class StdioConnection
 
   private bindChildProcessEvents(child: ChildProcessWithoutNullStreams): void {
     child.on(NODE_EVENT.ERROR, (error: Error) => {
+      // Stale-closure guard: a late error from a replaced child must not
+      // flip the state of a newer connection.
+      if (this.child !== child) return;
       this.emit(CONNECTION_EVENT.ERROR, error);
       this.setStatus(CONNECTION_STATUS.ERROR);
     });
 
     child.on(NODE_EVENT.CLOSE, (code: number | null, signal: NodeJS.Signals | null) => {
+      const isCurrent = this.child === child;
       const wasDisconnecting = this.isDisconnecting;
-      this.isDisconnecting = false;
+      if (isCurrent) this.isDisconnecting = false;
       this.emit(CONNECTION_EVENT.EXIT, { code, signal });
+      if (!isCurrent) {
+        // A replaced/force-killed child closing late must not wipe the state
+        // or status of the connection's CURRENT child.
+        return;
+      }
       this.child = undefined;
       this.stream = undefined;
       const hasError = !wasDisconnecting && ((code !== null && code !== 0) || signal !== null);
