@@ -6,5 +6,4 @@ export const PERMISSION_OUTCOME = {
   SELECTED: "selected",
 } as const;
 
-export type PermissionOutcome =
-  (typeof PERMISSION_OUTCOME)[keyof typeof PERMISSION_OUTCOME];
+export type PermissionOutcome = (typeof PERMISSION_OUTCOME)[keyof typeof PERMISSION_OUTCOME];

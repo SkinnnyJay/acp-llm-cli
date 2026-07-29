@@ -75,10 +75,7 @@ export function createAcpAgentPort(
   return new ACPClient(connection, options);
 }
 
-class ACPClient
-  extends EventEmitter<AgentPortEvents>
-  implements IAgentPort, Client
-{
+class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Client {
   private clientConnection: ClientSideConnection | undefined;
   private readonly toolHost: IToolHost | undefined;
   private readonly clientCapabilities: ClientCapabilities;
@@ -93,9 +90,7 @@ class ACPClient
     this.connection.on(CONNECTION_EVENT.STATE, (status) =>
       this.emit(AGENT_PORT_EVENT.STATE, status)
     );
-    this.connection.on(CONNECTION_EVENT.ERROR, (error) =>
-      this.emit(AGENT_PORT_EVENT.ERROR, error)
-    );
+    this.connection.on(CONNECTION_EVENT.ERROR, (error) => this.emit(AGENT_PORT_EVENT.ERROR, error));
   }
 
   get connectionStatus(): ConnectionStatus {

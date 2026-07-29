@@ -1,9 +1,4 @@
-/** Cursor CLI mode values. Session modeId from app is mapped to these. */
-export const CURSOR_MODE = {
-  AGENT: "agent",
-  PLAN: "plan",
-  ASK: "ask",
-} as const;
+import { CURSOR_MODE } from "./constants";
 
 export type CursorCliMode = (typeof CURSOR_MODE)[keyof typeof CURSOR_MODE];
 

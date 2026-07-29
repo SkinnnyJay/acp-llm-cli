@@ -26,11 +26,7 @@ import { STOP_REASON } from "../../domain/stop.reason";
 import { TIMEOUT } from "../../domain/timeouts";
 import type { AgentPortCapabilities, AgentPortEvents, IAgentPort } from "../../runtime/agent.port";
 import { getEnvString } from "../../runtime/env.reader";
-import {
-  CURSOR_CLI_ARG,
-  CURSOR_HEALTH_CHECK_PROMPT,
-  CURSOR_UUID_PATTERN,
-} from "./constants";
+import { CURSOR_CLI_ARG, CURSOR_HEALTH_CHECK_PROMPT, CURSOR_UUID_PATTERN } from "./constants";
 import { resolveCursorMode } from "./cursor.mode.utils";
 import { parseCursorNdjsonResult } from "./cursor.ndjson.utils";
 import { runCursorSpawnedCommand } from "./cursor.spawn.utils";
@@ -48,10 +44,7 @@ const CURSOR_CAPABILITIES: AgentPortCapabilities = {
  * IAgentPort for Cursor CLI: spawns process per prompt, parses NDJSON result.
  * Supports setSessionMode/setSessionModel, runCommand timeout, and graceful disconnect.
  */
-export class CursorAgentPort
-  extends EventEmitter<AgentPortEvents>
-  implements IAgentPort
-{
+export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities = CURSOR_CAPABILITIES;
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   private sessionId: string | undefined;
@@ -104,7 +97,12 @@ export class CursorAgentPort
       CURSOR_HEALTH_CHECK_PROMPT,
     ];
     try {
-      const result = await runCursorSpawnedCommand(command, args, this.config, TIMEOUT.CURSOR_PROMPT_MS);
+      const result = await runCursorSpawnedCommand(
+        command,
+        args,
+        this.config,
+        TIMEOUT.CURSOR_PROMPT_MS
+      );
       if (result.exitCode === 0) {
         this.status = CONNECTION_STATUS.CONNECTED;
         this.emit(AGENT_PORT_EVENT.STATE, this.status);
@@ -186,13 +184,13 @@ export class CursorAgentPort
     try {
       const textBlock = params.prompt?.find((contentBlock) => contentBlock.type === "text");
       const text =
-        textBlock && "text" in textBlock && typeof textBlock.text === "string" ? textBlock.text : "";
+        textBlock && "text" in textBlock && typeof textBlock.text === "string"
+          ? textBlock.text
+          : "";
       const command = this.resolveCliCommand();
       const baseArgs = this.resolveBaseArgs();
-      const mode =
-        this.sessionModeById.get(params.sessionId) ?? this.config.mode ?? undefined;
-      const model =
-        this.sessionModelById.get(params.sessionId) ?? this.config.model ?? undefined;
+      const mode = this.sessionModeById.get(params.sessionId) ?? this.config.mode ?? undefined;
+      const model = this.sessionModelById.get(params.sessionId) ?? this.config.model ?? undefined;
       const args = [
         CURSOR_CLI_ARG.PRINT,
         CURSOR_CLI_ARG.OUTPUT_FORMAT,
@@ -204,21 +202,20 @@ export class CursorAgentPort
         ...baseArgs,
         text,
       ];
-      const result = await runCursorSpawnedCommand(command, args, this.config, TIMEOUT.CURSOR_PROMPT_MS);
+      const result = await runCursorSpawnedCommand(
+        command,
+        args,
+        this.config,
+        TIMEOUT.CURSOR_PROMPT_MS
+      );
       const parsed = parseCursorNdjsonResult(result.stdout);
-      if (parsed?.sessionId) this.sessionId = parsed.sessionId;
+      if (parsed === null) {
+        throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
+      }
+      if (parsed.sessionId) this.sessionId = parsed.sessionId;
       return {
         stopReason: STOP_REASON.END_TURN,
-        ...(parsed?.result
-          ? {
-              content: [
-                {
-                  type: "text" as const,
-                  text: parsed.result,
-                },
-              ],
-            }
-          : {}),
+        ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
       };
     } finally {
       this.activePromptCount--;

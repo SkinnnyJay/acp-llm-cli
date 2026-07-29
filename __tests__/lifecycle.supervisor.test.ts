@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "eventemitter3";
+import { describe, expect, it, vi } from "vitest";
+import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
-import { CONNECTION_STATUS } from "../src/domain/connection.status";
-import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 
 function createMockPort(): IAgentPort {
   const emitter = new EventEmitter();

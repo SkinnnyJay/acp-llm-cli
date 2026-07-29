@@ -1,10 +1,10 @@
 import type { SessionNotification } from "@agentclientprotocol/sdk";
 import { ENVELOPE_KIND } from "../domain/envelope.kind";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
+import type { EnvelopeMode } from "../domain/envelope.mode";
 import { LIMIT } from "../domain/limits";
 import { OPENAI_COMPAT } from "../domain/openai.compat";
 import { SESSION_UPDATE_TYPE } from "../domain/session.update.types";
-import type { EnvelopeMode } from "../domain/envelope.mode";
 import type {
   NativeEnvelope,
   OpenAIStyleChunkEnvelope,
@@ -18,9 +18,7 @@ type AgentMessageChunkNotification = SessionNotification & {
   >;
 };
 
-function isAgentMessageChunk(
-  update: SessionNotification
-): update is AgentMessageChunkNotification {
+function isAgentMessageChunk(update: SessionNotification): update is AgentMessageChunkNotification {
   return update.update.sessionUpdate === SESSION_UPDATE_TYPE.AGENT_MESSAGE_CHUNK;
 }
 
@@ -56,10 +54,7 @@ export function sessionUpdateToEnvelopes(
   } = {}
 ): StreamEnvelope[] {
   const envelopes: StreamEnvelope[] = [];
-  const {
-    modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID,
-    chunkId = () => crypto.randomUUID(),
-  } = options;
+  const { modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID, chunkId = () => crypto.randomUUID() } = options;
 
   if (envelopeMode === ENVELOPE_MODE.NATIVE || envelopeMode === ENVELOPE_MODE.BOTH) {
     const native: NativeEnvelope = { kind: ENVELOPE_KIND.NATIVE, update };

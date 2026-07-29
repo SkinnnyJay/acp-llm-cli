@@ -1,4 +1,3 @@
-import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type { GenericFlagMap } from "../../cli/generic.options";
 import { GENERIC_OPTION_KEY } from "../../cli/generic.options";
 import type { ENV_KEY } from "../../domain/env.keys";
@@ -45,8 +44,6 @@ export const CURSOR_NDJSON_SUBTYPE = {
 export const CURSOR_UUID_PATTERN = /[0-9a-f-]{36}/;
 
 export const CURSOR_HEALTH_CHECK_PROMPT = "echo ok";
-
-export const CURSOR_PROTOCOL_VERSION = PROTOCOL_VERSION;
 
 /** Map generic option keys to Cursor CLI flag names. */
 export const CURSOR_GENERIC_FLAG_MAP: GenericFlagMap = {

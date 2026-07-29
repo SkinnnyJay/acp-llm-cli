@@ -8,7 +8,7 @@ describe("createStreamPromptQueue", () => {
     const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
     const c = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
 
-    const out: unknown[] = [];
+    const _out: unknown[] = [];
     q.push(a);
     q.push(b);
     q.push(c);

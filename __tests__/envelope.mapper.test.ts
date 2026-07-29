@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
+import { isNativeEnvelope, isOpenAIEnvelope } from "../src/domain/stream.envelopes";
 import {
   createOpenAIFinishEnvelope,
   sessionUpdateToEnvelopes,
 } from "../src/runtime/envelope.mapper";
-import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
-import { isNativeEnvelope, isOpenAIEnvelope } from "../src/domain/stream.envelopes";
 
 describe("sessionUpdateToEnvelopes", () => {
   it("emits native envelope when mode is NATIVE", () => {

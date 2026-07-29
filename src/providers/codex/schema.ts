@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { createProviderConfigSchema } from "../../cli/provider.config.schema";
 import { ModelIdSchema as OpenAIModelIdSchema } from "../../domain/models/openai.models";
 

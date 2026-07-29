@@ -16,10 +16,6 @@
     "./runtime": {
       "import": "./dist/runtime/index.js",
       "types": "./dist/runtime/index.d.ts"
-    },
-    "./core": {
-      "import": "./dist/runtime/index.js",
-      "types": "./dist/runtime/index.d.ts"
     }
   },
   "engines": {
@@ -49,11 +45,15 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check src __tests__",
+    "format": "biome format src __tests__",
+    "check:fix": "biome check --write src __tests__",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run build && npm test",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm test",
     "prepublishOnly": "npm run verify",
-    "update-models": "bun run scripts/update-models.ts"
+    "update-models": "tsx scripts/update-models.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
@@ -62,15 +62,22 @@
     "@simpill/patterns.utils": "^1.0.0",
     "@simpill/errors.utils": "^1.0.0",
     "@simpill/logger.utils": "^1.0.0",
-    "@simpill/protocols.utils": "^1.0.0",
+    "@simpill/protocols.utils": "^1.0.0"
+  },
+  "peerDependencies": {
     "eventemitter3": "^5.0.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "eventemitter3": "^5.0.1",
     "tsup": "^8.3.5",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.2",
+    "zod": "^3.23.8"
   },
   "files": [
     "dist"

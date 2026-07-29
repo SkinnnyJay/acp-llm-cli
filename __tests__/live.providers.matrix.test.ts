@@ -12,8 +12,8 @@ import { DEFAULT_COMMANDS } from "../src/domain/default.commands.js";
 import { PROVIDER_IDS } from "../src/domain/provider.ids.js";
 import { getDefaultFactory } from "../src/index.js";
 
-const LIVE = process.env["ACP_LLM_CLI_LIVE"] === "1";
-const FILTER = process.env["ACP_LLM_CLI_PROVIDER"];
+const LIVE = process.env.ACP_LLM_CLI_LIVE === "1";
+const FILTER = process.env.ACP_LLM_CLI_PROVIDER;
 
 type Case = {
   id: string;
@@ -68,6 +68,6 @@ describe.skipIf(!LIVE)("live provider matrix", () => {
         expect(message.length).toBeGreaterThan(0);
       }
     },
-    60_000,
+    60_000
   );
 });

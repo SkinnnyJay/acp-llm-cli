@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { EnvelopeMode } from "../domain/envelope.mode";
-import { PROVIDER_IDS } from "../domain/provider.ids";
+import { ERROR_MESSAGE } from "../domain/error.messages";
+import type { ISessionPersistence } from "../domain/session.persistence";
 import { wrapAgentPortWithStream } from "../runtime/acp.agent.port.stream";
 import { createAcpAgentPort } from "../runtime/acp.client";
 import type { ACPClientOptions } from "../runtime/acp.client";
@@ -12,7 +13,6 @@ import type { IConnection } from "../runtime/connection.interface";
 import { wrapAgentPortWithLifecycle } from "../runtime/lifecycle.supervisor";
 import type { LifecycleSupervisorOptions } from "../runtime/lifecycle.supervisor";
 import { StdioConnectionFactory } from "../runtime/stdio.connection.factory";
-import type { ISessionPersistence } from "../domain/session.persistence";
 
 /** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */
 export interface AcpSharedRuntimeOptions extends ACPClientOptions {
@@ -22,7 +22,10 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
   modelId?: string;
   /** Optional session persistence. When provided, enables lifecycle supervisor with save/restore on restart. */
   sessionPersistence?: ISessionPersistence;
-  /** Provider id for persistence key (e.g. PROVIDER_IDS.CLAUDE_CLI_ID). Default: claude. */
+  /**
+   * Provider id for persistence key (e.g. PROVIDER_IDS.CLAUDE_CLI_ID).
+   * Required when sessionPersistence is provided to prevent sessions being stored under the wrong key.
+   */
   providerId?: string;
   /** Workspace for persistence key. */
   workspace?: string;
@@ -52,15 +55,20 @@ export function createAcpCliHarnessRuntime(
     envelopeMode,
     modelId,
     sessionPersistence,
-    providerId = PROVIDER_IDS.CLAUDE_CLI_ID,
+    providerId,
     workspace,
     restartOptions,
     resumeOnRestart,
     ...clientOptions
   } = options ?? {};
+
+  if (sessionPersistence && !providerId) {
+    throw new Error(ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED);
+  }
+
   const port = createAcpAgentPort(connection, clientOptions);
   let wrapped = wrapAgentPortWithStream(port, { envelopeMode, modelId });
-  if (sessionPersistence) {
+  if (sessionPersistence && providerId) {
     wrapped = wrapAgentPortWithLifecycle(wrapped, {
       sessionPersistence,
       providerId,

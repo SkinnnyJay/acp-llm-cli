@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import { createHarness, getDefaultRegistry } from "../src/bootstrap";
+import { PROVIDER_IDS } from "../src/domain/provider.ids";
 
 describe("bootstrap", () => {
   it("getDefaultRegistry returns registry with adapters", () => {

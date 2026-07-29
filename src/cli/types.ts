@@ -1,5 +1,5 @@
 import type { BaseCliConfig } from "../runtime/config";
-import type { GenericFlagMap, GenericLlmCliOptions } from "./generic.options";
+import type { GenericFlagMap } from "./generic.options";
 
 /**
  * Options passed to getHelp. Same shape as spawn (command, args, cwd, env).

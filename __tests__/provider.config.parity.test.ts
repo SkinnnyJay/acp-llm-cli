@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { claudeConfigSchema } from "../src/providers/claude/schema";
-import { geminiConfigSchema } from "../src/providers/gemini/schema";
 import { codexConfigSchema } from "../src/providers/codex/schema";
 import { cursorConfigSchema } from "../src/providers/cursor/schema";
+import { geminiConfigSchema } from "../src/providers/gemini/schema";
 
 /**
  * App HarnessConfig-style shapes: command, args, env, cwd plus provider-specific options.

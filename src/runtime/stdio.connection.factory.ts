@@ -1,7 +1,7 @@
 import type { IConnectionFactory } from "./connection.factory.interface";
 import type { IConnection } from "./connection.interface";
+import { type SpawnFunction, StdioConnection } from "./stdio.connection";
 import type { SpawnOptions } from "./types";
-import { StdioConnection, type SpawnFunction } from "./stdio.connection";
 
 export class StdioConnectionFactory implements IConnectionFactory {
   constructor(private readonly spawnFn?: SpawnFunction) {}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAcpAgentPort } from "../src/runtime/acp.client";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { createAcpAgentPort } from "../src/runtime/acp.client";
 
 const createMockConnection = () => ({
   connect: vi.fn().mockResolvedValue(undefined),
@@ -21,7 +21,9 @@ type PortWithClient = Awaited<ReturnType<typeof createAcpAgentPort>> & {
 describe("ACPClient permission handling", () => {
   it("uses permissionHandler when provided", async () => {
     const connection = createMockConnection();
-    const handler = vi.fn().mockResolvedValue({ outcome: { outcome: "selected" as const, optionId: "deny" } });
+    const handler = vi
+      .fn()
+      .mockResolvedValue({ outcome: { outcome: "selected" as const, optionId: "deny" } });
     const port = createAcpAgentPort(connection, { permissionHandler: handler });
 
     const request = {
@@ -33,7 +35,7 @@ describe("ACPClient permission handling", () => {
       ],
     };
 
-    const result = await (port as PortWithClient).requestPermission!(request);
+    const result = await (port as PortWithClient).requestPermission?.(request);
 
     expect(handler).toHaveBeenCalledWith(request);
     expect(result).toEqual({ outcome: { outcome: "selected", optionId: "deny" } });
@@ -55,7 +57,7 @@ describe("ACPClient permission handling", () => {
     const emitted: unknown[] = [];
     port.on("permissionRequest", (r) => emitted.push(r));
 
-    const result = await (port as PortWithClient).requestPermission!(request);
+    const result = await (port as PortWithClient).requestPermission?.(request);
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual(request);
@@ -66,7 +68,7 @@ describe("ACPClient permission handling", () => {
     const connection = createMockConnection();
     const port = createAcpAgentPort(connection);
 
-    const result = await (port as PortWithClient).requestPermission!({
+    const result = await (port as PortWithClient).requestPermission?.({
       sessionId: "s1",
       toolCall: { toolCallId: "tc-1", title: "run", kind: "execute", rawInput: {} },
       options: [],
@@ -82,19 +84,17 @@ describe("ACPClient tool host handling", () => {
     const port = createAcpAgentPort(connection);
 
     await expect(
-      (port as PortWithClient).readTextFile!({ path: "/tmp/foo", offset: 0, length: 100 })
-    ).rejects.toThrow(
-      ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED
-    );
+      (port as PortWithClient).readTextFile?.({ path: "/tmp/foo", offset: 0, length: 100 })
+    ).rejects.toThrow(ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED);
   });
 
   it("writeTextFile throws when toolHost not configured", async () => {
     const connection = createMockConnection();
     const port = createAcpAgentPort(connection);
 
-    await expect((port as PortWithClient).writeTextFile!({ path: "/tmp/foo", content: "x" })).rejects.toThrow(
-      ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED
-    );
+    await expect(
+      (port as PortWithClient).writeTextFile?.({ path: "/tmp/foo", content: "x" })
+    ).rejects.toThrow(ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED);
   });
 
   it("createTerminal throws when toolHost not configured", async () => {
@@ -102,7 +102,7 @@ describe("ACPClient tool host handling", () => {
     const port = createAcpAgentPort(connection);
 
     await expect(
-      (port as PortWithClient).createTerminal!({ command: "bash", args: [], env: {} })
+      (port as PortWithClient).createTerminal?.({ command: "bash", args: [], env: {} })
     ).rejects.toThrow(ERROR_MESSAGE.TERMINAL_TOOLS_NOT_CONFIGURED);
   });
 
@@ -122,7 +122,7 @@ describe("ACPClient tool host handling", () => {
     });
 
     const params = { path: "/tmp/foo", offset: 0, length: 100 };
-    const result = await (port as PortWithClient).readTextFile!(params);
+    const result = await (port as PortWithClient).readTextFile?.(params);
 
     expect(readTextFile).toHaveBeenCalledWith(params);
     expect(result).toEqual({ content: "file content" });

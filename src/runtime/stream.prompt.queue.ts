@@ -43,8 +43,7 @@ export function createStreamPromptQueue(): {
         if (done) {
           if (done.reason === STREAM_PROMPT_QUEUE_REASON.ERROR) {
             reject(done.error);
-          }
-          else resolve({ done: true, value: undefined });
+          } else resolve({ done: true, value: undefined });
         } else if (queue.length > 0) {
           const value = queue.shift();
           if (value !== undefined) {

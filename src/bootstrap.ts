@@ -1,15 +1,14 @@
-import { PROVIDER_IDS } from "./domain/provider.ids";
 import { VALIDATION_ERROR } from "./domain/validation.errors";
+import { claudeAdapter } from "./providers/claude/adapter";
+import { codexAdapter } from "./providers/codex/adapter";
+import { cursorAdapter } from "./providers/cursor/adapter";
+import { geminiAdapter } from "./providers/gemini/adapter";
 import type { IAgentPort } from "./runtime/agent.port";
 import type { IProviderClientFactory, IProviderFactory } from "./runtime/interfaces/provider.types";
 import { ProviderClientFactory } from "./runtime/provider.client.factory";
 import { ProviderFactory } from "./runtime/provider.factory";
 import type { HarnessRegistry } from "./runtime/registry";
 import { HarnessRegistry as RegistryClass } from "./runtime/registry";
-import { claudeAdapter } from "./providers/claude/adapter";
-import { codexAdapter } from "./providers/codex/adapter";
-import { cursorAdapter } from "./providers/cursor/adapter";
-import { geminiAdapter } from "./providers/gemini/adapter";
 
 let defaultRegistry: HarnessRegistry | null = null;
 let defaultFactory: IProviderFactory | null = null;

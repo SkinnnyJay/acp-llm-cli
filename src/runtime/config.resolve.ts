@@ -1,6 +1,6 @@
 import { ENV_KEY } from "../domain/env.keys";
-import { getEnvString } from "./env.reader";
 import type { BaseCliConfig } from "./config";
+import { getEnvString } from "./env.reader";
 
 /**
  * Resolve config: defaults → env (ENV_KEY only) → overrides. No raw env strings.
@@ -19,7 +19,7 @@ export function resolveBaseConfig(
     overrides?.command ??
     getEnvString(ENV_KEY[envOverrides.commandKey], defaults.command, envOverride);
   const args =
-    overrides?.args?.length !== undefined && overrides.args.length > 0
+    overrides?.args && overrides.args.length > 0
       ? overrides.args
       : (() => {
           const raw = getEnvString(ENV_KEY[envOverrides.argsKey], "", envOverride);

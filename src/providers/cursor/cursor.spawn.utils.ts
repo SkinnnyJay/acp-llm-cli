@@ -1,5 +1,7 @@
-import { spawn } from "node:child_process";
+import { spawn as nodeSpawn } from "node:child_process";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { ENCODING } from "../../domain/encoding";
+import { ERROR_MESSAGE } from "../../domain/error.messages";
 import { NODE_EVENT } from "../../domain/node.events";
 import { TIMEOUT } from "../../domain/timeouts";
 import { mergeEnv } from "../../runtime/env.reader";
@@ -11,22 +13,33 @@ export interface CursorCommandResult {
   exitCode: number | null;
 }
 
+export type CursorSpawnFn = (
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv }
+) => ChildProcessWithoutNullStreams;
+
 /**
  * Spawn Cursor CLI with merged env, collect stdout/stderr, enforce timeout with SIGTERM then SIGKILL.
+ * Rejects on timeout so callers receive a typed error instead of a partial success result.
+ * Tracks and clears the force-kill timer on normal exit to prevent background zombie timers.
+ * The spawnFn parameter is injectable for testing.
  */
 export function runCursorSpawnedCommand(
   command: string,
   args: string[],
   config: CursorConfig,
-  timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS
+  timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS,
+  spawnFn: CursorSpawnFn = nodeSpawn
 ): Promise<CursorCommandResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawnFn(command, args, {
       cwd: config.cwd,
       env: mergeEnv(config.env),
     });
     let stdout = "";
     let stderr = "";
+
     child.stdout?.setEncoding(ENCODING.UTF8);
     child.stdout?.on(NODE_EVENT.DATA, (chunk: string) => {
       stdout += chunk;
@@ -35,27 +48,30 @@ export function runCursorSpawnedCommand(
     child.stderr?.on(NODE_EVENT.DATA, (chunk: string) => {
       stderr += chunk;
     });
-    const timeout = setTimeout(() => {
+
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutTimer = setTimeout(() => {
       child.kill("SIGTERM");
-      setTimeout(() => {
+      forceKillTimer = setTimeout(() => {
         try {
           child.kill("SIGKILL");
         } catch {
-          // ignore
+          // process may have already exited
         }
       }, TIMEOUT.CURSOR_FORCE_KILL_MS);
-      resolve({
-        stdout,
-        stderr: stderr + "\n[timed out after " + timeoutMs + "ms]",
-        exitCode: null,
-      });
+      reject(new Error(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(timeoutMs)));
     }, timeoutMs);
+
     child.on(NODE_EVENT.ERROR, (err) => {
-      clearTimeout(timeout);
+      clearTimeout(timeoutTimer);
+      clearTimeout(forceKillTimer);
       reject(err);
     });
+
     child.on(NODE_EVENT.CLOSE, (code) => {
-      clearTimeout(timeout);
+      clearTimeout(timeoutTimer);
+      clearTimeout(forceKillTimer);
       resolve({ stdout, stderr, exitCode: code });
     });
   });

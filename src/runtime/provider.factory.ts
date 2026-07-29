@@ -37,25 +37,30 @@ export class ProviderFactory implements IProviderFactory {
     }
 
     const metrics = this.getOrCreateMetrics(id);
+
+    // Validate config before entering the runtime try-catch so parse errors
+    // log exactly once (not once here and again in the catch block below).
+    if (config === null || config === undefined) {
+      const msg = VALIDATION_ERROR.CONFIG_REQUIRED;
+      this.logger.warn(msg, { providerId: id });
+      metrics.recordFailure(msg);
+      throw new Error(msg);
+    }
+
+    const result = provider.configSchema.safeParse(config);
+    if (!result.success) {
+      const first = result.error.issues[0];
+      const path = first?.path.join(".") ?? "config";
+      const detail = first?.message ?? result.error.message;
+      const msg = `${VALIDATION_ERROR.PARSE_FAILED(id)} Path: ${path}. ${detail}`;
+      this.logger.error(msg, { providerId: id, issues: result.error.issues });
+      metrics.recordFailure(msg);
+      throw new Error(msg);
+    }
+
+    // Only runtime errors from createHarness are caught here.
     const start = Date.now();
-
     try {
-      if (config === null || config === undefined) {
-        const msg = VALIDATION_ERROR.CONFIG_REQUIRED;
-        this.logger.warn(msg, { providerId: id });
-        throw new Error(msg);
-      }
-
-      const result = provider.configSchema.safeParse(config);
-      if (!result.success) {
-        const first = result.error.issues[0];
-        const path = first?.path.join(".") ?? "config";
-        const detail = first?.message ?? result.error.message;
-        const msg = `${VALIDATION_ERROR.PARSE_FAILED(id)} Path: ${path}. ${detail}`;
-        this.logger.error(msg, { providerId: id, issues: result.error.issues });
-        throw new Error(msg);
-      }
-
       const port = provider.createHarness(result.data);
       const durationMs = Date.now() - start;
       metrics.recordSuccess(durationMs);

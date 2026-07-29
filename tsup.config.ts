@@ -6,6 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ["@agentclientprotocol/sdk"],
-  noExternal: ["zod", "eventemitter3"],
+  external: ["@agentclientprotocol/sdk", "zod", "eventemitter3"],
 });
