@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Subpath export `./runtime` added; `./core` remains as an alias to the same build (deprecated; prefer `./runtime`).
 - Source filenames use dot-separated segments (e.g. `env.keys.ts`, `provider.factory.ts`) under `domain/`, `runtime/`, `providers/`, and `cli/`.
 
+## [0.1.2] - 2026-07-29
+
+### Added
+
+- Live provider matrix test (`ACP_LLM_CLI_LIVE=1`) for Claude / Codex / Cursor.
+- Unit assertion that defaults stay aligned with ACPX preferred binaries.
+- README section documenting mesh/ACPX vs this package's Cursor print-mode split.
+
 ## [0.1.1] - 2026-07-29
 
 ### Changed

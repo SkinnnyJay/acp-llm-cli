@@ -87,6 +87,19 @@ This package uses [**@simpill** scoped packages](https://www.npmjs.com/search?q=
 - **@simpill/errors.utils** — available for typed `AppError` and `serializeError`; adoption in throw paths can be done incrementally.
 - **@simpill/protocols.utils** — transitive dependency of logger.utils (protocol constants).
 
+## Mesh / ACPX compatibility
+
+`llm-mesh` speaks ACPX (`acpx <claude|codex|cursor> exec …`) as an `Executor` adapter.
+This package remains the typed harness for talking to provider CLIs directly:
+
+| Provider | This package default | ACPX built-in |
+|---|---|---|
+| Claude | `claude-agent-acp` | `npx -y @agentclientprotocol/claude-agent-acp` (preferred bin `claude-agent-acp`) |
+| Codex | `codex-acp` | `npx @zed-industries/codex-acp` (preferred bin `codex-acp`) |
+| Cursor | `cursor-agent` print/stream-json | `cursor-agent acp` |
+
+Live gates: `ACP_LLM_CLI_LIVE=1` for this package; `MESH_CLI_AGENT_LIVE=1` for llm-mesh.
+
 ## Env and config
 
 All env keys are in `ENV_KEY` (see `src/domain/env.keys.ts`). Copy `.env.sample` to `.env` and set:
