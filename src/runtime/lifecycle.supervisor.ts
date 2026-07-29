@@ -35,8 +35,10 @@ export interface LifecycleSupervisorOptions {
  */
 function extractSessionIdFromNotification(update: SessionNotification): string | undefined {
   const record = update as Record<string, unknown>;
+  // Only read the vendor-extension `session_id` field. The standard `sessionId` field
+  // identifies which session the notification belongs to and is always present — it is
+  // not a newly established session ID to persist.
   if (typeof record.session_id === "string") return record.session_id;
-  if (typeof record.sessionId === "string") return record.sessionId;
   return undefined;
 }
 

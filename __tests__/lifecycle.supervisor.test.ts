@@ -1,9 +1,13 @@
 import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { IAgentPort } from "../src/runtime/agent.port";
-import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor";
+import {
+  LifecycleAgentPort,
+  wrapAgentPortWithLifecycle,
+} from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 
 function createMockPort(): IAgentPort {
@@ -88,5 +92,182 @@ describe("wrapAgentPortWithLifecycle", () => {
 
     await wrapped.close?.();
     expect(inner.disconnect).toHaveBeenCalled();
+  });
+
+  it("is a named class (not anonymous)", () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    expect(wrapped.constructor.name).toBe("LifecycleAgentPort");
+  });
+
+  it("can be instantiated directly as LifecycleAgentPort", () => {
+    const inner = createMockPort();
+    const port = new LifecycleAgentPort(inner, { providerId: "test" });
+    expect(port).toBeInstanceOf(LifecycleAgentPort);
+  });
+
+  it("delegates connect, disconnect, initialize, prompt, authenticate to inner", async () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+
+    await wrapped.connect();
+    await wrapped.disconnect();
+    await wrapped.initialize();
+    await wrapped.prompt({ sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0]);
+    await wrapped.authenticate({} as Parameters<IAgentPort["authenticate"]>[0]);
+
+    expect(inner.connect).toHaveBeenCalledOnce();
+    expect(inner.disconnect).toHaveBeenCalledOnce();
+    expect(inner.initialize).toHaveBeenCalledOnce();
+    expect(inner.prompt).toHaveBeenCalledOnce();
+    expect(inner.authenticate).toHaveBeenCalledOnce();
+  });
+
+  it("forwards state, error, sessionUpdate, permissionRequest events from inner", () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+
+    const stateEvents: unknown[] = [];
+    const errorEvents: unknown[] = [];
+    const sessionUpdateEvents: unknown[] = [];
+
+    wrapped.on("state", (s) => stateEvents.push(s));
+    wrapped.on("error", (e) => errorEvents.push(e));
+    wrapped.on("sessionUpdate", (u) => sessionUpdateEvents.push(u));
+
+    (inner as unknown as EventEmitter).emit("state", CONNECTION_STATUS.CONNECTED);
+    (inner as unknown as EventEmitter).emit("error", new Error("inner error"));
+    (inner as unknown as EventEmitter).emit("sessionUpdate", { sessionId: "s1", update: {} });
+
+    expect(stateEvents).toEqual([CONNECTION_STATUS.CONNECTED]);
+    expect(errorEvents).toHaveLength(1);
+    expect(sessionUpdateEvents).toHaveLength(1);
+  });
+
+  it("saves session on sessionUpdate when persistence and session_id are present", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "gemini-cli",
+    });
+
+    await wrapped.sessionUpdate({
+      sessionId: "s1",
+      update: {},
+      session_id: "sess-from-update",
+    } as unknown as Parameters<IAgentPort["sessionUpdate"]>[0]);
+
+    const saved = await persistence.loadSession("gemini-cli");
+    expect(saved?.sessionId).toBe("sess-from-update");
+    expect(inner.sessionUpdate).toHaveBeenCalled();
+  });
+
+  it("does not save session on sessionUpdate when no persistence", async () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    await wrapped.sessionUpdate({
+      sessionId: "s1",
+      update: {},
+      session_id: "should-not-save",
+    } as unknown as Parameters<IAgentPort["sessionUpdate"]>[0]);
+    expect(inner.sessionUpdate).toHaveBeenCalledOnce();
+  });
+
+  it("does not save session when session_id is missing from sessionUpdate", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    const saveSpy = vi.spyOn(persistence, "saveSession");
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "test",
+    });
+
+    await wrapped.sessionUpdate({
+      sessionId: "s1",
+      update: {},
+    } as Parameters<IAgentPort["sessionUpdate"]>[0]);
+
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
+  it("restart() calls inner.restart and resumes saved session when resumeOnRestart is true", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    await persistence.saveSession({
+      providerId: "claude-cli",
+      sessionId: "saved-sess",
+      updatedAt: Date.now(),
+    });
+
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "claude-cli",
+      resumeOnRestart: true,
+      restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
+    });
+
+    await wrapped.restart?.();
+
+    expect(inner.restart).toHaveBeenCalled();
+    expect(inner.newSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "saved-sess" })
+    );
+  });
+
+  it("restart() does not call newSession when no persisted session exists", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "claude-cli",
+      resumeOnRestart: true,
+      restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
+    });
+
+    await wrapped.restart?.();
+
+    expect(inner.restart).toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+  });
+
+  it("restart() skips session resume when resumeOnRestart is false", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    await persistence.saveSession({
+      providerId: "claude-cli",
+      sessionId: "saved-sess",
+      updatedAt: Date.now(),
+    });
+
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "claude-cli",
+      resumeOnRestart: false,
+      restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
+    });
+
+    await wrapped.restart?.();
+
+    expect(inner.restart).toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+  });
+
+  it("streamPrompt throws STREAM_PROMPT_NOT_SUPPORTED when inner has no streamPrompt", async () => {
+    const inner = createMockPort();
+    const wrapped = new LifecycleAgentPort(inner, { providerId: "test" });
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+
+    await expect(async () => {
+      for await (const _ of wrapped.streamPrompt(params)) {
+        // consume
+      }
+    }).rejects.toThrow(ERROR_MESSAGE.STREAM_PROMPT_NOT_SUPPORTED);
+  });
+
+  it("connectionStatus reflects inner port status", () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    expect(wrapped.connectionStatus).toBe(inner.connectionStatus);
   });
 });
