@@ -107,7 +107,7 @@ Resolution order: defaults (from `default.commands.ts`) → env (via `ENV_KEY` o
 | `PROVIDER_IDS.CODEX_CLI_ID` | codex-cli |
 | `PROVIDER_IDS.CURSOR_CLI_ID` | cursor-cli |
 
-Default commands: `claude-code-acp`, `gemini` + `--experimental-acp`, `codex` + `--experimental-acp`, `cursor-agent`. See `DEFAULT_COMMANDS` and `src/domain/default.commands.ts`.
+Default commands: `claude-agent-acp`, `gemini` + `--experimental-acp`, `codex-acp`, `cursor-agent`. See `DEFAULT_COMMANDS` and `src/domain/default.commands.ts`. These match ACPX’s preferred Claude/Codex wrappers; Cursor in this package uses print/stream-json (ACPX uses `cursor-agent acp` for ACP mode).
 
 ## Model enums and update-models script
 
