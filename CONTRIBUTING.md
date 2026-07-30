@@ -13,7 +13,7 @@ Be respectful and constructive. See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 3. **Set up locally:**
    - Node.js **20+**
    - `npm ci`
-   - `npm run verify` (typecheck, build, tests)
+   - `npm run verify` (lint, typecheck, build, test:coverage)
 
 ## Source layout and file naming
 
@@ -25,30 +25,27 @@ Be respectful and constructive. See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 Filenames use **dot-separated** segments (`env.keys.ts`, `provider.factory.ts`). See [`src/README.md`](./src/README.md).
 
-## Branching: Git Flow
+## Branching
 
-This repository uses **[Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)**-style branches:
+This repository uses **GitHub Flow** (`main` + feature branches):
 
 | Branch | Role |
 |--------|------|
-| **`main`** | Production-ready code. Releases are tagged from here. Only merge via `release/*` or `hotfix/*` (or maintainers’ release process). |
-| **`develop`** | Integration branch for the next release. Default target for feature PRs. |
-| **`feature/<short-name>`** | Branched from `develop`. One topic per branch (e.g. `feature/codex-flags`). |
-| **`release/<version>`** | Branched from `develop` when preparing a release; final fixes only, then merge to `main` and back to `develop`. |
-| **`hotfix/<short-name>`** | Branched from `main` for urgent production fixes; merge to `main` and `develop`. |
+| **`main`** | Integration and release branch. Keep green. |
+| **`feat/<short-name>`** / **`feature/<short-name>`** | Branched from `main`. One topic per branch. |
 
 **Typical feature contribution:**
 
-1. `git checkout develop && git pull`
-2. `git checkout -b feature/my-change`
+1. `git checkout main && git pull`
+2. `git checkout -b feat/my-change`
 3. Commit with clear messages (see below).
-4. Open a **PR into `develop`** (not `main`, unless maintainers ask otherwise).
+4. Open a **PR into `main`**.
 
-**If your fork does not use `develop` yet:** open PRs against `main` and note in the description; maintainers may align branches when the repo is fully set up.
+If a `develop` branch is introduced later, maintainers will document Git Flow targets then.
 
-### Lighter alternative (GitHub Flow)
+### Optional Git Flow
 
-Smaller teams sometimes use only **`main`** + **`feature/*`** branches. That is acceptable if documented in the repo; still keep PRs small and `main` green.
+Larger teams may use `develop` + `release/*` + `hotfix/*`. That is acceptable when those branches exist and are documented.
 
 ## Pull requests
 

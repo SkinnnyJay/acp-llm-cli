@@ -64,3 +64,11 @@ export type { IToolHost } from "./tool.host.interface";
 
 // Session persistence
 export { createMemorySessionPersistence } from "./session.persistence.memory";
+export type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
+
+// Shared ACP CLI runtime builders (extension API)
+export {
+  createAcpCliHarnessRuntime,
+  createStandardAcpRuntime,
+} from "../providers/acp.shared";
+export type { AcpSharedRuntimeOptions } from "../providers/acp.shared";

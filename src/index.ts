@@ -68,7 +68,13 @@ export type { ModelId as XAIModelId } from "./domain/models/xai.models";
 export { baseCliConfigSchema } from "./runtime/config";
 export { createAcpAgentPort } from "./runtime/acp.client";
 export type { ACPClientOptions } from "./runtime/acp.client";
+export {
+  createAcpCliHarnessRuntime,
+  createStandardAcpRuntime,
+} from "./providers/acp.shared";
 export type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
+export { createMemorySessionPersistence } from "./runtime/session.persistence.memory";
+export type { ISessionPersistence, PersistedSession } from "./domain/session.persistence";
 
 export {
   genericLlmCliOptionsSchema,

@@ -5,7 +5,7 @@
 
 Source: **[github.com/SkinnnyJay/acp-llm-cli](https://github.com/SkinnnyJay/acp-llm-cli)**. Optional local path next to [simpill-utils](https://github.com/SkinnnyJay/simpill-utils): `utils/@simpill-acp-llm-cli.utils/`.
 
-Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor). Interface-first and Zod-driven: **Factory** and **Provider** classes driven by **interfaces** (common + extended), **Zod** for validation and clear error messages, **common metrics and logging**, and no magic numbers or strings. CLI research (commands/args, common vs provider-unique) is in the repo scratchpad and linked from implementation.
+Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor). Interface-first and Zod-driven: **Factory** and **Provider** classes driven by **interfaces**, **Zod** for validation and clear error messages, **common metrics and logging**, and no magic numbers or strings.
 
 ## Install
 
@@ -13,11 +13,11 @@ Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini,
 npm install @simpill/acp-llm-cli
 ```
 
-Subpath imports: use `@simpill/acp-llm-cli/runtime` for low-level harness exports; `@simpill/acp-llm-cli/core` is an alias to the same files (deprecated).
+Subpath imports: use `@simpill/acp-llm-cli` for the product API (factories, providers, models) and `@simpill/acp-llm-cli/runtime` for the extension API (decorators, connections, `createAcpCliHarnessRuntime`, session persistence).
 
 ## Usage
 
-**Recommended: Provider enum + ProviderClientFactory** (extensible module pattern):
+**Start here: Provider enum + ProviderClientFactory**
 
 ```ts
 import {
@@ -28,7 +28,7 @@ import {
 
 const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
-  command: "claude-code-acp",
+  command: "claude-agent-acp",
   args: [],
   model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
 });
@@ -36,46 +36,11 @@ await client.port.connect();
 await client.port.initialize();
 // client.port.prompt(), etc.
 await client.port.disconnect();
-// client.provider is Provider.CLAUDE
 ```
 
-Use `Provider.CLAUDE`, `Provider.GEMINI`, `Provider.CODEX`, `Provider.CURSOR`; `factory.listProviders()` returns all. To add a provider: add to the `Provider` enum, register the adapter in the registry, and the factory supports it.
+Use `Provider.CLAUDE`, `Provider.GEMINI`, `Provider.CODEX`, `Provider.CURSOR`; `factory.listProviders()` returns all.
 
-**Alternative: registry + createHarness by id:**
-
-```ts
-import { getDefaultRegistry, createHarness, PROVIDER_IDS } from "@simpill/acp-llm-cli";
-
-const registry = getDefaultRegistry();
-const port = createHarness(registry, PROVIDER_IDS.CLAUDE_CLI_ID, {
-  command: "claude-code-acp",
-  args: [],
-  cwd: process.cwd(),
-});
-await port.connect();
-await port.initialize();
-// prompt, newSession, etc.
-await port.disconnect();
-```
-
-With config file: load JSON, validate with the adapter's schema, then `createHarness(registry, id, config)`.
-
-**Factory (recommended):** Use `getDefaultFactory()` for Zod-validated config, clear error messages, and optional metrics/logging:
-
-```ts
-import { getDefaultFactory, PROVIDER_IDS } from "@simpill/acp-llm-cli";
-
-const factory = getDefaultFactory();
-const port = factory.createRuntime(PROVIDER_IDS.CLAUDE_CLI_ID, {
-  command: "claude-code-acp",
-  args: [],
-  model: "claude-sonnet-4-20250514",
-});
-// Invalid config throws with: "Config validation failed for provider 'claude-cli'. Path: ..."
-const metrics = factory.getMetrics?.(PROVIDER_IDS.CLAUDE_CLI_ID); // invocations, lastError, lastInvocationMs
-```
-
-Custom adapter: `registry.register(myAdapter); createHarness(registry, myId, config)` with id from a constant.
+**Also available:** `getDefaultFactory().createRuntime(id, config)` for Zod-validated config by provider id, and `createHarness(registry, id, config)` for custom registries. Prefer the ProviderClientFactory path above for new code.
 
 ## Simpill integration
 
@@ -152,7 +117,7 @@ const adapter = getAdapter(registry, PROVIDER_IDS.CLAUDE_CLI_ID);
 const spec = adapter?.cliSpec;
 if (spec) {
   const argv = spec.buildArgs({
-    command: "claude-code-acp",
+    command: "claude-agent-acp",
     args: [],
     model: "claude-sonnet-4-20250514",
     outputFormat: "stream-json",
@@ -170,7 +135,7 @@ Run the CLI with `--help` and get stdout for discovery or validation:
 
 ```ts
 const helpText = await spec.getHelp({
-  command: "claude-code-acp",
+  command: "claude-agent-acp",
   args: spec.defaultArgs,
   cwd: process.cwd(),
 });
@@ -226,22 +191,26 @@ if (port.capabilities?.streamPrompt && port.streamPrompt) {
 
 ### Lifecycle (restart, open, close)
 
-Ports from the shared runtime expose `restart()`, `open()`, and `close()`:
+Ports from the shared ACP stream wrapper expose `restart()`, `open()`, and `close()`:
 
 ```ts
 if (port.capabilities?.restart && port.restart) {
-  await port.restart(); // disconnect + connect + initialize, with backoff retries
+  // Stream wrapper: disconnect + connect + initialize (no backoff).
+  // With sessionPersistence via createAcpCliHarnessRuntime / LifecycleAgentPort:
+  // restart uses exponential backoff and can resume a saved session.
+  await port.restart();
 }
 ```
 
 ### Session persistence (opt-in)
 
-Enable session save/restore on restart by passing `sessionPersistence` to `createAcpCliHarnessRuntime`:
+Enable session save/restore on restart by passing `sessionPersistence` to `createAcpCliHarnessRuntime` (exported from `@simpill/acp-llm-cli/runtime` and the root package):
 
 ```ts
 import {
   createAcpCliHarnessRuntime,
   createMemorySessionPersistence,
+  type ISessionPersistence,
 } from "@simpill/acp-llm-cli/runtime";
 
 const persistence = createMemorySessionPersistence();
@@ -250,7 +219,7 @@ const port = createAcpCliHarnessRuntime(config, {
   providerId: "claude-cli",
   workspace: "/path/to/project",
 });
-// On restart(), the port will load persisted session and call newSession(sessionId) to resume
+// On restart(), the port loads the persisted session and calls newSession to resume
 ```
 
 For durable persistence across process restarts, implement `ISessionPersistence` with file or DB storage.
@@ -273,20 +242,14 @@ Cursor uses process-per-prompt and does not support streaming or lifecycle. Its 
 - **Metrics**: `ProviderMetricsCollector` holds `invocations`, `lastError`, `lastInvocationMs`; exposed via `factory.getMetrics(id)` when `collectMetrics` is true.
 - **Validation errors**: All config and validation messages use `VALIDATION_ERROR` in `src/domain/validation.errors.ts`; no raw error strings in business logic.
 
-## CLI research (scratchpad)
-
-Commands and arguments for each CLI (Claude, Gemini, Codex, Cursor) and the mapping to **common** vs **provider-unique** features are documented in the repo scratchpad. Implementation links back to that doc:
-
-- **Research doc**: `scratchpad/acp-llm-cli-cli-research.md` (in the repo root). Contains help-derived option tables, protocol notes, and the implementation reference (interfaces, factory, metrics, schemas, providers).
-
 ## Requirements
 
 - Node.js >= 20
-- One or more of: Claude CLI (claude-code-acp), Gemini CLI, Codex CLI, Cursor Agent CLI
+- One or more of: Claude CLI (`claude-agent-acp`), Gemini CLI, Codex CLI (`codex-acp`), Cursor Agent CLI
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) (branching, Git Flow, PR expectations). Please read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). Report security issues per [SECURITY.md](./SECURITY.md), not via public issues.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) (branching, PR expectations). Please read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). Report security issues per [SECURITY.md](./SECURITY.md), not via public issues.
 
 ## License
 

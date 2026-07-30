@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Source layout: `constants/` and top-level `types/` merged into `src/domain/`, `core/` renamed to `src/runtime/`, `summon.ts` renamed to `bootstrap.ts`.
-- Subpath export `./runtime` added; `./core` remains as an alias to the same build (deprecated; prefer `./runtime`).
-- Source filenames use dot-separated segments (e.g. `env.keys.ts`, `provider.factory.ts`) under `domain/`, `runtime/`, `providers/`, and `cli/`.
+- Subpath export is `./runtime` only (the former `./core` alias was removed).
+- Public API exports `createAcpCliHarnessRuntime`, `createStandardAcpRuntime`, and session persistence types.
+- README examples aligned with `claude-agent-acp` / `codex-acp` defaults.
 
 ## [0.1.2] - 2026-07-29
 

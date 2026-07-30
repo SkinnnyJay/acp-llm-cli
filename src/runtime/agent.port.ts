@@ -63,5 +63,3 @@ export interface IAgentPort extends EventEmitter<AgentPortEvents> {
   /** Optional: alias for disconnect(). */
   close?(): Promise<void>;
 }
-
-/** Alias for backward compatibility. */
