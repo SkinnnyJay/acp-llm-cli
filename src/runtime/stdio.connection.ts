@@ -88,9 +88,9 @@ export class StdioConnection
     this.isDisconnecting = true;
     await new Promise<void>((resolve) => {
       this.child?.once(NODE_EVENT.CLOSE, () => resolve());
-      this.child?.kill(SIGNAL.TERM);
+      this.child?.kill?.(SIGNAL.TERM);
       setTimeout(() => {
-        if (this.child?.kill) this.child.kill(SIGNAL.KILL);
+        this.child?.kill?.(SIGNAL.KILL);
         resolve();
       }, TIMEOUT.DISCONNECT_FORCE_MS).unref();
     });
