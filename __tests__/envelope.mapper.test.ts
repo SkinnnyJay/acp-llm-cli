@@ -110,6 +110,36 @@ describe("sessionUpdateToEnvelopes", () => {
     const envelopesOpenAI = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopesOpenAI).toHaveLength(0);
   });
+
+  it("extracts text via fallback when content type is not 'text' but has a text field", () => {
+    // Covers the `if ('text' in content && typeof content.text === 'string')` branch.
+    const update = {
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "code", text: "console.log()" },
+      },
+    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
+    expect(envelopes).toHaveLength(1);
+    expect(isOpenAIEnvelope(envelopes[0])).toBe(true);
+    expect(
+      (envelopes[0] as { choices: Array<{ delta: { content: string } }> }).choices[0]?.delta.content
+    ).toBe("console.log()");
+  });
+
+  it("returns no OpenAI envelope when content has no text field at all", () => {
+    // Covers the `return undefined` fallback in extractChunkText.
+    const update = {
+      sessionId: "session-1",
+      update: {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "image", url: "http://example.com/img.png" },
+      },
+    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
+    expect(envelopes).toHaveLength(0);
+  });
 });
 
 describe("createOpenAIFinishEnvelope", () => {

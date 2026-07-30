@@ -107,7 +107,7 @@ All env keys are in `ENV_KEY` (see `src/domain/env.keys.ts`). Copy `.env.sample`
 - `ACP_LLM_CLI_DEBUG` – truthy enables debug logging
 - `ACP_LLM_CLI_CLAUDE_COMMAND` / `ACP_LLM_CLI_CLAUDE_ARGS` – overrides for Claude (same pattern for Gemini, Codex, Cursor)
 - CLI-required keys: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` / `GEMINI_API_KEY`, `OPENAI_API_KEY`, `CURSOR_API_KEY`
-- For `bun run update-models`: set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `XAI_API_KEY` to refresh model enums from provider APIs.
+- For `npm run update-models`: set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `XAI_API_KEY` to refresh model enums from provider APIs.
 
 Resolution order: defaults (from `default.commands.ts`) → env (via `ENV_KEY` only) → passed config. All validated with Zod.
 
@@ -129,12 +129,12 @@ Model IDs are exposed as enums (no raw strings). Use `ANTHROPIC_MODEL_IDS`, `OPE
 **Refresh enums (no API keys required):**
 
 ```bash
-bun run update-models
+npm run update-models
 ```
 
 Optional: set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY` to use provider APIs instead of OpenRouter.
 
-The script uses **OpenRouter's public endpoint** (https://openrouter.ai/api/v1/models, no auth) when no keys are set. With API keys it uses provider APIs. Dry run: `ACP_LLM_CLI_MODELS_DRY_RUN=1 bun run update-models`.
+The script uses **OpenRouter's public endpoint** (https://openrouter.ai/api/v1/models, no auth) when no keys are set. With API keys it uses provider APIs. Dry run: `ACP_LLM_CLI_MODELS_DRY_RUN=1 npm run update-models`.
 
 ## Generic CLI layer (args, help, schema)
 

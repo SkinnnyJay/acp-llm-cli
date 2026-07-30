@@ -270,4 +270,46 @@ describe("wrapAgentPortWithLifecycle", () => {
     const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
     expect(wrapped.connectionStatus).toBe(inner.connectionStatus);
   });
+
+  it("initialize delegates to inner port", async () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const result = await wrapped.initialize({ protocolVersion: "1" } as Parameters<
+      typeof wrapped.initialize
+    >[0]);
+    expect(inner.initialize).toHaveBeenCalled();
+    expect(result).toMatchObject({ protocolVersion: "1" });
+  });
+
+  it("setSessionMode getter returns bound method from inner when present", () => {
+    const inner = createMockPort();
+    const modeFn = vi.fn();
+    (inner as Record<string, unknown>).setSessionMode = modeFn;
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const getter = wrapped.setSessionMode;
+    expect(typeof getter).toBe("function");
+  });
+
+  it("setSessionMode getter returns undefined when inner has no setSessionMode", () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const getter = wrapped.setSessionMode;
+    expect(getter).toBeUndefined();
+  });
+
+  it("setSessionModel getter returns bound method from inner when present", () => {
+    const inner = createMockPort();
+    const modelFn = vi.fn();
+    (inner as Record<string, unknown>).setSessionModel = modelFn;
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const getter = wrapped.setSessionModel;
+    expect(typeof getter).toBe("function");
+  });
+
+  it("setSessionModel getter returns undefined when inner has no setSessionModel", () => {
+    const inner = createMockPort();
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const getter = wrapped.setSessionModel;
+    expect(getter).toBeUndefined();
+  });
 });

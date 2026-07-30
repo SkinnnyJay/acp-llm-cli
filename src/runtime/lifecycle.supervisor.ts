@@ -176,12 +176,14 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     await restartWithBackoff(this.inner, this.restartOptions);
 
     if (sessionToResume?.sessionId && this.sessionPersistence) {
+      // `sessionId` is a vendor extension accepted by ACP implementations for session resume.
+      // The standard SDK type does not declare it, so a single cast is required.
       const resumeParams = {
         cwd: this.workspace ?? process.cwd(),
-        mcpServers: [] as const,
+        mcpServers: [] as NewSessionRequest["mcpServers"],
         sessionId: sessionToResume.sessionId,
-      };
-      await this.inner.newSession(resumeParams as unknown as NewSessionRequest);
+      } as NewSessionRequest;
+      await this.inner.newSession(resumeParams);
       await this.sessionPersistence.saveSession({
         ...sessionToResume,
         updatedAt: Date.now(),

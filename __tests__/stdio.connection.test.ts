@@ -187,4 +187,76 @@ describe("StdioConnection", () => {
 
     expect(exitEvents[0]).toEqual({ code: 0, signal: null });
   });
+
+  it("emits ERROR status and error event when child exits with a signal", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    const errors: Error[] = [];
+    conn.on("error", (e) => errors.push(e));
+
+    const errorStatus = new Promise<void>((resolve) => {
+      conn.on("state", (s) => {
+        if (s === CONNECTION_STATUS.ERROR) resolve();
+      });
+    });
+
+    triggerExit(null, "SIGKILL");
+    await errorStatus;
+
+    expect(conn.connectionStatus).toBe(CONNECTION_STATUS.ERROR);
+    expect(errors[0]?.message).toMatch(/SIGKILL/);
+  });
+
+  it("includes captured stderr lines in error message on non-zero exit", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    // Push stderr data before the child exits.
+    child.stderr.push("fatal: something broke\n");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const errors: Error[] = [];
+    conn.on("error", (e) => errors.push(e));
+
+    const errorStatus = new Promise<void>((resolve) => {
+      conn.on("state", (s) => {
+        if (s === CONNECTION_STATUS.ERROR) resolve();
+      });
+    });
+
+    triggerExit(1, null);
+    await errorStatus;
+
+    expect(errors[0]?.message).toMatch(/fatal: something broke/);
+  });
+
+  it("captureStderr silently ignores chunks that are all whitespace", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    child.stderr.push("   \n\n  \r\n");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const errors: Error[] = [];
+    conn.on("error", (e) => errors.push(e));
+
+    const errorStatus = new Promise<void>((resolve) => {
+      conn.on("state", (s) => {
+        if (s === CONNECTION_STATUS.ERROR) resolve();
+      });
+    });
+
+    triggerExit(1, null);
+    await errorStatus;
+
+    // No stderr lines captured → error message should not include extra text.
+    expect(errors[0]?.message).not.toMatch(/\n/);
+  });
 });
