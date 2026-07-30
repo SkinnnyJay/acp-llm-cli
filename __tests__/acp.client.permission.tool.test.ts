@@ -41,7 +41,7 @@ describe("ACPClient permission handling", () => {
     expect(result).toEqual({ outcome: { outcome: "selected", optionId: "deny" } });
   });
 
-  it("emits permissionRequest then returns first option when no handler", async () => {
+  it("emits permissionRequest then cancels when no handler (safe default)", async () => {
     const connection = createMockConnection();
     const port = createAcpAgentPort(connection);
 
@@ -61,7 +61,7 @@ describe("ACPClient permission handling", () => {
 
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual(request);
-    expect(result).toEqual({ outcome: { outcome: "selected", optionId: "allow" } });
+    expect(result).toEqual({ outcome: { outcome: "cancelled" } });
   });
 
   it("returns cancelled when no handler and no options", async () => {

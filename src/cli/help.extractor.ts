@@ -18,7 +18,7 @@ export interface HelpExtractorOptions {
 
 /**
  * Run CLI with --help and return stdout. Uses spawn, so no shell escaping of args.
- * Add HELP_FLAG at end unless already present in args.
+ * On timeout: SIGTERM then SIGKILL after the force-kill grace window.
  */
 export function extractHelp(options: HelpExtractorOptions): Promise<string> {
   const { command, args = [], cwd, env, timeoutMs = TIMEOUT.HELP_EXTRACTION_MS } = options;
@@ -33,8 +33,13 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
 
     let stdout = "";
     let stderr = "";
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+
     const timeout = setTimeout(() => {
       child.kill(SIGNAL.TERM);
+      forceKillTimer = setTimeout(() => {
+        child.kill(SIGNAL.KILL);
+      }, TIMEOUT.DISCONNECT_FORCE_MS);
       reject(new Error(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(timeoutMs)));
     }, timeoutMs);
 
@@ -49,11 +54,13 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
 
     child.on(NODE_EVENT.ERROR, (err) => {
       clearTimeout(timeout);
+      clearTimeout(forceKillTimer);
       reject(err);
     });
 
     child.on(NODE_EVENT.CLOSE, (code) => {
       clearTimeout(timeout);
+      clearTimeout(forceKillTimer);
       if (code !== 0 && code !== null) {
         reject(new Error(ERROR_MESSAGE.HELP_COMMAND_FAILED(code, stderr)));
         return;

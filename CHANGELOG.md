@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-30
+
 ### Changed
 
-- Subpath export is `./runtime` only (the former `./core` alias was removed).
+- **Breaking:** Default permission handler cancels when no `permissionHandler` is configured (no longer auto-selects the first option).
+- **Breaking:** Cursor CLI no longer hardcodes `--trust`; pass `trust: true` in config to enable it.
+- Session persistence saves from inbound `sessionUpdate` events and stores session `cwd` for resume.
+- Memory persistence keys are length-prefixed to avoid `providerId`/`workspace` collisions.
+- Help extraction and Cursor disconnect force-kill orphaned child processes.
 - Public API exports `createAcpCliHarnessRuntime`, `createStandardAcpRuntime`, and session persistence types.
-- README examples aligned with `claude-agent-acp` / `codex-acp` defaults.
+- Subpath export is `./runtime` only (the former `./core` alias was removed).
+- README / CONTRIBUTING / AGENTS / `.env.sample` aligned with real defaults and GitHub Flow.
 
 ## [0.1.2] - 2026-07-29
 
@@ -25,9 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Default Claude ACP binary: `claude-agent-acp` (was `claude-code-acp`), matching ACPX's preferred wrapper for `@agentclientprotocol/claude-agent-acp`.
-- Default Codex ACP binary: `codex-acp` with no args (was `codex --experimental-acp`), matching ACPX's preferred wrapper for `@zed-industries/codex-acp`.
-- Cursor remains `cursor-agent` print/stream-json in this package; ACP mode (`cursor-agent acp`) stays the ACPX path used by llm-mesh.
+- Default Claude ACP binary: `claude-agent-acp` (was `claude-code-acp`).
+- Default Codex ACP binary: `codex-acp` with no args (was `codex --experimental-acp`).
+- Cursor remains `cursor-agent` print/stream-json in this package.
 
 ## [0.1.0] - 2026-04-02
 

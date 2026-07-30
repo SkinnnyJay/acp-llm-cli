@@ -4,6 +4,8 @@
 export interface PersistedSession {
   providerId: string;
   workspace?: string;
+  /** Working directory used when the session was created (for resume). */
+  cwd?: string;
   sessionId: string;
   updatedAt?: number;
 }

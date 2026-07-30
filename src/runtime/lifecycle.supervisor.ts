@@ -17,27 +17,15 @@ import type { RestartWithBackoffOptions } from "./restart.with.backoff";
 import { restartWithBackoff } from "./restart.with.backoff";
 
 export interface LifecycleSupervisorOptions {
-  /** Session persistence for save/load/clear. When provided, enables sessionPersistence capability. */
   sessionPersistence?: ISessionPersistence;
-  /** Provider id for persistence key (e.g. "claude-cli", "codex-cli"). Required when sessionPersistence is set. */
   providerId: string;
-  /** Optional workspace for persistence key. */
   workspace?: string;
-  /** Restart backoff options. */
   restartOptions?: RestartWithBackoffOptions;
-  /** If true, on restart we call newSession with loaded sessionId to resume. Default: true when persistence is provided. */
   resumeOnRestart?: boolean;
 }
 
-/**
- * Extracts session_id from an ACP session notification if present.
- * SessionNotification shape may include session_id at the top level (SDK-version dependent).
- */
 function extractSessionIdFromNotification(update: SessionNotification): string | undefined {
   const record = update as Record<string, unknown>;
-  // Only read the vendor-extension `session_id` field. The standard `sessionId` field
-  // identifies which session the notification belongs to and is always present — it is
-  // not a newly established session ID to persist.
   if (typeof record.session_id === "string") return record.session_id;
   return undefined;
 }
@@ -46,23 +34,21 @@ function persistActiveSession(
   persistence: ISessionPersistence,
   providerId: string,
   workspace: string | undefined,
-  sessionId: string
+  sessionId: string,
+  cwd?: string
 ): Promise<void> {
   return persistence.saveSession({
     providerId,
     workspace,
+    cwd,
     sessionId,
     updatedAt: Date.now(),
   });
 }
 
 /**
- * Wraps an IAgentPort with optional restart and session persistence orchestration.
- *
- * - Saves session when newSession returns or when sessionUpdate carries session_id.
- * - On restart: graceful close, reopen, reinitialize, optional session resume via newSession(sessionId).
- * - Uses restartWithBackoff for retries.
- * - Opt-in: when sessionPersistence is not provided, only adds restart orchestration (no save/load).
+ * Wraps an IAgentPort with restart and optional session persistence orchestration.
+ * Saves session on newSession and on inbound sessionUpdate events carrying session_id.
  */
 export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities: AgentPortCapabilities;
@@ -73,6 +59,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   private readonly workspace: string | undefined;
   private readonly restartOptions: RestartWithBackoffOptions | undefined;
   private readonly resumeOnRestart: boolean;
+  private lastSessionCwd: string | undefined;
 
   constructor(inner: IAgentPort, options: LifecycleSupervisorOptions) {
     super();
@@ -91,11 +78,27 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     };
 
     inner.on("state", (status: ConnectionStatus) => this.emit("state", status));
-    inner.on("sessionUpdate", (update: SessionNotification) => this.emit("sessionUpdate", update));
+    inner.on("sessionUpdate", (update: SessionNotification) => {
+      void this.maybePersistFromNotification(update);
+      this.emit("sessionUpdate", update);
+    });
     inner.on("permissionRequest", (request: RequestPermissionRequest) =>
       this.emit("permissionRequest", request)
     );
     inner.on("error", (error: Error) => this.emit("error", error));
+  }
+
+  private async maybePersistFromNotification(update: SessionNotification): Promise<void> {
+    const sessionId = extractSessionIdFromNotification(update);
+    if (this.sessionPersistence && sessionId) {
+      await persistActiveSession(
+        this.sessionPersistence,
+        this.providerId,
+        this.workspace,
+        sessionId,
+        this.lastSessionCwd
+      );
+    }
   }
 
   get connectionStatus(): ConnectionStatus {
@@ -117,12 +120,14 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
     const response = await this.inner.newSession(params);
     const sessionId = response.sessionId;
+    this.lastSessionCwd = params.cwd;
     if (this.sessionPersistence && sessionId) {
       await persistActiveSession(
         this.sessionPersistence,
         this.providerId,
         this.workspace,
-        sessionId
+        sessionId,
+        params.cwd
       );
     }
     return response;
@@ -147,15 +152,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {
-    const sessionId = extractSessionIdFromNotification(params);
-    if (this.sessionPersistence && sessionId) {
-      await persistActiveSession(
-        this.sessionPersistence,
-        this.providerId,
-        this.workspace,
-        sessionId
-      );
-    }
+    await this.maybePersistFromNotification(params);
     return this.inner.sessionUpdate(params);
   }
 
@@ -176,16 +173,15 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     await restartWithBackoff(this.inner, this.restartOptions);
 
     if (sessionToResume?.sessionId && this.sessionPersistence) {
-      // `sessionId` is a vendor extension accepted by ACP implementations for session resume.
-      // The standard SDK type does not declare it, so a single cast is required.
       const resumeParams = {
-        cwd: this.workspace ?? process.cwd(),
+        cwd: sessionToResume.cwd ?? this.workspace ?? process.cwd(),
         mcpServers: [] as NewSessionRequest["mcpServers"],
         sessionId: sessionToResume.sessionId,
       } as NewSessionRequest;
       await this.inner.newSession(resumeParams);
       await this.sessionPersistence.saveSession({
         ...sessionToResume,
+        cwd: resumeParams.cwd,
         updatedAt: Date.now(),
       });
     }
@@ -200,7 +196,6 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   }
 }
 
-/** Factory function for backward compatibility and ergonomic use. */
 export function wrapAgentPortWithLifecycle(
   inner: IAgentPort,
   options: LifecycleSupervisorOptions

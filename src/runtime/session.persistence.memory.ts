@@ -3,13 +3,15 @@ import type { PersistedSession } from "../domain/session.persistence";
 
 /**
  * In-memory session persistence. Useful for tests or single-process use.
- * For durable persistence across restarts, implement ISessionPersistence with file or DB storage.
+ * Keys are length-prefixed to avoid collisions between providerId-only and
+ * providerId+workspace pairs that share a ":" delimiter.
  */
 export function createMemorySessionPersistence(): ISessionPersistence {
   const store = new Map<string, PersistedSession>();
 
   function key(providerId: string, workspace?: string): string {
-    return workspace ? `${providerId}:${workspace}` : providerId;
+    const ws = workspace ?? "";
+    return `${providerId.length}:${providerId}\0${ws.length}:${ws}`;
   }
 
   return {

@@ -53,6 +53,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   private readonly sessionModelById = new Map<string, string>();
   private activePromptCount = 0;
   private disconnectionInProgress = false;
+  private readonly activeAbortControllers = new Set<AbortController>();
 
   constructor(config: CursorConfig) {
     super();
@@ -86,6 +87,28 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     return this.config.args ?? [...DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS];
   }
 
+  /** Honor config.trust; never force --trust by default. */
+  private trustArgs(): string[] {
+    return this.config.trust === true ? [CURSOR_CLI_ARG.TRUST] : [];
+  }
+
+  private async runTracked(
+    command: string,
+    args: string[],
+    timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS
+  ) {
+    const controller = new AbortController();
+    this.activeAbortControllers.add(controller);
+    try {
+      return await runCursorSpawnedCommand(command, args, this.config, {
+        timeoutMs,
+        signal: controller.signal,
+      });
+    } finally {
+      this.activeAbortControllers.delete(controller);
+    }
+  }
+
   async connect(): Promise<void> {
     this.status = CONNECTION_STATUS.CONNECTING;
     const command = this.resolveConnectCommand();
@@ -93,16 +116,11 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
       CURSOR_CLI_ARG.PRINT,
       CURSOR_CLI_ARG.OUTPUT_FORMAT,
       CURSOR_CLI_ARG.STREAM_JSON,
-      CURSOR_CLI_ARG.TRUST,
+      ...this.trustArgs(),
       CURSOR_HEALTH_CHECK_PROMPT,
     ];
     try {
-      const result = await runCursorSpawnedCommand(
-        command,
-        args,
-        this.config,
-        TIMEOUT.CURSOR_PROMPT_MS
-      );
+      const result = await this.runTracked(command, args);
       if (result.exitCode === 0) {
         this.status = CONNECTION_STATUS.CONNECTED;
         this.emit(AGENT_PORT_EVENT.STATE, this.status);
@@ -125,6 +143,11 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     this.disconnectionInProgress = true;
     try {
       await this.waitForPromptCompletion();
+      for (const controller of this.activeAbortControllers) {
+        controller.abort();
+      }
+      this.activeAbortControllers.clear();
+      this.activePromptCount = 0;
       this.status = CONNECTION_STATUS.DISCONNECTED;
       this.emit(AGENT_PORT_EVENT.STATE, this.status);
     } finally {
@@ -138,7 +161,6 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     while (this.activePromptCount > 0 && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, TIMEOUT.CURSOR_GRACEFUL_SHUTDOWN_POLL_MS));
     }
-    if (this.activePromptCount > 0) this.activePromptCount = 0;
   }
 
   async initialize(_params?: Partial<InitializeRequest>): Promise<InitializeResponse> {
@@ -150,12 +172,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   async newSession(_params: NewSessionRequest): Promise<NewSessionResponse> {
     const command = this.resolveCliCommand();
     const baseArgs = this.resolveBaseArgs();
-    const result = await runCursorSpawnedCommand(
-      command,
-      [...baseArgs, CURSOR_CLI_ARG.CREATE_CHAT],
-      this.config,
-      TIMEOUT.CURSOR_PROMPT_MS
-    );
+    const result = await this.runTracked(command, [...baseArgs, CURSOR_CLI_ARG.CREATE_CHAT]);
     const match = result.stdout.match(CURSOR_UUID_PATTERN);
     this.sessionId = match?.[0] ?? undefined;
     return { sessionId: this.sessionId ?? "" };
@@ -195,19 +212,14 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
         CURSOR_CLI_ARG.PRINT,
         CURSOR_CLI_ARG.OUTPUT_FORMAT,
         CURSOR_CLI_ARG.STREAM_JSON,
-        CURSOR_CLI_ARG.TRUST,
+        ...this.trustArgs(),
         ...(this.sessionId ? [CURSOR_CLI_ARG.RESUME, this.sessionId] : []),
         ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
         ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
         ...baseArgs,
         text,
       ];
-      const result = await runCursorSpawnedCommand(
-        command,
-        args,
-        this.config,
-        TIMEOUT.CURSOR_PROMPT_MS
-      );
+      const result = await this.runTracked(command, args);
       const parsed = parseCursorNdjsonResult(result.stdout);
       if (parsed === null) {
         throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);

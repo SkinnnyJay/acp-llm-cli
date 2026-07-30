@@ -184,6 +184,42 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(inner.sessionUpdate).toHaveBeenCalled();
   });
 
+  it("saves session when inner emits sessionUpdate with session_id (event path)", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "event-provider",
+    });
+
+    (inner as unknown as EventEmitter).emit("sessionUpdate", {
+      sessionId: "s1",
+      update: {},
+      session_id: "from-event",
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+    const loaded = await persistence.loadSession("event-provider");
+    expect(loaded?.sessionId).toBe("from-event");
+  });
+
+  it("persists cwd from newSession for resume", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "cwd-provider",
+      workspace: "/ws",
+    });
+
+    await wrapped.newSession({ cwd: "/original/cwd", mcpServers: [] } as Parameters<
+      IAgentPort["newSession"]
+    >[0]);
+
+    const loaded = await persistence.loadSession("cwd-provider", "/ws");
+    expect(loaded?.cwd).toBe("/original/cwd");
+  });
+
   it("does not save session on sessionUpdate when no persistence", async () => {
     const inner = createMockPort();
     const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });

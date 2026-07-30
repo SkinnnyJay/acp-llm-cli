@@ -144,13 +144,8 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     if (this.options.permissionHandler) {
       return this.options.permissionHandler(params);
     }
-    const firstOption = params.options?.[0];
-    if (!firstOption) {
-      return { outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } };
-    }
-    return {
-      outcome: { outcome: PERMISSION_OUTCOME.SELECTED, optionId: firstOption.optionId },
-    };
+    // Safe default: deny when no handler is configured (never auto-allow).
+    return { outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } };
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {

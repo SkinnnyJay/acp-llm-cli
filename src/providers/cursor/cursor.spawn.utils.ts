@@ -19,26 +19,46 @@ export type CursorSpawnFn = (
   options: { cwd?: string; env?: NodeJS.ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
+export interface CursorSpawnOptions {
+  timeoutMs?: number;
+  spawnFn?: CursorSpawnFn;
+  signal?: AbortSignal;
+}
+
 /**
  * Spawn Cursor CLI with merged env, collect stdout/stderr, enforce timeout with SIGTERM then SIGKILL.
- * Rejects on timeout so callers receive a typed error instead of a partial success result.
- * Tracks and clears the force-kill timer on normal exit to prevent background zombie timers.
- * The spawnFn parameter is injectable for testing.
+ * Supports AbortSignal to kill the child on disconnect.
+ * Legacy signature: (cmd, args, config, timeoutMs, spawnFn) still works.
  */
 export function runCursorSpawnedCommand(
   command: string,
   args: string[],
   config: CursorConfig,
-  timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS,
-  spawnFn: CursorSpawnFn = nodeSpawn
+  timeoutMsOrOptions: number | CursorSpawnOptions = TIMEOUT.CURSOR_PROMPT_MS,
+  spawnFnLegacy?: CursorSpawnFn
 ): Promise<CursorCommandResult> {
+  const options: CursorSpawnOptions =
+    typeof timeoutMsOrOptions === "number"
+      ? { timeoutMs: timeoutMsOrOptions, spawnFn: spawnFnLegacy }
+      : timeoutMsOrOptions;
+  const timeoutMs = options.timeoutMs ?? TIMEOUT.CURSOR_PROMPT_MS;
+  const spawnFn = options.spawnFn ?? nodeSpawn;
+  const signal = options.signal;
+
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Cursor CLI command aborted"));
+      return;
+    }
+
     const child = spawnFn(command, args, {
       cwd: config.cwd,
       env: mergeEnv(config.env),
     });
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 
     child.stdout?.setEncoding(ENCODING.UTF8);
     child.stdout?.on(NODE_EVENT.DATA, (chunk: string) => {
@@ -49,10 +69,23 @@ export function runCursorSpawnedCommand(
       stderr += chunk;
     });
 
-    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+    const settleReject = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+    const settleResolve = (result: CursorCommandResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
 
-    const timeoutTimer = setTimeout(() => {
-      child.kill("SIGTERM");
+    const killChild = () => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // process may have already exited
+      }
       forceKillTimer = setTimeout(() => {
         try {
           child.kill("SIGKILL");
@@ -60,19 +93,33 @@ export function runCursorSpawnedCommand(
           // process may have already exited
         }
       }, TIMEOUT.CURSOR_FORCE_KILL_MS);
-      reject(new Error(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(timeoutMs)));
+    };
+
+    const onAbort = () => {
+      clearTimeout(timeoutTimer);
+      killChild();
+      settleReject(new Error("Cursor CLI command aborted"));
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    const timeoutTimer = setTimeout(() => {
+      killChild();
+      settleReject(new Error(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(timeoutMs)));
     }, timeoutMs);
 
     child.on(NODE_EVENT.ERROR, (err) => {
       clearTimeout(timeoutTimer);
       clearTimeout(forceKillTimer);
-      reject(err);
+      signal?.removeEventListener("abort", onAbort);
+      settleReject(err);
     });
 
     child.on(NODE_EVENT.CLOSE, (code) => {
       clearTimeout(timeoutTimer);
       clearTimeout(forceKillTimer);
-      resolve({ stdout, stderr, exitCode: code });
+      signal?.removeEventListener("abort", onAbort);
+      settleResolve({ stdout, stderr, exitCode: code });
     });
   });
 }

@@ -1,6 +1,6 @@
 {
   "name": "@simpill/acp-llm-cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor)",
   "license": "ISC",
   "author": "SkinnnyJay",
