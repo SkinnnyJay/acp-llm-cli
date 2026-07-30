@@ -54,6 +54,16 @@ describe("StdioConnection", () => {
     expect(conn.getStream()).toBeDefined();
   });
 
+  it("defaults args to an empty array when options.args is omitted", async () => {
+    const { child } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake" }, spawnFn);
+
+    await conn.connect();
+
+    expect(spawnFn).toHaveBeenCalledWith("fake", [], expect.any(Object));
+  });
+
   it("emits state=CONNECTING then state=CONNECTED on successful spawn", async () => {
     const { child } = createFakeChild();
     const spawnFn = vi.fn().mockReturnValue(child);
@@ -274,6 +284,26 @@ describe("StdioConnection", () => {
 
       expect(child.kill).toHaveBeenCalledWith("SIGTERM");
       expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("completes force-disconnect when child.kill is unavailable", async () => {
+    vi.useFakeTimers();
+    try {
+      const { child } = createFakeChild();
+      // Simulate a child handle that lost its kill method before the force-kill timer.
+      (child as { kill: unknown }).kill = undefined;
+      const spawnFn = vi.fn().mockReturnValue(child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(500);
+      await disconnectPromise;
+
       expect(conn.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
     } finally {
       vi.useRealTimers();

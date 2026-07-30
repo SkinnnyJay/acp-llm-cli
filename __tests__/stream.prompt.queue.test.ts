@@ -85,4 +85,19 @@ describe("createStreamPromptQueue", () => {
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual(one);
   });
+
+  it("close after pushError is a no-op for done state", async () => {
+    const q = createStreamPromptQueue();
+    const consumePromise = (async () => {
+      for await (const _ of q.consume()) {
+        // wait for terminal error
+      }
+    })();
+
+    q.pushError(new Error("first"));
+    q.close();
+    q.pushError(new Error("second"));
+
+    await expect(consumePromise).rejects.toThrow("first");
+  });
 });

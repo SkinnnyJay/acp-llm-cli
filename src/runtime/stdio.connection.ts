@@ -107,20 +107,7 @@ export class StdioConnection
 
   private createNdjsonStream(child: ChildProcessWithoutNullStreams): Stream {
     const input = Writable.toWeb(child.stdin);
-    const outputReader = Readable.toWeb(child.stdout).getReader();
-    const output = new ReadableStream<Uint8Array>({
-      async pull(controller) {
-        const result = await outputReader.read();
-        if (result.done) {
-          controller.close();
-          return;
-        }
-        if (result.value) controller.enqueue(result.value);
-      },
-      cancel(reason) {
-        void outputReader.cancel(reason);
-      },
-    });
+    const output = Readable.toWeb(child.stdout);
     return ndJsonStream(input, output);
   }
 

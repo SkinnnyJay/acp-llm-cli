@@ -31,11 +31,9 @@ export function createStreamPromptQueue(): {
       }
       return Promise.resolve({ done: true, value: undefined });
     }
-    if (queue.length > 0) {
-      const value = queue.shift();
-      if (value !== undefined) {
-        return Promise.resolve({ done: false, value });
-      }
+    const queued = queue.shift();
+    if (queued !== undefined) {
+      return Promise.resolve({ done: false, value: queued });
     }
     return new Promise((resolve, reject) => {
       wake = () => {
@@ -44,13 +42,11 @@ export function createStreamPromptQueue(): {
           if (done.reason === STREAM_PROMPT_QUEUE_REASON.ERROR) {
             reject(done.error);
           } else resolve({ done: true, value: undefined });
-        } else if (queue.length > 0) {
-          const value = queue.shift();
-          if (value !== undefined) {
-            resolve({ done: false, value });
-          } else {
-            resolve({ done: true, value: undefined });
-          }
+          return;
+        }
+        const value = queue.shift();
+        if (value !== undefined) {
+          resolve({ done: false, value });
         }
       };
     });
