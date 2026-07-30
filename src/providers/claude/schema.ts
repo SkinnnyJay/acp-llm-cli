@@ -4,7 +4,8 @@ import { ModelIdSchema as AnthropicModelIdSchema } from "../../domain/models/ant
 
 /**
  * Claude CLI config: base command/args/cwd/env plus generic LLM options.
- * model: validated against Anthropic model enum (run npm run update-models to refresh) or any string.
+ * model: validated against Anthropic model enum (run npm run update-models to refresh)
+ * or any string (open escape for new model ids / overrides).
  */
 export const claudeConfigSchema = createProviderConfigSchema(AnthropicModelIdSchema);
 

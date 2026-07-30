@@ -259,4 +259,75 @@ describe("StreamAgentPort", () => {
       }
     }).rejects.toBe("string-fail");
   });
+
+  it("filters sessionUpdate events for other session ids", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner, { envelopeMode: ENVELOPE_MODE.NATIVE });
+
+    (inner.prompt as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      setTimeout(() => {
+        (inner as unknown as EventEmitter).emit("sessionUpdate", {
+          sessionId: "other",
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "skip" },
+          },
+        });
+        (inner as unknown as EventEmitter).emit("sessionUpdate", {
+          sessionId: "s1",
+          update: {
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "keep" },
+          },
+        });
+      }, 0);
+      await new Promise((r) => setTimeout(r, 10));
+      return { stopReason: "end_turn" };
+    });
+
+    const texts: string[] = [];
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    for await (const env of port.streamPrompt(params)) {
+      const native = env as {
+        kind?: string;
+        update?: { update?: { content?: { text?: string } } };
+      };
+      if (native.kind === "native") {
+        const text = native.update?.update?.content?.text;
+        if (text) texts.push(text);
+      }
+    }
+    expect(texts).toEqual(["keep"]);
+  });
+
+  it("rejects concurrent streamPrompt calls on the same port", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+
+    let releasePrompt!: () => void;
+    const promptGate = new Promise<void>((r) => {
+      releasePrompt = r;
+    });
+    (inner.prompt as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      await promptGate;
+      return { stopReason: "end_turn" };
+    });
+
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    const first = (async () => {
+      for await (const _ of port.streamPrompt(params)) {
+        // consume
+      }
+    })();
+
+    await new Promise((r) => setTimeout(r, 5));
+    await expect(async () => {
+      for await (const _ of port.streamPrompt(params)) {
+        // should not start
+      }
+    }).rejects.toThrow(/already in progress/i);
+
+    releasePrompt();
+    await first;
+  });
 });

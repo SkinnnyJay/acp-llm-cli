@@ -9,10 +9,7 @@ import { CODEX_CONFIG_KEYS } from "./constants";
 import { codexConfigSchema } from "./schema";
 import type { CodexConfig } from "./schema";
 
-const createRuntime = (
-  config: CodexConfig,
-  runtimeOptions?: AcpSharedRuntimeOptions
-): IAgentPort =>
+const createRuntime = (config: CodexConfig, runtimeOptions?: AcpSharedRuntimeOptions): IAgentPort =>
   createStandardAcpRuntime(
     config,
     {

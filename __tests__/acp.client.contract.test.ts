@@ -18,7 +18,6 @@ vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
       newSession = mockNewSession;
       prompt = mockPrompt;
       authenticate = mockAuthenticate;
-      constructor(_factory: unknown, _stream: unknown) {}
     },
   };
 });

@@ -1,10 +1,9 @@
+import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
-import {
-  getDefaultFactory,
-  resetDefaultFactoriesForTests,
-} from "../src/bootstrap";
+import { getDefaultFactory, resetDefaultFactoriesForTests } from "../src/bootstrap";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
+import type { AcpSharedRuntimeOptions } from "../src/providers/acp.shared";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { baseCliConfigSchema } from "../src/runtime/config";
 import { createCliHarnessAdapter } from "../src/runtime/create.cli.harness.adapter";
@@ -12,8 +11,6 @@ import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor"
 import { ProviderFactory } from "../src/runtime/provider.factory";
 import { HarnessRegistry } from "../src/runtime/registry";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
-import type { AcpSharedRuntimeOptions } from "../src/providers/acp.shared";
-import { EventEmitter } from "eventemitter3";
 
 function createMockPort(): IAgentPort {
   const emitter = new EventEmitter();

@@ -129,9 +129,9 @@ describe("CursorAgentPort spawn contract", () => {
   });
 
   it("throws when NDJSON result is missing", async () => {
-    const spawnFn = vi.fn().mockImplementation(() =>
-      createFakeChild({ stdout: "not-json\n", exitCode: 0 })
-    );
+    const spawnFn = vi
+      .fn()
+      .mockImplementation(() => createFakeChild({ stdout: "not-json\n", exitCode: 0 }));
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
       { spawnFn: spawnFn as never }

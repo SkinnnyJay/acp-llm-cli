@@ -10,11 +10,12 @@ import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { LIMIT } from "../domain/limits";
 import { NODE_EVENT } from "../domain/node.events";
-import { SIGNAL } from "../domain/signals";
-import { TIMEOUT } from "../domain/timeouts";
 import type { ProcessEnv } from "../domain/process.env";
+import { SIGNAL } from "../domain/signals";
+import { formatStderrForError } from "../domain/stderr.format";
+import { TIMEOUT } from "../domain/timeouts";
 import type { IConnection } from "./connection.interface";
-import { mergeEnv } from "./env.reader";
+import { isDebugEnabled, mergeEnv } from "./env.reader";
 import type { SpawnOptions as SpawnOptionsType } from "./types";
 
 export type SpawnFunction = (
@@ -153,7 +154,10 @@ export class StdioConnection
 
   private formatExitError(code: number | null, signal: string | null): Error {
     const suffix = signal ? ` (signal ${signal})` : "";
-    const details = this.stderrLines.length ? `\n${this.stderrLines.join("\n")}` : "";
+    const rawDetails = this.stderrLines.length ? `\n${this.stderrLines.join("\n")}` : "";
+    const details = rawDetails
+      ? formatStderrForError(rawDetails, { debug: isDebugEnabled(this.options.env) })
+      : "";
     return new Error(ERROR_MESSAGE.AGENT_PROCESS_EXITED(code ?? "unknown", suffix, details));
   }
 }

@@ -22,10 +22,11 @@ import { DEFAULT_COMMANDS } from "../../domain/default.commands";
 import { ENV_KEY } from "../../domain/env.keys";
 import { ERROR_MESSAGE } from "../../domain/error.messages";
 import { PORT_CAPABILITY } from "../../domain/port.capabilities";
+import { formatStderrForError } from "../../domain/stderr.format";
 import { STOP_REASON } from "../../domain/stop.reason";
 import { TIMEOUT } from "../../domain/timeouts";
 import type { AgentPortCapabilities, AgentPortEvents, IAgentPort } from "../../runtime/agent.port";
-import { getEnvString } from "../../runtime/env.reader";
+import { getEnvString, isDebugEnabled } from "../../runtime/env.reader";
 import { CURSOR_CLI_ARG, CURSOR_HEALTH_CHECK_PROMPT, CURSOR_UUID_PATTERN } from "./constants";
 import { resolveCursorMode } from "./cursor.mode.utils";
 import { parseCursorNdjsonResult } from "./cursor.ndjson.utils";
@@ -138,7 +139,10 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
         this.emit(AGENT_PORT_EVENT.STATE, this.status);
         this.emit(
           AGENT_PORT_EVENT.ERROR,
-          new Error(result.stderr || ERROR_MESSAGE.CURSOR_CLI_CHECK_FAILED)
+          new Error(
+            formatStderrForError(result.stderr, { debug: isDebugEnabled(this.config.env) }) ||
+              ERROR_MESSAGE.CURSOR_CLI_CHECK_FAILED
+          )
         );
       }
     } catch (err) {

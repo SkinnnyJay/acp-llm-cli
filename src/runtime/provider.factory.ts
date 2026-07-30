@@ -29,11 +29,7 @@ export class ProviderFactory implements IProviderFactory {
     this.collectMetrics = options.collectMetrics ?? true;
   }
 
-  createRuntime(
-    id: string,
-    config: unknown,
-    runtimeOptions?: AcpSharedRuntimeOptions
-  ): IAgentPort {
+  createRuntime(id: string, config: unknown, runtimeOptions?: AcpSharedRuntimeOptions): IAgentPort {
     const provider = this.registry.get(id);
     if (!provider) {
       const msg = VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id);

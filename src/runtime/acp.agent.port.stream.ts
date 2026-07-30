@@ -8,6 +8,7 @@ import { AGENT_PORT_EVENT } from "../domain/agent.port.events";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import type { EnvelopeMode } from "../domain/envelope.mode";
+import { ERROR_MESSAGE } from "../domain/error.messages";
 import { OPENAI_COMPAT } from "../domain/openai.compat";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import type { StreamEnvelope } from "../domain/stream.envelopes";
@@ -25,6 +26,13 @@ export interface WrapAgentPortOptions {
   modelId?: string;
 }
 
+function notificationSessionId(update: SessionNotification): string | undefined {
+  const record = update as Record<string, unknown>;
+  if (typeof record.sessionId === "string") return record.sessionId;
+  if (typeof record.session_id === "string") return record.session_id;
+  return undefined;
+}
+
 /**
  * Wraps an IAgentPort to add streamPrompt (dual-envelope ACP→OpenAI bridging),
  * plus restart, open, and close capability metadata.
@@ -36,6 +44,7 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   private readonly inner: IAgentPort;
   private readonly envelopeMode: EnvelopeMode;
   private readonly modelId: string | undefined;
+  private streamBusy = false;
 
   constructor(inner: IAgentPort, options: WrapAgentPortOptions = {}) {
     super();
@@ -105,10 +114,22 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
     params: PromptRequest,
     streamOptions?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope> {
+    if (this.streamBusy) {
+      throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    }
+    this.streamBusy = true;
+
     const mode = streamOptions?.envelopeMode ?? this.envelopeMode;
     const modelId = this.modelId;
+    const sessionId = params.sessionId;
     const queue = createStreamPromptQueue();
-    const handler = (update: SessionNotification) => queue.push(update);
+    const handler = (update: SessionNotification) => {
+      const updateSessionId = notificationSessionId(update);
+      if (sessionId && updateSessionId && updateSessionId !== sessionId) {
+        return;
+      }
+      queue.push(update);
+    };
     this.inner.on(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
 
     const promptPromise = this.inner.prompt(params);
@@ -135,6 +156,8 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
     } catch (err) {
       queue.pushError(err instanceof Error ? err : new Error(String(err)));
       throw err;
+    } finally {
+      this.streamBusy = false;
     }
   }
 

@@ -5,8 +5,9 @@ import { ERROR_MESSAGE } from "../domain/error.messages";
 import { NODE_EVENT } from "../domain/node.events";
 import type { ProcessEnv } from "../domain/process.env";
 import { SIGNAL } from "../domain/signals";
+import { formatStderrForError } from "../domain/stderr.format";
 import { TIMEOUT } from "../domain/timeouts";
-import { mergeEnv } from "../runtime/env.reader";
+import { isDebugEnabled, mergeEnv } from "../runtime/env.reader";
 
 export const HELP_FLAG = "--help";
 
@@ -79,7 +80,14 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
       if (code !== 0 && code !== null) {
-        reject(new Error(ERROR_MESSAGE.HELP_COMMAND_FAILED(code, stderr)));
+        reject(
+          new Error(
+            ERROR_MESSAGE.HELP_COMMAND_FAILED(
+              code,
+              formatStderrForError(stderr, { debug: isDebugEnabled(env) })
+            )
+          )
+        );
         return;
       }
       resolve(stdout || stderr);

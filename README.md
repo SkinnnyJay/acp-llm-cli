@@ -30,6 +30,7 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
+  // Enum id or any string (open escape for unlisted models):
   model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
 });
 await client.port.connect();
@@ -41,6 +42,8 @@ await client.port.disconnect();
 Use `Provider.CLAUDE`, `Provider.GEMINI`, `Provider.CODEX`, `Provider.CURSOR`; `factory.listProviders()` returns all.
 
 **Also available:** `getDefaultFactory().createRuntime(id, config, runtimeOptions?)` for Zod-validated config by provider id (pass `sessionPersistence`, `permissionHandler`, etc.), and `createHarness(registry, id, config, runtimeOptions?)` for custom registries. Prefer the ProviderClientFactory path above for new code; use `@simpill/acp-llm-cli/runtime` when building custom ports or adapters.
+
+Runnable examples (after `npm run build`): `examples/minimal-claude.ts`, `examples/cursor-print.ts`, `examples/stream-prompt.ts`. See [docs/api.md](./docs/api.md) for the curated export list.
 
 ## Simpill integration
 

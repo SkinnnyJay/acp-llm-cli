@@ -16,6 +16,7 @@ export const ERROR_MESSAGE = {
   HELP_EXTRACTION_TIMEOUT: (timeoutMs: number) => `Help extraction timed out after ${timeoutMs}ms`,
   HELP_COMMAND_FAILED: (code: number, stderr: string) =>
     `Help command exited ${code}. stderr: ${stderr}`,
+  STREAM_PROMPT_IN_PROGRESS: "Another streamPrompt is already in progress on this port",
   AGENT_PROCESS_EXITED: (code: number | string, suffix: string, details: string) =>
     `Agent process exited with code ${code}${suffix}${details}`,
 } as const;

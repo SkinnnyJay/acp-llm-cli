@@ -6,10 +6,7 @@ import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
 import { isNativeEnvelope, isOpenAIEnvelope } from "../src/domain/stream.envelopes";
 import { sessionUpdateToEnvelopes } from "../src/runtime/envelope.mapper";
 
-const FIXTURE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "fixtures/acp/session-updates.jsonl"
-);
+const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "fixtures/acp/session-updates.jsonl");
 
 describe("ACP session update fixtures", () => {
   it("maps golden jsonl lines to envelope invariants", () => {
@@ -32,12 +29,17 @@ describe("ACP session update fixtures", () => {
           "text" &&
         typeof (update.update as { content?: { text?: string } }).content?.text === "string";
 
-      if (hasText && (update.update as { sessionUpdate?: string }).sessionUpdate === "agent_message_chunk") {
+      if (
+        hasText &&
+        (update.update as { sessionUpdate?: string }).sessionUpdate === "agent_message_chunk"
+      ) {
         expect(both.some(isOpenAIEnvelope)).toBe(true);
       }
     }
 
-    const first = sessionUpdateToEnvelopes(lines[0]!, ENVELOPE_MODE.OPENAI);
+    const firstUpdate = lines[0];
+    if (!firstUpdate) throw new Error("fixture missing first line");
+    const first = sessionUpdateToEnvelopes(firstUpdate, ENVELOPE_MODE.OPENAI);
     expect(first).toHaveLength(1);
     expect(isOpenAIEnvelope(first[0])).toBe(true);
     expect(first[0]).toMatchObject({

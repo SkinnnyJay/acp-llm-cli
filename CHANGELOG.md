@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zod peer aligned with ACP SDK (`^3.25.0 || ^4.0.0`).
 - Public types use `ProcessEnv` / `string` instead of bare `NodeJS.*` namespaces.
 - CI: Node 20+22 matrix, coverage artifact, `npm pack` smoke + publint; stub release workflow on `v*` tags (no publish until requested).
+- Stream isolation: `streamPrompt` filters by `sessionId` and rejects concurrent calls on one port.
+- Stderr in thrown errors is redacted/truncated unless debug is enabled; examples + `docs/api.md`.
 - Subpath export is `./runtime` only (the former `./core` alias was removed).
 - README / CONTRIBUTING / AGENTS / `.env.sample` aligned with real defaults and GitHub Flow.
 
