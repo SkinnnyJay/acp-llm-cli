@@ -16,11 +16,6 @@ export default defineConfig({
         // Pure provider registration objects — no business logic to test
         "src/providers/*/adapter.ts",
         "src/providers/cursor/cli.definition.ts",
-        // Integration-only: requires spawning real CLI processes
-        "src/cli/help.extractor.ts",
-        "src/providers/cursor/cursor.agent.port.ts",
-        // Integration-only: requires a live ACP WebSocket server
-        "src/runtime/acp.client.ts",
       ],
       thresholds: {
         branches: 80,

@@ -1,11 +1,14 @@
 /**
- * Live provider matrix — Claude / Codex / Cursor against real CLIs.
+ * Live provider matrix — Claude / Codex / Gemini / Cursor against real CLIs.
  *
  * Skip by default. Enable:
  *   ACP_LLM_CLI_LIVE=1 npm test -- __tests__/live.providers.matrix.test.ts
- * Optional filter: ACP_LLM_CLI_PROVIDER=claude|codex|cursor
+ * Optional filter: ACP_LLM_CLI_PROVIDER=claude|codex|gemini|cursor
  *
- * Cursor in this package uses print/stream-json (not ACP). Claude/Codex use ACP stdio.
+ * When LIVE=1, asserts connect → initialize → newSession → short prompt → disconnect.
+ * Missing binaries fail the test (no soft-pass).
+ *
+ * Cursor in this package uses print/stream-json (not ACP). Others use ACP stdio.
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COMMANDS } from "../src/domain/default.commands.js";
@@ -39,6 +42,13 @@ const CASES: Case[] = [
     mode: "acp",
   },
   {
+    id: "gemini",
+    providerId: PROVIDER_IDS.GEMINI_CLI_ID,
+    command: DEFAULT_COMMANDS.GEMINI_DEFAULT_COMMAND,
+    args: [...DEFAULT_COMMANDS.GEMINI_DEFAULT_ARGS],
+    mode: "acp",
+  },
+  {
     id: "cursor",
     providerId: PROVIDER_IDS.CURSOR_CLI_ID,
     command: DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
@@ -49,7 +59,7 @@ const CASES: Case[] = [
 
 describe.skipIf(!LIVE)("live provider matrix", () => {
   it.each(CASES)(
-    "$id defaults resolve and port lifecycle does not throw on construct",
+    "$id connect → initialize → newSession → prompt → disconnect",
     async (c) => {
       const factory = getDefaultFactory();
       const port = factory.createRuntime(c.providerId, {
@@ -57,17 +67,27 @@ describe.skipIf(!LIVE)("live provider matrix", () => {
         args: c.args,
         cwd: process.cwd(),
       });
+
       expect(port).toBeTruthy();
-      // Soft connect probe — may fail if binary missing; assert structured error.
-      try {
-        await port.connect();
-        await port.disconnect?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        // Missing binary is an environment issue; surface but don't flake CI when live.
-        expect(message.length).toBeGreaterThan(0);
+      expect(port.capabilities).toBeDefined();
+
+      await port.connect();
+      const init = await port.initialize();
+      expect(init).toHaveProperty("protocolVersion");
+
+      const session = await port.newSession({ cwd: process.cwd(), mcpServers: [] });
+      expect(typeof session.sessionId).toBe("string");
+
+      if (session.sessionId) {
+        const promptRes = await port.prompt({
+          sessionId: session.sessionId,
+          prompt: [{ type: "text", text: "Reply with exactly: ok" }],
+        });
+        expect(promptRes).toHaveProperty("stopReason");
       }
+
+      await port.disconnect();
     },
-    60_000
+    120_000
   );
 });

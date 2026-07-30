@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { spawn as nodeSpawn } from "node:child_process";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { NODE_EVENT } from "../domain/node.events";
@@ -8,12 +9,20 @@ import { mergeEnv } from "../runtime/env.reader";
 
 export const HELP_FLAG = "--help";
 
+export type HelpSpawnFn = (
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; stdio: ["ignore", "pipe", "pipe"] }
+) => ChildProcessWithoutNullStreams;
+
 export interface HelpExtractorOptions {
   command: string;
   args?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  /** Injectable for tests; defaults to node:child_process spawn. */
+  spawnFn?: HelpSpawnFn;
 }
 
 /**
@@ -21,11 +30,18 @@ export interface HelpExtractorOptions {
  * On timeout: SIGTERM then SIGKILL after the force-kill grace window.
  */
 export function extractHelp(options: HelpExtractorOptions): Promise<string> {
-  const { command, args = [], cwd, env, timeoutMs = TIMEOUT.HELP_EXTRACTION_MS } = options;
+  const {
+    command,
+    args = [],
+    cwd,
+    env,
+    timeoutMs = TIMEOUT.HELP_EXTRACTION_MS,
+    spawnFn = nodeSpawn,
+  } = options;
   const helpArgs = args.includes(HELP_FLAG) ? [...args] : [...args, HELP_FLAG];
 
   return new Promise((resolve, reject) => {
-    const child = spawn(command, helpArgs, {
+    const child = spawnFn(command, helpArgs, {
       cwd,
       env: mergeEnv(env),
       stdio: ["ignore", "pipe", "pipe"],

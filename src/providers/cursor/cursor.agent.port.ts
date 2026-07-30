@@ -29,6 +29,7 @@ import { getEnvString } from "../../runtime/env.reader";
 import { CURSOR_CLI_ARG, CURSOR_HEALTH_CHECK_PROMPT, CURSOR_UUID_PATTERN } from "./constants";
 import { resolveCursorMode } from "./cursor.mode.utils";
 import { parseCursorNdjsonResult } from "./cursor.ndjson.utils";
+import type { CursorSpawnFn } from "./cursor.spawn.utils";
 import { runCursorSpawnedCommand } from "./cursor.spawn.utils";
 import type { CursorConfig } from "./schema";
 
@@ -40,6 +41,11 @@ const CURSOR_CAPABILITIES: AgentPortCapabilities = {
   [PORT_CAPABILITY.SESSION_PERSISTENCE]: false,
 };
 
+export interface CursorAgentPortOptions {
+  /** Injectable spawn for tests; defaults to node:child_process spawn. */
+  spawnFn?: CursorSpawnFn;
+}
+
 /**
  * IAgentPort for Cursor CLI: spawns process per prompt, parses NDJSON result.
  * Supports setSessionMode/setSessionModel, runCommand timeout, and graceful disconnect.
@@ -49,15 +55,17 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   private sessionId: string | undefined;
   private readonly config: CursorConfig;
+  private readonly spawnFn: CursorSpawnFn | undefined;
   private readonly sessionModeById = new Map<string, string>();
   private readonly sessionModelById = new Map<string, string>();
   private activePromptCount = 0;
   private disconnectionInProgress = false;
   private readonly activeAbortControllers = new Set<AbortController>();
 
-  constructor(config: CursorConfig) {
+  constructor(config: CursorConfig, options?: CursorAgentPortOptions) {
     super();
     this.config = config;
+    this.spawnFn = options?.spawnFn;
   }
 
   get connectionStatus(): ConnectionStatus {
@@ -103,6 +111,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
       return await runCursorSpawnedCommand(command, args, this.config, {
         timeoutMs,
         signal: controller.signal,
+        spawnFn: this.spawnFn,
       });
     } finally {
       this.activeAbortControllers.delete(controller);
@@ -142,10 +151,11 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   async disconnect(): Promise<void> {
     this.disconnectionInProgress = true;
     try {
-      await this.waitForPromptCompletion();
+      // Abort in-flight spawns first so disconnect cannot hang on a stuck child.
       for (const controller of this.activeAbortControllers) {
         controller.abort();
       }
+      await this.waitForPromptCompletion();
       this.activeAbortControllers.clear();
       this.activePromptCount = 0;
       this.status = CONNECTION_STATUS.DISCONNECTED;

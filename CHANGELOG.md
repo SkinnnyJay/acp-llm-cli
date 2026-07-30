@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory persistence keys are length-prefixed to avoid `providerId`/`workspace` collisions.
 - Help extraction and Cursor disconnect force-kill orphaned child processes.
 - Public API exports `createAcpCliHarnessRuntime`, `createStandardAcpRuntime`, and session persistence types.
+- Factory / adapters accept `AcpSharedRuntimeOptions` (`sessionPersistence`, permissions, envelope); ACP ports always get lifecycle wrap.
 - Subpath export is `./runtime` only (the former `./core` alias was removed).
 - README / CONTRIBUTING / AGENTS / `.env.sample` aligned with real defaults and GitHub Flow.
 
