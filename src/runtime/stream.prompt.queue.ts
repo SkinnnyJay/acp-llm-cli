@@ -45,9 +45,7 @@ export function createStreamPromptQueue(): {
           return;
         }
         const value = queue.shift();
-        if (value !== undefined) {
-          resolve({ done: false, value });
-        }
+        resolve(value !== undefined ? { done: false, value } : { done: true, value: undefined });
       };
     });
   };
