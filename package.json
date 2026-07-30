@@ -53,31 +53,35 @@
     "test:coverage": "vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run build && npm run test:coverage",
     "prepublishOnly": "npm run verify",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
+    "publint": "node scripts/publint-pack.mjs",
     "update-models": "tsx scripts/update-models.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
     "@simpill/async.utils": "^1.0.0",
     "@simpill/env.utils": "^1.0.0",
-    "@simpill/patterns.utils": "^1.0.0",
     "@simpill/errors.utils": "^1.0.0",
     "@simpill/logger.utils": "^1.0.0",
+    "@simpill/patterns.utils": "^1.0.0",
     "@simpill/protocols.utils": "^1.0.0"
   },
+  "sideEffects": false,
   "peerDependencies": {
     "eventemitter3": "^5.0.1",
-    "zod": "^3.23.8"
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^4.1.2",
     "eventemitter3": "^5.0.1",
+    "publint": "^0.3.12",
     "tsup": "^8.3.5",
     "tsx": "^4.19.0",
     "typescript": "^5.7.2",
     "vitest": "^4.1.2",
-    "zod": "^3.23.8"
+    "zod": "^3.25.0"
   },
   "files": [
     "dist"

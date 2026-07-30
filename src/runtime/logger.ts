@@ -1,5 +1,6 @@
 import { getLogger } from "@simpill/logger.utils";
 import type { LogMetadata } from "@simpill/logger.utils";
+import type { ProcessEnv } from "../domain/process.env";
 import { isDebugEnabled } from "./env.reader";
 
 export interface ILogger {
@@ -25,7 +26,7 @@ function toMetadata(args: unknown[]): LogMetadata | undefined {
  * Logger backed by @simpill/logger.utils. When options.env (or process.env) has
  * ACP_LLM_CLI_DEBUG falsy, debug() is a no-op.
  */
-export function createLogger(name: string, options?: { env?: NodeJS.ProcessEnv }): ILogger {
+export function createLogger(name: string, options?: { env?: ProcessEnv }): ILogger {
   const simpillLogger = getLogger(name);
   const debugOn = isDebugEnabled(options?.env);
 

@@ -1,3 +1,4 @@
+import type { ProcessEnv } from "../domain/process.env";
 import type { BaseCliConfig } from "../runtime/config";
 import type { GenericFlagMap } from "./generic.options";
 
@@ -8,7 +9,7 @@ export interface GetHelpOptions {
   command: string;
   args?: string[];
   cwd?: string;
-  env?: NodeJS.ProcessEnv;
+  env?: ProcessEnv;
 }
 
 /**

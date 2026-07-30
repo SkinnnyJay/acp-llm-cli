@@ -1,4 +1,5 @@
 import { ENV_KEY } from "../domain/env.keys";
+import type { ProcessEnv } from "../domain/process.env";
 import type { BaseCliConfig } from "./config";
 import { getEnvString } from "./env.reader";
 
@@ -13,7 +14,7 @@ export function resolveBaseConfig(
     argsKey: keyof typeof ENV_KEY;
   },
   overrides?: Partial<BaseCliConfig>,
-  envOverride?: NodeJS.ProcessEnv
+  envOverride?: ProcessEnv
 ): BaseCliConfig {
   const command =
     overrides?.command ??

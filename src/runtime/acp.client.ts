@@ -57,7 +57,7 @@ export interface IACPConnectionLike {
     event: typeof CONNECTION_EVENT.EXIT,
     handler: (info: {
       code: number | null;
-      signal: NodeJS.Signals | null;
+      signal: string | null;
     }) => void
   ): void;
 }

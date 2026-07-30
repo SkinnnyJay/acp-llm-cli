@@ -12,6 +12,7 @@ import { LIMIT } from "../domain/limits";
 import { NODE_EVENT } from "../domain/node.events";
 import { SIGNAL } from "../domain/signals";
 import { TIMEOUT } from "../domain/timeouts";
+import type { ProcessEnv } from "../domain/process.env";
 import type { IConnection } from "./connection.interface";
 import { mergeEnv } from "./env.reader";
 import type { SpawnOptions as SpawnOptionsType } from "./types";
@@ -19,14 +20,14 @@ import type { SpawnOptions as SpawnOptionsType } from "./types";
 export type SpawnFunction = (
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv }
+  options: { cwd?: string; env?: ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
 export class StdioConnection
   extends EventEmitter<{
     state: (status: ConnectionStatus) => void;
     error: (error: Error) => void;
-    exit: (info: { code: number | null; signal: NodeJS.Signals | null }) => void;
+    exit: (info: { code: number | null; signal: string | null }) => void;
   }>
   implements IConnection
 {
@@ -117,7 +118,7 @@ export class StdioConnection
       this.setStatus(CONNECTION_STATUS.ERROR);
     });
 
-    child.on(NODE_EVENT.CLOSE, (code: number | null, signal: NodeJS.Signals | null) => {
+    child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
       const wasDisconnecting = this.isDisconnecting;
       this.isDisconnecting = false;
       this.emit(CONNECTION_EVENT.EXIT, { code, signal });
@@ -150,7 +151,7 @@ export class StdioConnection
     }
   }
 
-  private formatExitError(code: number | null, signal: NodeJS.Signals | null): Error {
+  private formatExitError(code: number | null, signal: string | null): Error {
     const suffix = signal ? ` (signal ${signal})` : "";
     const details = this.stderrLines.length ? `\n${this.stderrLines.join("\n")}` : "";
     return new Error(ERROR_MESSAGE.AGENT_PROCESS_EXITED(code ?? "unknown", suffix, details));

@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help extraction and Cursor disconnect force-kill orphaned child processes.
 - Public API exports `createAcpCliHarnessRuntime`, `createStandardAcpRuntime`, and session persistence types.
 - Factory / adapters accept `AcpSharedRuntimeOptions` (`sessionPersistence`, permissions, envelope); ACP ports always get lifecycle wrap.
+- Kept `@simpill/errors.utils`, `@simpill/patterns.utils`, and `@simpill/protocols.utils` as direct deps so packed installs resolve transitive requirements from env/logger/async utils.
+- Zod peer aligned with ACP SDK (`^3.25.0 || ^4.0.0`).
+- Public types use `ProcessEnv` / `string` instead of bare `NodeJS.*` namespaces.
+- CI: Node 20+22 matrix, coverage artifact, `npm pack` smoke + publint; stub release workflow on `v*` tags (no publish until requested).
 - Subpath export is `./runtime` only (the former `./core` alias was removed).
 - README / CONTRIBUTING / AGENTS / `.env.sample` aligned with real defaults and GitHub Flow.
 

@@ -14,6 +14,6 @@ export interface IConnection {
   on(event: typeof CONNECTION_EVENT.ERROR, handler: (error: Error) => void): this;
   on(
     event: typeof CONNECTION_EVENT.EXIT,
-    handler: (info: { code: number | null; signal: NodeJS.Signals | null }) => void
+    handler: (info: { code: number | null; signal: string | null }) => void
   ): this;
 }

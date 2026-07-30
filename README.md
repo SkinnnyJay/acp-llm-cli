@@ -49,8 +49,9 @@ This package uses [**@simpill** scoped packages](https://www.npmjs.com/search?q=
 - **@simpill/env.utils** — type-safe env reads (e.g. `ACP_LLM_CLI_DEBUG`, command overrides) via `Env` and a small env-reader layer for test overrides.
 - **@simpill/logger.utils** — structured logging; `createLogger()` returns an `ILogger` that delegates to `getLogger()` with debug gated by `ACP_LLM_CLI_DEBUG`.
 - **@simpill/async.utils** — `retry` and `delay` for `restartWithBackoff` (exponential backoff with cap).
-- **@simpill/errors.utils** — available for typed `AppError` and `serializeError`; adoption in throw paths can be done incrementally.
-- **@simpill/protocols.utils** — transitive dependency of logger.utils (protocol constants).
+- **@simpill/errors.utils**, **@simpill/patterns.utils**, **@simpill/protocols.utils** — declared directly so packed installs resolve transitive requirements of the packages above.
+
+Peer dependencies: `zod` (`^3.25.0 || ^4.0.0`, aligned with `@agentclientprotocol/sdk`) and `eventemitter3`.
 
 ## Mesh / ACPX compatibility
 

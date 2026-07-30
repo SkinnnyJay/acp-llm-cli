@@ -3,6 +3,7 @@ import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { ENCODING } from "../../domain/encoding";
 import { ERROR_MESSAGE } from "../../domain/error.messages";
 import { NODE_EVENT } from "../../domain/node.events";
+import type { ProcessEnv } from "../../domain/process.env";
 import { TIMEOUT } from "../../domain/timeouts";
 import { mergeEnv } from "../../runtime/env.reader";
 import type { CursorConfig } from "./schema";
@@ -16,7 +17,7 @@ export interface CursorCommandResult {
 export type CursorSpawnFn = (
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv }
+  options: { cwd?: string; env?: ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
 export interface CursorSpawnOptions {
