@@ -1,4 +1,5 @@
 import type { Provider } from "../../domain/provider";
+import type { AcpSharedRuntimeOptions } from "../../providers/acp.shared";
 import type { IAgentPort } from "../agent.port";
 import type { BaseCliConfig } from "../config";
 import type { IHarnessAdapter } from "../harness.adapter";
@@ -21,7 +22,11 @@ export interface IProviderClient {
  * Factory that returns IProviderClient by provider enum. Extensible: new providers add to Provider and registry.
  */
 export interface IProviderClientFactory {
-  getClient(provider: Provider, config: unknown): IProviderClient;
+  getClient(
+    provider: Provider,
+    config: unknown,
+    runtimeOptions?: AcpSharedRuntimeOptions
+  ): IProviderClient;
   listProviders(): Provider[];
 }
 
@@ -45,7 +50,7 @@ export interface IProviderFactory {
    * Create an IAgentPort for the given provider id and config.
    * Config is validated with the provider's Zod schema; throws with clear errors on failure.
    */
-  createRuntime(id: string, config: unknown): IAgentPort;
+  createRuntime(id: string, config: unknown, runtimeOptions?: AcpSharedRuntimeOptions): IAgentPort;
 
   /** Get the provider (adapter) for an id, if registered. */
   getProvider(id: string): IProvider<BaseCliConfig> | undefined;

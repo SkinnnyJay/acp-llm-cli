@@ -1,4 +1,5 @@
 import { VALIDATION_ERROR } from "./domain/validation.errors";
+import type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
 import { claudeAdapter } from "./providers/claude/adapter";
 import { codexAdapter } from "./providers/codex/adapter";
 import { cursorAdapter } from "./providers/cursor/adapter";
@@ -12,6 +13,7 @@ import { HarnessRegistry as RegistryClass } from "./runtime/registry";
 
 let defaultRegistry: HarnessRegistry | null = null;
 let defaultFactory: IProviderFactory | null = null;
+let defaultFactoryCollectMetrics: boolean | null = null;
 let defaultClientFactory: IProviderClientFactory | null = null;
 
 /**
@@ -30,22 +32,32 @@ export function getDefaultRegistry(): HarnessRegistry {
 
 /**
  * Creates a ProviderFactory with default registry, metrics, and logging.
- * Use createRuntime(id, config) for Zod-validated config and clear errors.
+ * Use createRuntime(id, config, options?) for Zod-validated config and clear errors.
+ * Throws if called again with a different collectMetrics value after first init.
  */
 export function getDefaultFactory(options?: {
   collectMetrics?: boolean;
 }): IProviderFactory {
+  const collectMetrics = options?.collectMetrics ?? true;
   if (!defaultFactory) {
+    defaultFactoryCollectMetrics = collectMetrics;
     defaultFactory = new ProviderFactory({
       registry: getDefaultRegistry(),
-      collectMetrics: options?.collectMetrics ?? true,
+      collectMetrics,
     });
+    return defaultFactory;
+  }
+  if (defaultFactoryCollectMetrics !== collectMetrics) {
+    throw new Error(
+      `getDefaultFactory already initialized with collectMetrics=${String(defaultFactoryCollectMetrics)}; ` +
+        `cannot reinitialize with collectMetrics=${String(collectMetrics)}`
+    );
   }
   return defaultFactory;
 }
 
 /**
- * Creates a ProviderClientFactory: getClient(Provider.CLAUDE, config) returns IProviderClient (provider + port).
+ * Creates a ProviderClientFactory: getClient(Provider.CLAUDE, config, options?) returns IProviderClient.
  * Uses default ProviderFactory under the hood. Extensible: add to Provider enum and register adapter.
  */
 export function getDefaultProviderClientFactory(): IProviderClientFactory {
@@ -57,15 +69,20 @@ export function getDefaultProviderClientFactory(): IProviderClientFactory {
 
 /**
  * Get adapter by id (use PROVIDER_IDS constants), parse config with adapter's schema, return IAgentPort.
- * For validated config and better errors, use getDefaultFactory().createRuntime(id, config).
+ * For validated config and better errors, use getDefaultFactory().createRuntime(id, config, options?).
  */
-export function createHarness(registry: HarnessRegistry, id: string, config: unknown): IAgentPort {
+export function createHarness(
+  registry: HarnessRegistry,
+  id: string,
+  config: unknown,
+  runtimeOptions?: AcpSharedRuntimeOptions
+): IAgentPort {
   const adapter = registry.get(id);
   if (!adapter) {
     throw new Error(VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id));
   }
   const parsed = adapter.configSchema.parse(config);
-  return adapter.createHarness(parsed);
+  return adapter.createHarness(parsed, runtimeOptions);
 }
 
 export function getAdapter(
@@ -73,4 +90,12 @@ export function getAdapter(
   id: string
 ): ReturnType<HarnessRegistry["get"]> {
   return registry.get(id);
+}
+
+/** Test-only: reset singleton factories. Not part of the public API. */
+export function resetDefaultFactoriesForTests(): void {
+  defaultRegistry = null;
+  defaultFactory = null;
+  defaultFactoryCollectMetrics = null;
+  defaultClientFactory = null;
 }

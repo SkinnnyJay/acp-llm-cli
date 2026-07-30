@@ -2,13 +2,17 @@ import { DEFAULT_COMMANDS } from "../../domain/default.commands";
 import { PROVIDER_IDS } from "../../domain/provider.ids";
 import type { IAgentPort } from "../../runtime/agent.port";
 import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapter";
+import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { codexCliSpec } from "./cli.definition";
 import { CODEX_CONFIG_KEYS } from "./constants";
 import { codexConfigSchema } from "./schema";
 import type { CodexConfig } from "./schema";
 
-const createRuntime = (config: CodexConfig): IAgentPort =>
+const createRuntime = (
+  config: CodexConfig,
+  runtimeOptions?: AcpSharedRuntimeOptions
+): IAgentPort =>
   createStandardAcpRuntime(
     config,
     {
@@ -19,7 +23,11 @@ const createRuntime = (config: CodexConfig): IAgentPort =>
       commandKey: CODEX_CONFIG_KEYS.COMMAND_KEY,
       argsKey: CODEX_CONFIG_KEYS.ARGS_KEY,
     },
-    codexConfigSchema
+    codexConfigSchema,
+    {
+      ...runtimeOptions,
+      providerId: runtimeOptions?.providerId ?? PROVIDER_IDS.CODEX_CLI_ID,
+    }
   );
 
 export const codexAdapter = createCliHarnessAdapter<CodexConfig>({

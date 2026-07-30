@@ -40,7 +40,7 @@ await client.port.disconnect();
 
 Use `Provider.CLAUDE`, `Provider.GEMINI`, `Provider.CODEX`, `Provider.CURSOR`; `factory.listProviders()` returns all.
 
-**Also available:** `getDefaultFactory().createRuntime(id, config)` for Zod-validated config by provider id, and `createHarness(registry, id, config)` for custom registries. Prefer the ProviderClientFactory path above for new code.
+**Also available:** `getDefaultFactory().createRuntime(id, config, runtimeOptions?)` for Zod-validated config by provider id (pass `sessionPersistence`, `permissionHandler`, etc.), and `createHarness(registry, id, config, runtimeOptions?)` for custom registries. Prefer the ProviderClientFactory path above for new code; use `@simpill/acp-llm-cli/runtime` when building custom ports or adapters.
 
 ## Simpill integration
 
@@ -204,22 +204,25 @@ if (port.capabilities?.restart && port.restart) {
 
 ### Session persistence (opt-in)
 
-Enable session save/restore on restart by passing `sessionPersistence` to `createAcpCliHarnessRuntime` (exported from `@simpill/acp-llm-cli/runtime` and the root package):
+Enable session save/restore on restart by passing `sessionPersistence` through the factory (product API) or `createAcpCliHarnessRuntime` (extension API):
 
 ```ts
 import {
-  createAcpCliHarnessRuntime,
+  getDefaultFactory,
   createMemorySessionPersistence,
-  type ISessionPersistence,
-} from "@simpill/acp-llm-cli/runtime";
+  PROVIDER_IDS,
+} from "@simpill/acp-llm-cli";
 
 const persistence = createMemorySessionPersistence();
-const port = createAcpCliHarnessRuntime(config, {
-  sessionPersistence: persistence,
-  providerId: "claude-cli",
-  workspace: "/path/to/project",
-});
-// On restart(), the port loads the persisted session and calls newSession to resume
+const port = getDefaultFactory().createRuntime(
+  PROVIDER_IDS.CLAUDE_CLI_ID,
+  { command: "claude-agent-acp", args: [] },
+  {
+    sessionPersistence: persistence,
+    workspace: "/path/to/project",
+  }
+);
+// On restart(), the port loads the persisted session and can resume
 ```
 
 For durable persistence across process restarts, implement `ISessionPersistence` with file or DB storage.
@@ -232,13 +235,13 @@ Cursor uses process-per-prompt and does not support streaming or lifecycle. Its 
 
 - **Provider** — Enum-like const: `Provider.CLAUDE`, `Provider.GEMINI`, `Provider.CODEX`, `Provider.CURSOR` (values match `PROVIDER_IDS`). Use with Zod via `ProviderSchema`.
 - **IProviderClient** — `{ provider: Provider; port: IAgentPort }`. Returned by the client factory.
-- **ProviderClientFactory** — `getClient(provider: Provider, config: unknown): IProviderClient`. Delegates to `IProviderFactory.createRuntime`; validates provider and config. `listProviders(): Provider[]`.
+- **ProviderClientFactory** — `getClient(provider, config, runtimeOptions?): IProviderClient`. Delegates to `IProviderFactory.createRuntime`; validates provider and config. `listProviders(): Provider[]`.
 - **Extending** — Add a new provider: (1) add entry to `Provider` and `PROVIDER_IDS`, (2) register the adapter in the registry (e.g. in `bootstrap.ts`), (3) no factory changes needed.
 
 ## Interfaces, factory, metrics, and logging
 
 - **Interfaces**: `IProvider` (same as `IHarnessAdapter`), `IProviderFactory`, `IProviderMetrics` — see `src/runtime/interfaces/provider.types.ts`.
-- **Factory**: `ProviderFactory` implements `IProviderFactory`: `createRuntime(id, config)` validates config with the provider's Zod schema and throws with messages from `VALIDATION_ERROR`; optional per-provider metrics and `createLogger(ProviderFactory)` logging (debug when `ACP_LLM_CLI_DEBUG` is set).
+- **Factory**: `ProviderFactory` implements `IProviderFactory`: `createRuntime(id, config, runtimeOptions?)` validates config with the provider's Zod schema and throws with messages from `VALIDATION_ERROR`; optional per-provider metrics and `createLogger(ProviderFactory)` logging (debug when `ACP_LLM_CLI_DEBUG` is set).
 - **Metrics**: `ProviderMetricsCollector` holds `invocations`, `lastError`, `lastInvocationMs`; exposed via `factory.getMetrics(id)` when `collectMetrics` is true.
 - **Validation errors**: All config and validation messages use `VALIDATION_ERROR` in `src/domain/validation.errors.ts`; no raw error strings in business logic.
 

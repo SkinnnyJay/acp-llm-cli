@@ -1,4 +1,5 @@
 import { VALIDATION_ERROR } from "../domain/validation.errors";
+import type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
 import type { IAgentPort } from "./agent.port";
 import type { BaseCliConfig } from "./config";
 import type { IProvider, IProviderFactory } from "./interfaces/provider.types";
@@ -28,7 +29,11 @@ export class ProviderFactory implements IProviderFactory {
     this.collectMetrics = options.collectMetrics ?? true;
   }
 
-  createRuntime(id: string, config: unknown): IAgentPort {
+  createRuntime(
+    id: string,
+    config: unknown,
+    runtimeOptions?: AcpSharedRuntimeOptions
+  ): IAgentPort {
     const provider = this.registry.get(id);
     if (!provider) {
       const msg = VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id);
@@ -61,7 +66,11 @@ export class ProviderFactory implements IProviderFactory {
     // Only runtime errors from createHarness are caught here.
     const start = Date.now();
     try {
-      const port = provider.createHarness(result.data);
+      const mergedOptions: AcpSharedRuntimeOptions = {
+        ...runtimeOptions,
+        providerId: runtimeOptions?.providerId ?? id,
+      };
+      const port = provider.createHarness(result.data, mergedOptions);
       const durationMs = Date.now() - start;
       metrics.recordSuccess(durationMs);
       this.logger.debug("createRuntime succeeded", {

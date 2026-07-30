@@ -20,11 +20,11 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
   envelopeMode?: EnvelopeMode;
   /** Model id used in OpenAI-style stream envelopes. */
   modelId?: string;
-  /** Optional session persistence. When provided, enables lifecycle supervisor with save/restore on restart. */
+  /** Optional session persistence. When provided, enables save/restore on restart. */
   sessionPersistence?: ISessionPersistence;
   /**
-   * Provider id for persistence key (e.g. PROVIDER_IDS.CLAUDE_CLI_ID).
-   * Required when sessionPersistence is provided to prevent sessions being stored under the wrong key.
+   * Provider id for persistence key and lifecycle identity.
+   * Required when sessionPersistence is provided.
    */
   providerId?: string;
   /** Workspace for persistence key. */
@@ -36,8 +36,8 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
 }
 
 /**
- * Build connection from config, create IAgentPort with optional dual-envelope streaming
- * and lifecycle (restart, open, close, session persistence). Used by Claude, Codex, Gemini.
+ * Build connection from config, create IAgentPort with dual-envelope streaming
+ * and lifecycle (restart, open, close, optional session persistence).
  */
 export function createAcpCliHarnessRuntime(
   config: BaseCliConfig,
@@ -67,17 +67,15 @@ export function createAcpCliHarnessRuntime(
   }
 
   const port = createAcpAgentPort(connection, clientOptions);
-  let wrapped = wrapAgentPortWithStream(port, { envelopeMode, modelId });
-  if (sessionPersistence && providerId) {
-    wrapped = wrapAgentPortWithLifecycle(wrapped, {
-      sessionPersistence,
-      providerId,
-      workspace,
-      restartOptions,
-      resumeOnRestart,
-    });
-  }
-  return wrapped;
+  const streamed = wrapAgentPortWithStream(port, { envelopeMode, modelId });
+  // Always wrap with lifecycle for restart/open/close; persistence remains optional.
+  return wrapAgentPortWithLifecycle(streamed, {
+    sessionPersistence,
+    providerId: providerId ?? "acp-cli",
+    workspace,
+    restartOptions,
+    resumeOnRestart,
+  });
 }
 
 /**
@@ -88,9 +86,10 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   config: TConfig,
   defaults: Parameters<typeof resolveBaseConfig>[0],
   configKeys: Parameters<typeof resolveBaseConfig>[1],
-  schema: z.ZodType<TConfig, z.ZodTypeDef, unknown>
+  schema: z.ZodType<TConfig, z.ZodTypeDef, unknown>,
+  runtimeOptions?: AcpSharedRuntimeOptions
 ): IAgentPort {
   const resolved = resolveBaseConfig(defaults, configKeys, config);
   const parsed = schema.parse(resolved);
-  return createAcpCliHarnessRuntime(parsed);
+  return createAcpCliHarnessRuntime(parsed, runtimeOptions);
 }

@@ -3,13 +3,17 @@ import { PROVIDER_IDS } from "../../domain/provider.ids";
 import type { IAgentPort } from "../../runtime/agent.port";
 import { resolveBaseConfig } from "../../runtime/config.resolve";
 import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapter";
+import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { cursorCliSpec } from "./cli.definition";
 import { CURSOR_CONFIG_KEYS } from "./constants";
 import { CursorAgentPort } from "./cursor.agent.port";
 import { cursorConfigSchema } from "./schema";
 import type { CursorConfig } from "./schema";
 
-function createRuntime(config: CursorConfig): IAgentPort {
+function createRuntime(
+  config: CursorConfig,
+  _runtimeOptions?: AcpSharedRuntimeOptions
+): IAgentPort {
   const resolved = resolveBaseConfig(
     {
       command: DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
