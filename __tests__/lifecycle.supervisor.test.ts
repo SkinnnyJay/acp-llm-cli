@@ -83,6 +83,23 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(loaded?.sessionId).toBe("sess-123");
   });
 
+  it("does not save session when newSession returns an empty sessionId", async () => {
+    const inner = createMockPort();
+    (inner.newSession as ReturnType<typeof vi.fn>).mockResolvedValue({ sessionId: "" });
+    const persistence = createMemorySessionPersistence();
+    const saveSpy = vi.spyOn(persistence, "saveSession");
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      sessionPersistence: persistence,
+      providerId: "claude-cli",
+    });
+
+    await wrapped.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
+      IAgentPort["newSession"]
+    >[0]);
+
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
   it("delegates open to connect and close to disconnect", async () => {
     const inner = createMockPort();
     const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
@@ -130,18 +147,22 @@ describe("wrapAgentPortWithLifecycle", () => {
     const stateEvents: unknown[] = [];
     const errorEvents: unknown[] = [];
     const sessionUpdateEvents: unknown[] = [];
+    const permissionEvents: unknown[] = [];
 
     wrapped.on("state", (s) => stateEvents.push(s));
     wrapped.on("error", (e) => errorEvents.push(e));
     wrapped.on("sessionUpdate", (u) => sessionUpdateEvents.push(u));
+    wrapped.on("permissionRequest", (r) => permissionEvents.push(r));
 
     (inner as unknown as EventEmitter).emit("state", CONNECTION_STATUS.CONNECTED);
     (inner as unknown as EventEmitter).emit("error", new Error("inner error"));
     (inner as unknown as EventEmitter).emit("sessionUpdate", { sessionId: "s1", update: {} });
+    (inner as unknown as EventEmitter).emit("permissionRequest", { sessionId: "s1" });
 
     expect(stateEvents).toEqual([CONNECTION_STATUS.CONNECTED]);
     expect(errorEvents).toHaveLength(1);
     expect(sessionUpdateEvents).toHaveLength(1);
+    expect(permissionEvents).toHaveLength(1);
   });
 
   it("saves session on sessionUpdate when persistence and session_id are present", async () => {
@@ -251,6 +272,23 @@ describe("wrapAgentPortWithLifecycle", () => {
 
     expect(inner.restart).toHaveBeenCalled();
     expect(inner.newSession).not.toHaveBeenCalled();
+  });
+
+  it("streamPrompt yields from inner.streamPrompt when supported", async () => {
+    const inner = createMockPort();
+    const envelopes = [{ kind: "native", update: { sessionId: "s1", update: {} } }];
+    (inner as { streamPrompt: unknown }).streamPrompt = vi
+      .fn()
+      .mockImplementation(async function* () {
+        yield* envelopes;
+      });
+    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    const out: unknown[] = [];
+    for await (const env of wrapped.streamPrompt(params)) {
+      out.push(env);
+    }
+    expect(out).toEqual(envelopes);
   });
 
   it("streamPrompt throws STREAM_PROMPT_NOT_SUPPORTED when inner has no streamPrompt", async () => {

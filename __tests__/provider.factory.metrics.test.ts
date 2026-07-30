@@ -77,6 +77,50 @@ describe("ProviderFactory metrics", () => {
     factory.createRuntime("test-provider", { command: "cmd" });
     expect(factory.getMetrics?.("test-provider")).toBeUndefined();
   });
+
+  it("records failure message when createHarness throws a non-Error value", () => {
+    const id = "string-throw-provider";
+    const registry = new HarnessRegistry();
+    registry.register({
+      id,
+      name: "StringThrow",
+      configSchema: baseCliConfigSchema,
+      createHarness: vi.fn().mockImplementation(() => {
+        throw "raw-string-failure";
+      }),
+    });
+    const factory = new ProviderFactory({ registry, logger: silentLogger, collectMetrics: true });
+
+    expect(() => factory.createRuntime(id, { command: "cmd" })).toThrow();
+    expect(factory.getMetrics?.(id)?.lastError).toBe("raw-string-failure");
+  });
+
+  it("uses the default logger when none is injected", () => {
+    const { registry } = makeRegistry("default-logger-provider");
+    const factory = new ProviderFactory({ registry });
+    const port = factory.createRuntime("default-logger-provider", { command: "cmd" });
+    expect(port).toBeDefined();
+  });
+
+  it("uses fallback path/detail when parse failure has empty issues", () => {
+    const id = "empty-issues-provider";
+    const registry = new HarnessRegistry();
+    registry.register({
+      id,
+      name: "EmptyIssues",
+      configSchema: {
+        safeParse: () => ({
+          success: false as const,
+          error: { issues: [], message: "validation failed" },
+        }),
+      } as typeof baseCliConfigSchema,
+      createHarness: vi.fn(),
+    });
+    const factory = new ProviderFactory({ registry, logger: silentLogger, collectMetrics: true });
+
+    expect(() => factory.createRuntime(id, { command: "cmd" })).toThrow(/Path: config/);
+    expect(() => factory.createRuntime(id, { command: "cmd" })).toThrow(/validation failed/);
+  });
 });
 
 describe("ProviderMetricsCollector", () => {

@@ -203,4 +203,60 @@ describe("StreamAgentPort", () => {
       }
     }).rejects.toThrow("prompt failed");
   });
+
+  it("connectionStatus reflects the inner port", () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+    expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+  });
+
+  it("setSessionMode and setSessionModel getters bind inner methods when present", () => {
+    const inner = createMockPort();
+    const modeFn = vi.fn();
+    const modelFn = vi.fn();
+    (inner as Record<string, unknown>).setSessionMode = modeFn;
+    (inner as Record<string, unknown>).setSessionModel = modelFn;
+    const port = new StreamAgentPort(inner);
+    expect(typeof port.setSessionMode).toBe("function");
+    expect(typeof port.setSessionModel).toBe("function");
+  });
+
+  it("setSessionMode and setSessionModel getters are undefined when inner lacks them", () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+    expect(port.setSessionMode).toBeUndefined();
+    expect(port.setSessionModel).toBeUndefined();
+  });
+
+  it("streamPrompt in NATIVE mode does not emit an OpenAI finish envelope", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner, { envelopeMode: ENVELOPE_MODE.NATIVE });
+    (inner.prompt as ReturnType<typeof vi.fn>).mockResolvedValue({ stopReason: "end_turn" });
+
+    const envelopes: unknown[] = [];
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    for await (const env of port.streamPrompt(params)) {
+      envelopes.push(env);
+    }
+
+    expect(
+      envelopes.some(
+        (e) =>
+          "object" in (e as object) && (e as { object: string }).object === "chat.completion.chunk"
+      )
+    ).toBe(false);
+  });
+
+  it("streamPrompt rethrows non-Error rejection values", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+    (inner.prompt as ReturnType<typeof vi.fn>).mockRejectedValue("string-fail");
+
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    await expect(async () => {
+      for await (const _ of port.streamPrompt(params)) {
+        // consume
+      }
+    }).rejects.toBe("string-fail");
+  });
 });

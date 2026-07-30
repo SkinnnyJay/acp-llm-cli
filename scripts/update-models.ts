@@ -1,6 +1,6 @@
 /**
  * Fetches available model IDs and writes src/domain/models/*.ts.
- * Run: bun run update-models
+ * Run: npm run update-models
  *
  * Public source (no keys): OpenRouter GET https://openrouter.ai/api/v1/models
  * Optional (with keys): Anthropic, OpenAI, Gemini, xAI provider APIs (override OpenRouter data).

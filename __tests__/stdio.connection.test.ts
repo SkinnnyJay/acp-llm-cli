@@ -259,4 +259,64 @@ describe("StdioConnection", () => {
     // No stderr lines captured → error message should not include extra text.
     expect(errors[0]?.message).not.toMatch(/\n/);
   });
+
+  it("force-kills the child when disconnect close event never fires", async () => {
+    vi.useFakeTimers();
+    try {
+      const { child } = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValue(child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(500);
+      await disconnectPromise;
+
+      expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits ERROR when spawn throws a non-Error value", async () => {
+    const spawnFn = vi.fn().mockImplementation(() => {
+      throw "spawn-string-error";
+    });
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    const errors: Error[] = [];
+    conn.on("error", (e) => errors.push(e));
+
+    await conn.connect();
+
+    expect(conn.connectionStatus).toBe(CONNECTION_STATUS.ERROR);
+    expect(errors[0]?.message).toBe("spawn-string-error");
+  });
+
+  it("keeps only the most recent stderr lines when the cap is exceeded", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    const lines = Array.from({ length: 120 }, (_, i) => `line-${i}`).join("\n");
+    child.stderr.push(`${lines}\n`);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const errors: Error[] = [];
+    conn.on("error", (e) => errors.push(e));
+
+    const errorStatus = new Promise<void>((resolve) => {
+      conn.on("state", (s) => {
+        if (s === CONNECTION_STATUS.ERROR) resolve();
+      });
+    });
+
+    triggerExit(1, null);
+    await errorStatus;
+
+    expect(errors[0]?.message).toMatch(/line-119/);
+    expect(errors[0]?.message).not.toMatch(/line-0\b/);
+  });
 });

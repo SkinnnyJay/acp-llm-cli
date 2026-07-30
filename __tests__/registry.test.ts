@@ -27,4 +27,25 @@ describe("HarnessRegistry", () => {
     expect(registry.get(PROVIDER_IDS.CLAUDE_CLI_ID)).toBe(adapter);
     expect(registry.list()).toHaveLength(1);
   });
+
+  it("createCliHarnessAdapter exposes id, name, and optional cliSpec getters", () => {
+    const cliSpec = {
+      defaultArgs: ["--x"],
+      genericFlagMap: {},
+      knownFlags: {},
+      buildArgs: () => ["--x"],
+      getHelp: async () => "help",
+    };
+    const adapter = createCliHarnessAdapter<BaseCliConfig>({
+      id: "test-id",
+      name: "Test Name",
+      configSchema: baseCliConfigSchema,
+      createRuntime: () => ({}) as IAgentPort,
+      cliSpec,
+    });
+    expect(adapter.id).toBe("test-id");
+    expect(adapter.name).toBe("Test Name");
+    expect(adapter.cliSpec).toBe(cliSpec);
+    expect(adapter.createHarness({ command: "cmd", args: [], env: {} })).toBeDefined();
+  });
 });

@@ -2,9 +2,10 @@
  * Targeted branch-coverage tests for modules whose branches weren't exercised
  * by functional tests. Each suite is minimal — it covers uncovered branches only.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createStandardCliSpec } from "../src/cli/standard.cli.factory";
 import { ENV_KEY } from "../src/domain/env.keys";
+import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { getEnvBoolean, getEnvString, mergeEnv } from "../src/runtime/env.reader";
 import { createStreamPromptQueue } from "../src/runtime/stream.prompt.queue";
 
@@ -194,9 +195,52 @@ describe("createStandardCliSpec.buildArgs", () => {
     expect(spec.knownFlags).toEqual({ verbose: "-v" });
   });
 
-  it("getHelp calls extractHelp with overridden args when provided", async () => {
+  it("getHelp delegates to extractHelp with command and args", async () => {
+    const helpModule = await import("../src/cli/help.extractor");
+    const spy = vi.spyOn(helpModule, "extractHelp").mockResolvedValue("help text");
+
     const spec = createStandardCliSpec(["--default"], flagMap, knownFlags);
-    // Verify the method exists; spawning is integration-only.
-    expect(typeof spec.getHelp).toBe("function");
+    const result = await spec.getHelp({
+      command: "my-cli",
+      args: ["--custom"],
+      cwd: "/tmp",
+      env: { FOO: "1" },
+    });
+
+    expect(result).toBe("help text");
+    expect(spy).toHaveBeenCalledWith({
+      command: "my-cli",
+      args: ["--custom"],
+      cwd: "/tmp",
+      env: { FOO: "1" },
+    });
+    spy.mockRestore();
+  });
+
+  it("getHelp falls back to defaultArgs when options.args is omitted", async () => {
+    const helpModule = await import("../src/cli/help.extractor");
+    const spy = vi.spyOn(helpModule, "extractHelp").mockResolvedValue("default help");
+
+    const spec = createStandardCliSpec(["--default"], flagMap, knownFlags);
+    await spec.getHelp({ command: "my-cli" });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "my-cli",
+        args: ["--default"],
+      })
+    );
+    spy.mockRestore();
+  });
+});
+
+describe("ERROR_MESSAGE helpers", () => {
+  it("formats HELP and AGENT_PROCESS_EXITED messages", () => {
+    expect(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(1000)).toMatch(/1000/);
+    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")).toMatch(/2/);
+    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")).toMatch(/boom/);
+    expect(ERROR_MESSAGE.AGENT_PROCESS_EXITED(1, " (signal SIGTERM)", "\nstderr")).toMatch(
+      /SIGTERM/
+    );
   });
 });

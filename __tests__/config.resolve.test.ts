@@ -43,4 +43,24 @@ describe("resolveBaseConfig", () => {
     );
     expect(result.command).toBe("env-cmd");
   });
+
+  it("splits non-empty env args on whitespace", () => {
+    const result = resolveBaseConfig(
+      { command: "cmd", args: ["--default"] },
+      { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
+      undefined,
+      { [ENV_KEY.ACP_LLM_CLI_CLAUDE_ARGS]: "  --experimental-acp  --verbose  " }
+    );
+    expect(result.args).toEqual(["--experimental-acp", "--verbose"]);
+  });
+
+  it("falls back to default args when env args are whitespace-only", () => {
+    const result = resolveBaseConfig(
+      { command: "cmd", args: ["--default"] },
+      { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
+      undefined,
+      { [ENV_KEY.ACP_LLM_CLI_CLAUDE_ARGS]: "   " }
+    );
+    expect(result.args).toEqual(["--default"]);
+  });
 });

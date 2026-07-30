@@ -142,4 +142,35 @@ describe("buildGenericArgs", () => {
     const result = buildGenericArgs({ verbose: true }, {}, ["--x", "--y"]);
     expect(result).toEqual(["--x", "--y"]);
   });
+
+  it("skips workspace/resume/sessionId/debug/print when flags are absent from flagMap", () => {
+    const result = buildGenericArgs(
+      {
+        workspace: "/tmp",
+        resume: "sess",
+        sessionId: "id",
+        debug: true,
+        print: true,
+      },
+      {},
+      ["--base"]
+    );
+    expect(result).toEqual(["--base"]);
+  });
+
+  it("skips model/output/input/stream/trust/sandbox when flags are absent from flagMap", () => {
+    const result = buildGenericArgs(
+      {
+        model: "m",
+        outputFormat: "json",
+        inputFormat: "text",
+        stream: true,
+        trust: true,
+        sandbox: "docker",
+      },
+      {},
+      ["--base"]
+    );
+    expect(result).toEqual(["--base"]);
+  });
 });

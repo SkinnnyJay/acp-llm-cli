@@ -35,6 +35,32 @@ function createMockPort(sessionId = "sess-default"): IAgentPort {
   } as unknown as IAgentPort;
 }
 
+describe("createMemorySessionPersistence", () => {
+  it("clearSession removes a previously saved session", async () => {
+    const persistence = createMemorySessionPersistence();
+    await persistence.saveSession({
+      providerId: "p1",
+      workspace: "/w",
+      sessionId: "s1",
+      updatedAt: Date.now(),
+    });
+    expect(await persistence.loadSession("p1", "/w")).not.toBeNull();
+    await persistence.clearSession("p1", "/w");
+    expect(await persistence.loadSession("p1", "/w")).toBeNull();
+  });
+
+  it("assigns updatedAt when saveSession omits it", async () => {
+    const persistence = createMemorySessionPersistence();
+    const before = Date.now();
+    await persistence.saveSession({
+      providerId: "p2",
+      sessionId: "s2",
+    } as Parameters<typeof persistence.saveSession>[0]);
+    const loaded = await persistence.loadSession("p2");
+    expect(loaded?.updatedAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
 describe("Session persistence key isolation", () => {
   it("stores sessions under distinct keys per provider", async () => {
     const persistence = createMemorySessionPersistence();

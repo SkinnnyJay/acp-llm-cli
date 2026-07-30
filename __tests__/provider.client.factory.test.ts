@@ -38,4 +38,14 @@ describe("ProviderClientFactory", () => {
       /Config validation failed|Validation error|invalid_type/
     );
   });
+
+  it("getClient throws for a value outside the Provider enum", () => {
+    const factory = getDefaultProviderClientFactory();
+    expect(() =>
+      factory.getClient("not-a-provider" as (typeof PROVIDER_VALUES)[number], {
+        command: "cmd",
+        args: [],
+      })
+    ).toThrow(/Unknown provider id/);
+  });
 });

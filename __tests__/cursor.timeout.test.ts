@@ -96,4 +96,60 @@ describe("runCursorSpawnedCommand", () => {
       )
     ).rejects.toThrow("ENOENT");
   });
+
+  it("accumulates stdout and stderr data before close", async () => {
+    const emitter = new EventEmitter();
+    const stdout = new Readable({ read() {} });
+    const stderr = new Readable({ read() {} });
+    const stdin = new Writable({
+      write(_chunk, _enc, cb) {
+        cb();
+      },
+    });
+    const child = Object.assign(emitter, { stdout, stderr, stdin, kill: vi.fn(), pid: 102 });
+    const spawnFn = vi.fn().mockReturnValue(child);
+
+    const promise = runCursorSpawnedCommand(
+      "cursor-agent",
+      [],
+      { command: "cursor-agent", args: [], env: {} },
+      1000,
+      spawnFn as Parameters<typeof runCursorSpawnedCommand>[5]
+    );
+
+    stdout.emit("data", "out-1");
+    stderr.emit("data", "err-1");
+    child.emit("close", 0);
+
+    const result = await promise;
+    expect(result.stdout).toBe("out-1");
+    expect(result.stderr).toBe("err-1");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("force-kills with SIGKILL after the force-kill grace window on timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const child = createHangingChild();
+      const spawnFn = vi.fn().mockReturnValue(child);
+
+      const promise = runCursorSpawnedCommand(
+        "cursor-agent",
+        [],
+        { command: "cursor-agent", args: [], env: {} },
+        50,
+        spawnFn as Parameters<typeof runCursorSpawnedCommand>[5]
+      );
+
+      const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(50));
+      await vi.advanceTimersByTimeAsync(50);
+      await assertion;
+      expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

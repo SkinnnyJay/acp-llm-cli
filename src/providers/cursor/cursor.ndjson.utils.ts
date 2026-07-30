@@ -17,9 +17,8 @@ export interface CursorNdjsonParseResult {
 
 export function parseCursorNdjsonResult(stdout: string): CursorNdjsonParseResult | null {
   const lines = stdout.split(/\r?\n/).filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    if (line === undefined) continue;
+  // Walk newest → oldest so the last matching result line wins.
+  for (const line of lines.reverse()) {
     try {
       const parsed = cursorResultLineSchema.safeParse(JSON.parse(line));
       if (parsed.success) {
