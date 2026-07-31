@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../src/runtime/logger", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
 import { PROVIDER_VALUES, Provider, getDefaultProviderClientFactory } from "../src/index";
 
 describe("ProviderClientFactory", () => {
