@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: `verify` is lint/typecheck/build/test; coverage + pack smoke run on Node 20 only.
+- StreamAgentPort owns streaming only; restart/open/close remain on LifecycleAgentPort.
+- Validation failures log at `warn` (not `error`); shared test helpers for fake children / mock ports.
+- Stream queue uses O(1) read-index dequeue; OpenAI chunk ids/timestamps reused per stream.
+
 ## [0.2.0] - 2026-07-30
 
 ### Changed
