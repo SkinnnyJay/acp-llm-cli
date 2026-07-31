@@ -9,8 +9,10 @@ import type { ConnectionStatus } from "../domain/connection.status";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { LIMIT } from "../domain/limits";
 import { OPENAI_COMPAT } from "../domain/openai.compat";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
+import { notificationSessionId } from "../domain/session.notification";
 import type { StreamEnvelope } from "../domain/stream.envelopes";
 import type {
   AgentPortCapabilities,
@@ -26,18 +28,7 @@ export interface WrapAgentPortOptions {
   modelId?: string;
 }
 
-function notificationSessionId(update: SessionNotification): string | undefined {
-  const record = update as Record<string, unknown>;
-  if (typeof record.sessionId === "string") return record.sessionId;
-  if (typeof record.session_id === "string") return record.session_id;
-  return undefined;
-}
-
-/**
- * Wraps an IAgentPort to add streamPrompt (dual-envelope ACP→OpenAI bridging),
- * plus restart, open, and close capability metadata.
- * Keeps envelope logic in one place so providers remain thin.
- */
+/** Adds streamPrompt only. Restart/open/close belong to LifecycleAgentPort. */
 export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities: AgentPortCapabilities;
 
@@ -45,19 +36,17 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   private readonly envelopeMode: EnvelopeMode;
   private readonly modelId: string | undefined;
   private streamBusy = false;
+  private chunkSeq = 0;
 
   constructor(inner: IAgentPort, options: WrapAgentPortOptions = {}) {
     super();
     this.inner = inner;
     this.envelopeMode = options.envelopeMode ?? ENVELOPE_MODE.BOTH;
     this.modelId = options.modelId;
-
     this.capabilities = {
+      ...inner.capabilities,
       [PORT_CAPABILITY.STREAM_PROMPT]: true,
-      [PORT_CAPABILITY.RESTART]: true,
-      [PORT_CAPABILITY.OPEN_CLOSE]: true,
     };
-
     inner.on(AGENT_PORT_EVENT.STATE, (status: ConnectionStatus) =>
       this.emit(AGENT_PORT_EVENT.STATE, status)
     );
@@ -73,84 +62,52 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   get connectionStatus(): ConnectionStatus {
     return this.inner.connectionStatus;
   }
-
-  async connect(): Promise<void> {
-    return this.inner.connect();
-  }
-
-  async disconnect(): Promise<void> {
-    return this.inner.disconnect();
-  }
-
-  async initialize(...args: Parameters<IAgentPort["initialize"]>) {
-    return this.inner.initialize(...args);
-  }
-
-  async newSession(...args: Parameters<IAgentPort["newSession"]>) {
-    return this.inner.newSession(...args);
-  }
-
-  async prompt(...args: Parameters<IAgentPort["prompt"]>) {
-    return this.inner.prompt(...args);
-  }
-
-  async authenticate(...args: Parameters<IAgentPort["authenticate"]>) {
-    return this.inner.authenticate(...args);
-  }
-
-  async sessionUpdate(...args: Parameters<IAgentPort["sessionUpdate"]>) {
-    return this.inner.sessionUpdate(...args);
-  }
-
-  get setSessionMode() {
-    return this.inner.setSessionMode?.bind(this.inner);
-  }
-
-  get setSessionModel() {
-    return this.inner.setSessionModel?.bind(this.inner);
-  }
+  async connect(): Promise<void> { return this.inner.connect(); }
+  async disconnect(): Promise<void> { return this.inner.disconnect(); }
+  async initialize(...args: Parameters<IAgentPort["initialize"]>) { return this.inner.initialize(...args); }
+  async newSession(...args: Parameters<IAgentPort["newSession"]>) { return this.inner.newSession(...args); }
+  async prompt(...args: Parameters<IAgentPort["prompt"]>) { return this.inner.prompt(...args); }
+  async authenticate(...args: Parameters<IAgentPort["authenticate"]>) { return this.inner.authenticate(...args); }
+  async sessionUpdate(...args: Parameters<IAgentPort["sessionUpdate"]>) { return this.inner.sessionUpdate(...args); }
+  get setSessionMode() { return this.inner.setSessionMode?.bind(this.inner); }
+  get setSessionModel() { return this.inner.setSessionModel?.bind(this.inner); }
 
   async *streamPrompt(
     params: PromptRequest,
     streamOptions?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope> {
-    if (this.streamBusy) {
-      throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
-    }
+    if (this.streamBusy) throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
     this.streamBusy = true;
-
     const mode = streamOptions?.envelopeMode ?? this.envelopeMode;
     const modelId = this.modelId;
     const sessionId = params.sessionId;
+    const streamCreated = Math.floor(Date.now() / LIMIT.MS_PER_SECOND);
+    const chunkId = () => `chunk-${++this.chunkSeq}`;
     const queue = createStreamPromptQueue();
     const handler = (update: SessionNotification) => {
       const updateSessionId = notificationSessionId(update);
-      if (sessionId && updateSessionId && updateSessionId !== sessionId) {
-        return;
-      }
+      if (sessionId && updateSessionId && updateSessionId !== sessionId) return;
       queue.push(update);
     };
     this.inner.on(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
-
     const promptPromise = this.inner.prompt(params);
-    promptPromise
-      .finally(() => {
-        this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
-        queue.close();
-        // Suppress the dangling rejection here; it is re-thrown below via `await promptPromise`.
-      })
-      .catch(() => {});
-
+    promptPromise.finally(() => {
+      this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
+      queue.close();
+    }).catch(() => {});
     try {
       for await (const update of queue.consume()) {
-        const envelopes = sessionUpdateToEnvelopes(update, mode, { modelId });
-        for (const env of envelopes) yield env;
+        for (const env of sessionUpdateToEnvelopes(update, mode, { modelId, chunkId, created: streamCreated })) {
+          yield env;
+        }
       }
       await promptPromise;
       if (mode === ENVELOPE_MODE.OPENAI || mode === ENVELOPE_MODE.BOTH) {
         yield createOpenAIFinishEnvelope({
           modelId,
           finishReason: OPENAI_COMPAT.FINISH_REASON_STOP,
+          chunkId: chunkId(),
+          created: streamCreated,
         });
       }
     } catch (err) {
@@ -160,26 +117,8 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       this.streamBusy = false;
     }
   }
-
-  async restart(): Promise<void> {
-    await this.inner.disconnect();
-    await this.inner.connect();
-    await this.inner.initialize();
-  }
-
-  async open(): Promise<void> {
-    return this.inner.connect();
-  }
-
-  async close(): Promise<void> {
-    return this.inner.disconnect();
-  }
 }
 
-/** Factory function — ergonomic wrapper around StreamAgentPort constructor. */
-export function wrapAgentPortWithStream(
-  inner: IAgentPort,
-  options: WrapAgentPortOptions = {}
-): IAgentPort {
+export function wrapAgentPortWithStream(inner: IAgentPort, options: WrapAgentPortOptions = {}): IAgentPort {
   return new StreamAgentPort(inner, options);
 }

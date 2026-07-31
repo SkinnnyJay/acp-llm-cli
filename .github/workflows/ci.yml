@@ -33,6 +33,10 @@ jobs:
       - name: Verify
         run: npm run verify
 
+      - name: Coverage
+        if: matrix.node-version == 20
+        run: npm run test:coverage
+
       - name: Upload coverage
         if: matrix.node-version == 20
         uses: actions/upload-artifact@v4
@@ -42,7 +46,9 @@ jobs:
           if-no-files-found: ignore
 
       - name: Pack and import smoke
+        if: matrix.node-version == 20
         run: npm run pack:smoke
 
       - name: Publint packed tarball
+        if: matrix.node-version == 20
         run: npm run publint

@@ -9,6 +9,7 @@ import { EventEmitter } from "eventemitter3";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
+import { notificationSessionId } from "../domain/session.notification";
 import type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
 import type { StreamEnvelope } from "../domain/stream.envelopes";
 import type { AgentPortCapabilities, AgentPortEvents, StreamPromptOptions } from "./agent.port";
@@ -89,7 +90,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   }
 
   private async maybePersistFromNotification(update: SessionNotification): Promise<void> {
-    const sessionId = extractSessionIdFromNotification(update);
+    const sessionId = notificationSessionId(update, { vendorOnly: true });
     if (this.sessionPersistence && sessionId) {
       await persistActiveSession(
         this.sessionPersistence,

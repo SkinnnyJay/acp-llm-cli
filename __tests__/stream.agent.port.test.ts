@@ -40,12 +40,12 @@ describe("StreamAgentPort", () => {
     expect(port.constructor.name).toBe("StreamAgentPort");
   });
 
-  it("exposes streamPrompt, restart, openClose capabilities", () => {
+  it("exposes streamPrompt capability (restart/openClose owned by lifecycle)", () => {
     const inner = createMockPort();
     const port = new StreamAgentPort(inner);
     expect(port.capabilities[PORT_CAPABILITY.STREAM_PROMPT]).toBe(true);
-    expect(port.capabilities[PORT_CAPABILITY.RESTART]).toBe(true);
-    expect(port.capabilities[PORT_CAPABILITY.OPEN_CLOSE]).toBe(true);
+    expect(port.capabilities[PORT_CAPABILITY.RESTART]).toBeUndefined();
+    expect(port.capabilities[PORT_CAPABILITY.OPEN_CLOSE]).toBeUndefined();
   });
 
   it("delegates connect/disconnect/initialize/newSession/prompt/authenticate/sessionUpdate to inner", async () => {
@@ -70,39 +70,6 @@ describe("StreamAgentPort", () => {
     expect(inner.prompt).toHaveBeenCalledOnce();
     expect(inner.authenticate).toHaveBeenCalledOnce();
     expect(inner.sessionUpdate).toHaveBeenCalledOnce();
-  });
-
-  it("restart calls inner disconnect, connect, initialize in order", async () => {
-    const inner = createMockPort();
-    const calls: string[] = [];
-    (inner.disconnect as ReturnType<typeof vi.fn>).mockImplementation(async () => {
-      calls.push("disconnect");
-    });
-    (inner.connect as ReturnType<typeof vi.fn>).mockImplementation(async () => {
-      calls.push("connect");
-    });
-    (inner.initialize as ReturnType<typeof vi.fn>).mockImplementation(async () => {
-      calls.push("initialize");
-    });
-
-    const port = new StreamAgentPort(inner);
-    await port.restart?.();
-
-    expect(calls).toEqual(["disconnect", "connect", "initialize"]);
-  });
-
-  it("open() calls inner.connect()", async () => {
-    const inner = createMockPort();
-    const port = new StreamAgentPort(inner);
-    await port.open?.();
-    expect(inner.connect).toHaveBeenCalledOnce();
-  });
-
-  it("close() calls inner.disconnect()", async () => {
-    const inner = createMockPort();
-    const port = new StreamAgentPort(inner);
-    await port.close?.();
-    expect(inner.disconnect).toHaveBeenCalledOnce();
   });
 
   it("forwards state/error/sessionUpdate/permissionRequest events from inner", () => {

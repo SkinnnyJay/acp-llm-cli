@@ -30,7 +30,7 @@ describe("ProviderFactory metrics", () => {
     expect(metrics).toBeDefined();
     expect(metrics?.invocations).toBe(1);
     expect(metrics?.lastError).toBeDefined();
-    expect(silentLogger.error).toHaveBeenCalledOnce();
+    expect(silentLogger.warn).toHaveBeenCalledOnce();
   });
 
   it("throws and records failure when config is null", () => {

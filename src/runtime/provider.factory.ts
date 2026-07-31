@@ -33,7 +33,7 @@ export class ProviderFactory implements IProviderFactory {
     const provider = this.registry.get(id);
     if (!provider) {
       const msg = VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id);
-      this.logger.error(msg);
+      this.logger.warn(msg);
       throw new Error(msg);
     }
 
@@ -54,7 +54,7 @@ export class ProviderFactory implements IProviderFactory {
       const path = first?.path.join(".") ?? "config";
       const detail = first?.message ?? result.error.message;
       const msg = `${VALIDATION_ERROR.PARSE_FAILED(id)} Path: ${path}. ${detail}`;
-      this.logger.error(msg, { providerId: id, issues: result.error.issues });
+      this.logger.warn(msg, { providerId: id, issues: result.error.issues });
       metrics.recordFailure(msg);
       throw new Error(msg);
     }

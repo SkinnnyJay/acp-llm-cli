@@ -51,10 +51,15 @@ export function sessionUpdateToEnvelopes(
   options: {
     modelId?: string;
     chunkId?: () => string;
+    created?: number;
   } = {}
 ): StreamEnvelope[] {
   const envelopes: StreamEnvelope[] = [];
-  const { modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID, chunkId = () => crypto.randomUUID() } = options;
+  const {
+    modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID,
+    chunkId = () => crypto.randomUUID(),
+    created = Math.floor(Date.now() / LIMIT.MS_PER_SECOND),
+  } = options;
 
   if (envelopeMode === ENVELOPE_MODE.NATIVE || envelopeMode === ENVELOPE_MODE.BOTH) {
     const native: NativeEnvelope = { kind: ENVELOPE_KIND.NATIVE, update };
@@ -67,7 +72,7 @@ export function sessionUpdateToEnvelopes(
       const openai: OpenAIStyleChunkEnvelope = {
         id: chunkId(),
         object: OPENAI_COMPAT.OBJECT_CHUNK,
-        created: Math.floor(Date.now() / LIMIT.MS_PER_SECOND),
+        created,
         model: modelId,
         choices: [
           {
@@ -90,15 +95,19 @@ export function sessionUpdateToEnvelopes(
 export function createOpenAIFinishEnvelope(options: {
   modelId?: string;
   finishReason?: string;
+  chunkId?: string;
+  created?: number;
 }): OpenAIStyleChunkEnvelope {
   const {
     modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID,
     finishReason = OPENAI_COMPAT.FINISH_REASON_STOP,
+    chunkId = crypto.randomUUID(),
+    created = Math.floor(Date.now() / LIMIT.MS_PER_SECOND),
   } = options;
   return {
-    id: crypto.randomUUID(),
+    id: chunkId,
     object: OPENAI_COMPAT.OBJECT_CHUNK,
-    created: Math.floor(Date.now() / LIMIT.MS_PER_SECOND),
+    created,
     model: modelId,
     choices: [
       {

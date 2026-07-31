@@ -51,11 +51,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run lint && npm run typecheck && npm run build && npm run test:coverage",
-    "prepublishOnly": "npm run verify",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm test",
+    "prepublishOnly": "npm run verify:coverage",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "publint": "node scripts/publint-pack.mjs",
-    "update-models": "tsx scripts/update-models.ts"
+    "update-models": "tsx scripts/update-models.ts",
+    "verify:coverage": "npm run lint && npm run typecheck && npm run build && npm run test:coverage"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
