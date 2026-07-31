@@ -50,9 +50,9 @@ export function createFakeChild(opts: FakeChildOptions = {}): FakeChildHandle {
   };
 
   if (!opts.hang) {
+    // setTimeout(0) so callers can attach stdout/stderr listeners before close.
     const delay = opts.delayMs ?? 0;
-    if (delay <= 0) queueMicrotask(() => triggerExit());
-    else setTimeout(() => triggerExit(), delay);
+    setTimeout(() => triggerExit(), delay);
   }
 
   return {
