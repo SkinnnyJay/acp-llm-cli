@@ -25,12 +25,6 @@ export interface LifecycleSupervisorOptions {
   resumeOnRestart?: boolean;
 }
 
-function extractSessionIdFromNotification(update: SessionNotification): string | undefined {
-  const record = update as Record<string, unknown>;
-  if (typeof record.session_id === "string") return record.session_id;
-  return undefined;
-}
-
 function persistActiveSession(
   persistence: ISessionPersistence,
   providerId: string,

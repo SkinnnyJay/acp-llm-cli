@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractHelp, HELP_FLAG } from "../src/cli/help.extractor";
+import { HELP_FLAG, extractHelp } from "../src/cli/help.extractor";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { SIGNAL } from "../src/domain/signals";
 import { TIMEOUT } from "../src/domain/timeouts";
@@ -30,9 +30,9 @@ describe("extractHelp", () => {
     const { child } = createFakeChild({ stderr: "boom", exitCode: 2 });
     const spawnFn = vi.fn().mockReturnValue(child);
 
-    await expect(
-      extractHelp({ command: "fake-cli", spawnFn: spawnFn as never })
-    ).rejects.toThrow(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom"));
+    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn as never })).rejects.toThrow(
+      ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")
+    );
   });
 
   it("SIGTERM then SIGKILL on timeout", async () => {
@@ -45,9 +45,7 @@ describe("extractHelp", () => {
       timeoutMs: 100,
       spawnFn: spawnFn as never,
     });
-    const assertion = expect(promise).rejects.toThrow(
-      ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(100)
-    );
+    const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(100));
 
     await vi.advanceTimersByTimeAsync(100);
     expect(child.kill).toHaveBeenCalledWith(SIGNAL.TERM);

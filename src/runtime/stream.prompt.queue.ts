@@ -65,7 +65,11 @@ export function createStreamPromptQueue(): {
       if (wake) wake();
     },
     consume() {
-      return { [Symbol.asyncIterator]() { return { next: () => nextPromise() }; } };
+      return {
+        [Symbol.asyncIterator]() {
+          return { next: () => nextPromise() };
+        },
+      };
     },
   };
 }

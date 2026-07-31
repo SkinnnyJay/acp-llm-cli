@@ -62,15 +62,33 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   get connectionStatus(): ConnectionStatus {
     return this.inner.connectionStatus;
   }
-  async connect(): Promise<void> { return this.inner.connect(); }
-  async disconnect(): Promise<void> { return this.inner.disconnect(); }
-  async initialize(...args: Parameters<IAgentPort["initialize"]>) { return this.inner.initialize(...args); }
-  async newSession(...args: Parameters<IAgentPort["newSession"]>) { return this.inner.newSession(...args); }
-  async prompt(...args: Parameters<IAgentPort["prompt"]>) { return this.inner.prompt(...args); }
-  async authenticate(...args: Parameters<IAgentPort["authenticate"]>) { return this.inner.authenticate(...args); }
-  async sessionUpdate(...args: Parameters<IAgentPort["sessionUpdate"]>) { return this.inner.sessionUpdate(...args); }
-  get setSessionMode() { return this.inner.setSessionMode?.bind(this.inner); }
-  get setSessionModel() { return this.inner.setSessionModel?.bind(this.inner); }
+  async connect(): Promise<void> {
+    return this.inner.connect();
+  }
+  async disconnect(): Promise<void> {
+    return this.inner.disconnect();
+  }
+  async initialize(...args: Parameters<IAgentPort["initialize"]>) {
+    return this.inner.initialize(...args);
+  }
+  async newSession(...args: Parameters<IAgentPort["newSession"]>) {
+    return this.inner.newSession(...args);
+  }
+  async prompt(...args: Parameters<IAgentPort["prompt"]>) {
+    return this.inner.prompt(...args);
+  }
+  async authenticate(...args: Parameters<IAgentPort["authenticate"]>) {
+    return this.inner.authenticate(...args);
+  }
+  async sessionUpdate(...args: Parameters<IAgentPort["sessionUpdate"]>) {
+    return this.inner.sessionUpdate(...args);
+  }
+  get setSessionMode() {
+    return this.inner.setSessionMode?.bind(this.inner);
+  }
+  get setSessionModel() {
+    return this.inner.setSessionModel?.bind(this.inner);
+  }
 
   async *streamPrompt(
     params: PromptRequest,
@@ -91,13 +109,19 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
     };
     this.inner.on(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
     const promptPromise = this.inner.prompt(params);
-    promptPromise.finally(() => {
-      this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
-      queue.close();
-    }).catch(() => {});
+    promptPromise
+      .finally(() => {
+        this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
+        queue.close();
+      })
+      .catch(() => {});
     try {
       for await (const update of queue.consume()) {
-        for (const env of sessionUpdateToEnvelopes(update, mode, { modelId, chunkId, created: streamCreated })) {
+        for (const env of sessionUpdateToEnvelopes(update, mode, {
+          modelId,
+          chunkId,
+          created: streamCreated,
+        })) {
           yield env;
         }
       }
@@ -119,6 +143,9 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   }
 }
 
-export function wrapAgentPortWithStream(inner: IAgentPort, options: WrapAgentPortOptions = {}): IAgentPort {
+export function wrapAgentPortWithStream(
+  inner: IAgentPort,
+  options: WrapAgentPortOptions = {}
+): IAgentPort {
   return new StreamAgentPort(inner, options);
 }
