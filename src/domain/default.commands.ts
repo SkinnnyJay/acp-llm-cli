@@ -9,11 +9,11 @@
  */
 export const DEFAULT_COMMANDS = {
   CLAUDE_DEFAULT_COMMAND: "claude-agent-acp",
-  CLAUDE_DEFAULT_ARGS: [] as string[],
+  CLAUDE_DEFAULT_ARGS: [] as const,
   GEMINI_DEFAULT_COMMAND: "gemini",
-  GEMINI_DEFAULT_ARGS: ["--experimental-acp"],
+  GEMINI_DEFAULT_ARGS: ["--experimental-acp"] as const,
   CODEX_DEFAULT_COMMAND: "codex-acp",
-  CODEX_DEFAULT_ARGS: [] as string[],
+  CODEX_DEFAULT_ARGS: [] as const,
   CURSOR_DEFAULT_COMMAND: "cursor-agent",
-  CURSOR_DEFAULT_ARGS: [] as string[],
+  CURSOR_DEFAULT_ARGS: [] as const,
 } as const;

@@ -44,12 +44,9 @@ export function createMockAgentPort(options: MockAgentPortOptions = {}): IAgentP
   };
 
   if (options.withRestart) {
+    // Stub only — callers that need disconnect/connect semantics should assert those separately.
     Object.assign(port, {
-      restart: vi.fn().mockImplementation(async () => {
-        await port.disconnect();
-        await port.connect();
-        await port.initialize();
-      }),
+      restart: vi.fn().mockResolvedValue(undefined),
     });
   }
 

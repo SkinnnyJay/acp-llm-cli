@@ -1,5 +1,5 @@
-import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
@@ -8,32 +8,7 @@ import type { IAgentPort } from "../src/runtime/agent.port";
 import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 
-function createMockPort(sessionId = "sess-default"): IAgentPort {
-  const emitter = new EventEmitter();
-  return {
-    get connectionStatus() {
-      return CONNECTION_STATUS.DISCONNECTED;
-    },
-    capabilities: {},
-    connect: vi.fn().mockResolvedValue(undefined),
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    initialize: vi.fn().mockResolvedValue({ protocolVersion: "1" }),
-    newSession: vi.fn().mockResolvedValue({ sessionId }),
-    prompt: vi.fn().mockResolvedValue({ stopReason: "end_turn" }),
-    authenticate: vi.fn().mockResolvedValue({}),
-    sessionUpdate: vi.fn().mockResolvedValue(undefined),
-    on: emitter.on.bind(emitter),
-    off: emitter.off.bind(emitter),
-    emit: emitter.emit.bind(emitter),
-    addListener: emitter.addListener.bind(emitter),
-    removeListener: emitter.removeListener.bind(emitter),
-    removeAllListeners: emitter.removeAllListeners.bind(emitter),
-    listeners: emitter.listeners.bind(emitter),
-    listenerCount: emitter.listenerCount.bind(emitter),
-    eventNames: emitter.eventNames.bind(emitter),
-    once: emitter.once.bind(emitter),
-  } as unknown as IAgentPort;
-}
+const createMockPort = (sessionId = "sess-default") => createMockAgentPort({ sessionId });
 
 describe("createMemorySessionPersistence", () => {
   it("clearSession removes a previously saved session", async () => {
