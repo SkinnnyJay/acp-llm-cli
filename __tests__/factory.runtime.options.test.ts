@@ -1,5 +1,5 @@
-import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 import { getDefaultFactory, resetDefaultFactoriesForTests } from "../src/bootstrap";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
@@ -12,32 +12,7 @@ import { ProviderFactory } from "../src/runtime/provider.factory";
 import { HarnessRegistry } from "../src/runtime/registry";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 
-function createMockPort(): IAgentPort {
-  const emitter = new EventEmitter();
-  let status = CONNECTION_STATUS.DISCONNECTED;
-  const port = {
-    get connectionStatus() {
-      return status;
-    },
-    connect: vi.fn().mockImplementation(async () => {
-      status = CONNECTION_STATUS.CONNECTED;
-      emitter.emit("state", status);
-    }),
-    disconnect: vi.fn().mockImplementation(async () => {
-      status = CONNECTION_STATUS.DISCONNECTED;
-      emitter.emit("state", status);
-    }),
-    initialize: vi.fn().mockResolvedValue({ protocolVersion: "1", agentCapabilities: {} }),
-    newSession: vi.fn().mockResolvedValue({ sessionId: "factory-sess-1" }),
-    prompt: vi.fn().mockResolvedValue({ stopReason: "end_turn" }),
-    authenticate: vi.fn().mockResolvedValue({}),
-    sessionUpdate: vi.fn().mockResolvedValue(undefined),
-    on: emitter.on.bind(emitter),
-    off: emitter.off.bind(emitter),
-    emit: emitter.emit.bind(emitter),
-  };
-  return port as unknown as IAgentPort;
-}
+const createMockPort = () => createMockAgentPort({ sessionId: "factory-sess-1" });
 
 describe("ProviderFactory runtime options composition", () => {
   it("threads sessionPersistence through createRuntime and persists on newSession + events", async () => {

@@ -1,46 +1,16 @@
-import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { IAgentPort } from "../src/runtime/agent.port";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 import {
   LifecycleAgentPort,
   wrapAgentPortWithLifecycle,
 } from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 
-function createMockPort(): IAgentPort {
-  const emitter = new EventEmitter();
-  let status = CONNECTION_STATUS.DISCONNECTED;
-  const port = {
-    get connectionStatus() {
-      return status;
-    },
-    connect: vi.fn().mockImplementation(async () => {
-      status = CONNECTION_STATUS.CONNECTED;
-      emitter.emit("state", status);
-    }),
-    disconnect: vi.fn().mockImplementation(async () => {
-      status = CONNECTION_STATUS.DISCONNECTED;
-      emitter.emit("state", status);
-    }),
-    initialize: vi.fn().mockResolvedValue({ protocolVersion: "1", agentCapabilities: {} }),
-    newSession: vi.fn().mockResolvedValue({ sessionId: "sess-123" }),
-    prompt: vi.fn().mockResolvedValue({ stopReason: "end_turn" }),
-    authenticate: vi.fn().mockResolvedValue({}),
-    sessionUpdate: vi.fn().mockResolvedValue(undefined),
-    restart: vi.fn().mockImplementation(async () => {
-      await port.disconnect();
-      await port.connect();
-      await port.initialize();
-    }),
-    on: emitter.on.bind(emitter),
-    off: emitter.off.bind(emitter),
-    emit: emitter.emit.bind(emitter),
-  };
-  return port as unknown as IAgentPort;
-}
+const createMockPort = () => createMockAgentPort({ sessionId: "sess-123", withRestart: true });
 
 describe("wrapAgentPortWithLifecycle", () => {
   it("adds restart, openClose, and sessionPersistence capabilities when persistence provided", () => {

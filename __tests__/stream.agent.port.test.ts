@@ -1,37 +1,12 @@
-import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import { StreamAgentPort, wrapAgentPortWithStream } from "../src/runtime/acp.agent.port.stream";
 import type { IAgentPort } from "../src/runtime/agent.port";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 
-function createMockPort(): IAgentPort {
-  const emitter = new EventEmitter();
-  return {
-    get connectionStatus() {
-      return CONNECTION_STATUS.DISCONNECTED;
-    },
-    capabilities: {},
-    connect: vi.fn().mockResolvedValue(undefined),
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    initialize: vi.fn().mockResolvedValue({ protocolVersion: "1" }),
-    newSession: vi.fn().mockResolvedValue({ sessionId: "sess-1" }),
-    prompt: vi.fn().mockResolvedValue({ stopReason: "end_turn" }),
-    authenticate: vi.fn().mockResolvedValue({}),
-    sessionUpdate: vi.fn().mockResolvedValue(undefined),
-    on: emitter.on.bind(emitter),
-    off: emitter.off.bind(emitter),
-    emit: emitter.emit.bind(emitter),
-    addListener: emitter.addListener.bind(emitter),
-    removeListener: emitter.removeListener.bind(emitter),
-    removeAllListeners: emitter.removeAllListeners.bind(emitter),
-    listeners: emitter.listeners.bind(emitter),
-    listenerCount: emitter.listenerCount.bind(emitter),
-    eventNames: emitter.eventNames.bind(emitter),
-    once: emitter.once.bind(emitter),
-  } as unknown as IAgentPort;
-}
+const createMockPort = () => createMockAgentPort();
 
 describe("StreamAgentPort", () => {
   it("is a named class (not anonymous)", () => {
