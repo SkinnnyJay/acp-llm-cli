@@ -1,12 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { createMockAgentPort } from "./helpers/mock.agent.port";
-import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { describe, expect, it } from "vitest";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import { createAcpCliHarnessRuntime } from "../src/providers/acp.shared";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 
 const createMockPort = (sessionId = "sess-default") => createMockAgentPort({ sessionId });
 

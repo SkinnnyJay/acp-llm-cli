@@ -3,12 +3,12 @@ import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { IAgentPort } from "../src/runtime/agent.port";
-import { createMockAgentPort } from "./helpers/mock.agent.port";
 import {
   LifecycleAgentPort,
   wrapAgentPortWithLifecycle,
 } from "../src/runtime/lifecycle.supervisor";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 
 const createMockPort = () => createMockAgentPort({ sessionId: "sess-123", withRestart: true });
 
