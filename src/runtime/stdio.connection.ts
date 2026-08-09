@@ -88,13 +88,21 @@ export class StdioConnection
       return;
     }
     this.isDisconnecting = true;
+    // Capture the child being torn down: `this.child` may already point at a
+    // freshly spawned process by the time the force-kill timer fires (restart
+    // path), and that new child must never receive this disconnect's SIGKILL.
+    const child = this.child;
     await new Promise<void>((resolve) => {
-      this.child?.once(NODE_EVENT.CLOSE, () => resolve());
-      this.child?.kill?.(SIGNAL.TERM);
-      setTimeout(() => {
-        this.child?.kill?.(SIGNAL.KILL);
+      const forceKill = setTimeout(() => {
+        child.kill?.(SIGNAL.KILL);
         resolve();
-      }, TIMEOUT.DISCONNECT_FORCE_MS).unref();
+      }, TIMEOUT.DISCONNECT_FORCE_MS);
+      forceKill.unref();
+      child.once(NODE_EVENT.CLOSE, () => {
+        clearTimeout(forceKill);
+        resolve();
+      });
+      child.kill?.(SIGNAL.TERM);
     });
     this.child = undefined;
     this.stream = undefined;

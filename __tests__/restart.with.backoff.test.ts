@@ -105,3 +105,32 @@ describe("restartWithBackoff", () => {
     await expect(restartWithBackoff(port)).resolves.toBeUndefined();
   });
 });
+
+describe("restartWithBackoff actually waits between attempts", () => {
+  it("applies the capped exponential delay for real (regression: unawaited onRetry gave zero backoff)", async () => {
+    vi.useFakeTimers();
+    try {
+      const port = createMockPort({ hasRestart: true });
+      const restart = port as IAgentPort & { restart: () => Promise<void> };
+      (restart.restart as ReturnType<typeof vi.fn>)
+        .mockRejectedValueOnce(new Error("t1"))
+        .mockRejectedValueOnce(new Error("t2"))
+        .mockResolvedValueOnce(undefined);
+
+      const p = restartWithBackoff(port, { maxRetries: 3, backoffBaseMs: 100, backoffCapMs: 5000 });
+      // Attempt 1 fails synchronously in microtasks; delay = min(100 * 2^1, 5000) = 200ms.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(restart.restart as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(199);
+      expect(restart.restart as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(restart.restart as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(2);
+      // Attempt 2 fails; delay = min(100 * 2^2, 5000) = 400ms.
+      await vi.advanceTimersByTimeAsync(400);
+      expect(restart.restart as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(3);
+      await expect(p).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
