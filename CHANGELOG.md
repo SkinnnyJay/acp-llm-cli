@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (extension API):** `LifecycleSupervisorOptions` groups session persistence into one
   optional `persistence: { store, providerId, workspace?, resumeOnRestart? }` object.
   `AcpSharedRuntimeOptions` - the surface the factories and adapters use - is unchanged.
+- `ProviderClientFactory.listProviders()` now returns only providers the injected factory has
+  actually registered, instead of the full static enum. The default factory registers all four, so
+  the common path is unchanged; a factory built over a partial registry no longer advertises ids
+  that `getClient` would reject.
+- Removed the unused `ENV_KEY.RUN_INTEGRATION` constant, which narrows the exported `EnvKey`
+  union. Nothing in this package read it. Added `ACP_LLM_CLI_LIVE`, `ACP_LLM_CLI_PROVIDER` and
+  `ACP_LLM_CLI_MODELS_DRY_RUN`, which were previously read as raw strings.
 - `HarnessRegistry` is now a value export from the package root, so `new HarnessRegistry()` works
   from `.` as the custom-registry docs describe. `HelpExtractorOptions` is exported from the root.
 - The ACP runtime builders moved to `src/runtime/`, so the runtime layer no longer imports the

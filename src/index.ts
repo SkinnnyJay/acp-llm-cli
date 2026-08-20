@@ -82,11 +82,6 @@ export type { ISessionPersistence, PersistedSession } from "./domain/session.per
 export {
   genericLlmCliOptionsSchema,
   GENERIC_OPTION_KEY,
-  /**
-   * @deprecated Unused and misleading: the arg builder does not consult it, and no schema applies
-   * these values, so `stream: true` here is a default that is never applied. Scheduled for
-   * removal in the next major, along with the `*_MODEL_ID_LIST` exports below.
-   */
   GENERIC_OPTION_DEFAULTS,
   buildGenericArgs,
   extractHelp,

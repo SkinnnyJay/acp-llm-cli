@@ -334,4 +334,37 @@ describe("StreamAgentPort", () => {
 
     expect(inner.listenerCount("sessionUpdate")).toBe(1);
   });
+
+  it("frees the stream lock on disconnect even if the prompt never settles", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+    const update = {
+      sessionId: "s1",
+      update: {
+        sessionUpdate: "agent_message_chunk" as const,
+        content: { type: "text", text: "partial" },
+      },
+    };
+    (inner.prompt as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      setTimeout(() => {
+        (inner as unknown as EventEmitter).emit("sessionUpdate", update);
+      }, 0);
+      // Never settles: an agent that hangs without closing its pipe.
+      return new Promise(() => {});
+    });
+
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    for await (const _envelope of port.streamPrompt(params)) {
+      break;
+    }
+
+    await port.disconnect();
+    (inner.prompt as ReturnType<typeof vi.fn>).mockResolvedValue({ stopReason: "end_turn" });
+
+    // A reset port must be usable again rather than permanently busy.
+    for await (const _envelope of port.streamPrompt(params)) {
+      // drain
+    }
+    expect(inner.prompt).toHaveBeenCalledTimes(2);
+  });
 });

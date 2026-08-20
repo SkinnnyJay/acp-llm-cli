@@ -101,8 +101,15 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     });
     this.connection.on(CONNECTION_EVENT.ERROR, (error) => this.emit(AGENT_PORT_EVENT.ERROR, error));
     // The transport declares and emits EXIT; nothing used to subscribe, so the client kept a
-    // link to a process that had already gone away.
-    this.connection.on(CONNECTION_EVENT.EXIT, () => this.detach());
+    // link to a process that had already gone away. EXIT is announced for every child, including
+    // one abandoned by an earlier reconnect, so check ownership: if the transport still hands
+    // back the stream this link was built on, the exit belongs to some other child.
+    this.connection.on(CONNECTION_EVENT.EXIT, () => {
+      if (this.attached && this.connection.getStream() === this.attached.stream) {
+        return;
+      }
+      this.detach();
+    });
   }
 
   private detach(): void {

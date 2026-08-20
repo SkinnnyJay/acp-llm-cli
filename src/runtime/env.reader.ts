@@ -19,13 +19,15 @@ import type { ProcessEnv } from "../domain/process.env";
  */
 function readRaw(key: EnvKey, override?: ProcessEnv): string | undefined {
   const fromOverride = override?.[key];
-  if (fromOverride !== undefined) return String(fromOverride);
+  // An empty override is treated as absent rather than as a value, so it falls through to the
+  // ambient environment instead of shadowing it - the behaviour callers had before.
+  if (fromOverride !== undefined && fromOverride !== "") return String(fromOverride);
   return Env.getValue(key);
 }
 
 export function getEnvString(key: EnvKey, defaultValue: string, override?: ProcessEnv): string {
   const raw = readRaw(key, override);
-  // An empty value means "unset" on both paths, so it cannot produce a config that fails
+  // An empty ambient value also means "unset", so it cannot produce a config that fails
   // `command: z.string().min(1)` with a confusing message.
   return raw === undefined || raw === "" ? defaultValue : raw;
 }

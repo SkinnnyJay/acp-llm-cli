@@ -505,4 +505,36 @@ describe("StdioConnection", () => {
 
     expect(streamInsideHandler).toBeUndefined();
   });
+
+  it("does not report a stale child's error on a healthy connection", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = createFakeChild();
+      const b = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValueOnce(a.child).mockReturnValueOnce(b.child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(TIMEOUT.DISCONNECT_FORCE_MS);
+      await disconnectPromise;
+      await conn.connect();
+
+      const errors: Error[] = [];
+      let statusInsideHandler: string | undefined;
+      conn.on("error", (e) => {
+        errors.push(e);
+        statusInsideHandler = conn.connectionStatus;
+      });
+
+      a.triggerError(new Error("stale child hiccup"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(errors).toHaveLength(0);
+      expect(statusInsideHandler).toBeUndefined();
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

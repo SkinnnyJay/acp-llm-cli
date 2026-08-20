@@ -5,7 +5,12 @@
 
 /** Derive a constant name from a model id. Not injective: `-`, `.` and every \W char map to `_`. */
 export function safeKey(id: string): string {
-  return id.replace(/[-.]/g, "_").replace(/\W/g, "_").toUpperCase();
+  const key = id.replace(/[-.]/g, "_").replace(/\W/g, "_").toUpperCase();
+  if (key === "") {
+    // Would otherwise emit `  : "",` - syntactically invalid TypeScript in a generated file.
+    throw new Error(`Model id ${JSON.stringify(id)} produces an empty constant name.`);
+  }
+  return key;
 }
 
 /**
@@ -62,6 +67,10 @@ export const MODEL_IDS = {
 ${body}
 } as const;
 
+/**
+ * @deprecated Unread anywhere, and lossier than its source: readonly string[] discards the
+ * literal union MODEL_IDS already carries. Use Object.values(MODEL_IDS). Removed next major.
+ */
 export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
 
 export const ModelIdSchema = z.enum([

@@ -132,18 +132,6 @@ describe("createAcpAgentPort contract", () => {
     );
   });
 
-  it("stops accepting requests once the agent process exits", async () => {
-    const connection = createMockConnection();
-    const port = createAcpAgentPort(connection);
-    await port.connect();
-
-    connection.emitExit({ code: 1, signal: null });
-
-    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
-      ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
-    );
-  });
-
   it("forwards transport state and error events to the port", async () => {
     const connection = createMockConnection();
     const port = createAcpAgentPort(connection);
@@ -175,6 +163,32 @@ describe("createAcpAgentPort contract", () => {
     connection.disconnect.mockRejectedValueOnce(new Error("kill failed"));
 
     await expect(port.disconnect()).rejects.toThrow("kill failed");
+    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
+      ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
+    );
+  });
+
+  it("keeps the live link when a previously abandoned child finally exits", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+
+    // A stale child's exit is still announced connection-wide, but it does not belong to the
+    // stream this client is attached to.
+    connection.emitExit({ code: null, signal: "SIGKILL" });
+
+    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).resolves.toBeDefined();
+  });
+
+  it("detaches when the child backing the attached stream exits", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+
+    // The transport clears its stream before announcing the exit.
+    connection.getStream.mockReturnValue(undefined);
+    connection.emitExit({ code: 1, signal: null });
+
     await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
       ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
     );

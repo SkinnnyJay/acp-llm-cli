@@ -35,7 +35,8 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   private readonly inner: IAgentPort;
   private readonly envelopeMode: EnvelopeMode;
   private readonly modelId: string | undefined;
-  private streamBusy = false;
+  /** Identifies the stream currently holding the lock, so a stale release cannot free a newer one. */
+  private activeStream: symbol | undefined;
   private chunkSeq = 0;
 
   constructor(inner: IAgentPort, options: WrapAgentPortOptions = {}) {
@@ -66,7 +67,17 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
     return this.inner.connect();
   }
   async disconnect(): Promise<void> {
+    // Reset the port: without this a prompt that never settles - an agent that hangs without
+    // closing its pipe - would leave streaming permanently unavailable, with no way back.
+    this.activeStream = undefined;
     return this.inner.disconnect();
+  }
+
+  /** Only the stream that took the lock may release it. */
+  private release(token: symbol): void {
+    if (this.activeStream === token) {
+      this.activeStream = undefined;
+    }
   }
   async initialize(...args: Parameters<IAgentPort["initialize"]>) {
     return this.inner.initialize(...args);
@@ -94,8 +105,9 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
     params: PromptRequest,
     streamOptions?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope> {
-    if (this.streamBusy) throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
-    this.streamBusy = true;
+    if (this.activeStream) throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    const streamToken = Symbol("streamPrompt");
+    this.activeStream = streamToken;
     const mode = streamOptions?.envelopeMode ?? this.envelopeMode;
     const modelId = this.modelId;
     const sessionId = params.sessionId;
@@ -115,7 +127,7 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       // A synchronous throw from prompt() must not leave the port permanently busy.
       this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
       queue.close();
-      this.streamBusy = false;
+      this.release(streamToken);
       throw err;
     }
     // Busy-ness is released by the prompt that owns it, not by the generator frame: a consumer
@@ -124,7 +136,7 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       .finally(() => {
         this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
         queue.close();
-        this.streamBusy = false;
+        this.release(streamToken);
       })
       .catch(() => {});
     try {
@@ -150,7 +162,7 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       queue.pushError(err instanceof Error ? err : new Error(String(err)));
       throw err;
     } finally {
-      // Abandonment only needs to stop buffering; the prompt's own finally clears streamBusy.
+      // Abandonment only needs to stop buffering; the prompt's own finally releases the lock.
       queue.close();
     }
   }

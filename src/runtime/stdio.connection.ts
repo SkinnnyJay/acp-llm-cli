@@ -131,9 +131,12 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     // checks that it still owns that state. State is updated before the event announcing it,
     // so a listener always observes the status the event describes.
     child.on(NODE_EVENT.ERROR, (error: Error) => {
-      if (this.child === child) {
-        this.setStatus(CONNECTION_STATUS.ERROR);
+      // A child this connection no longer owns cannot put it into an error state, and reporting
+      // its failure would hand listeners an error that contradicts connectionStatus.
+      if (this.child !== child) {
+        return;
       }
+      this.setStatus(CONNECTION_STATUS.ERROR);
       this.emit(CONNECTION_EVENT.ERROR, error);
     });
 
