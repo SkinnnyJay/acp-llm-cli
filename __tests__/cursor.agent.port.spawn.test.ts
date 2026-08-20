@@ -219,7 +219,6 @@ describe("CursorAgentPort spawn contract", () => {
     expect(args).not.toContain(CURSOR_CLI_ARG.MODE);
   });
 
-
   it("is idempotent when disconnect is called concurrently", async () => {
     const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
     const port = new CursorAgentPort(
@@ -271,5 +270,4 @@ describe("CursorAgentPort spawn contract", () => {
 
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
   });
-
 });

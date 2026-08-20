@@ -7,4 +7,3 @@ export const AGENT_PORT_EVENT = {
   PERMISSION_REQUEST: "permissionRequest",
   ERROR: "error",
 } as const;
-

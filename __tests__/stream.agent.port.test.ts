@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
-import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
+import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import { StreamAgentPort, wrapAgentPortWithStream } from "../src/runtime/acp.agent.port.stream";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -334,5 +334,4 @@ describe("StreamAgentPort", () => {
 
     expect(inner.listenerCount("sessionUpdate")).toBe(1);
   });
-
 });

@@ -81,7 +81,12 @@ describe("provider config passthrough", () => {
     } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
 
     createStandardAcpRuntime(
-      { command: "explicit-binary", args: ["--from-caller"], env: {}, model: "m" } as unknown as BaseCliConfig,
+      {
+        command: "explicit-binary",
+        args: ["--from-caller"],
+        env: {},
+        model: "m",
+      } as unknown as BaseCliConfig,
       { command: "default-binary", args: ["--from-defaults"] },
       { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
       capturingSchema

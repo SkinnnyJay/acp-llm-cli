@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { modelIdEntries, safeKey } from "../scripts/model.constants";
 import { MODEL_IDS as ANTHROPIC } from "../src/domain/models/anthropic.models";
 import { MODEL_IDS as GEMINI } from "../src/domain/models/gemini.models";
 import { MODEL_IDS as OPENAI } from "../src/domain/models/openai.models";
 import { MODEL_IDS as XAI } from "../src/domain/models/xai.models";
-import { modelIdEntries, safeKey } from "../scripts/model.constants";
 
 describe("model id key derivation", () => {
   it("throws rather than silently renaming when two ids collide", () => {

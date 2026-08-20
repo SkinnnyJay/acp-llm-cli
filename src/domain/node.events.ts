@@ -6,4 +6,3 @@ export const NODE_EVENT = {
   ERROR: "error",
   CLOSE: "close",
 } as const;
-

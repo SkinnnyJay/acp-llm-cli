@@ -127,9 +127,9 @@ describe("createAcpAgentPort contract", () => {
 
     connection.setStatus(CONNECTION_STATUS.ERROR);
 
-    await expect(
-      port.prompt({ sessionId: "s1", prompt: [] } as never)
-    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
+      ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
+    );
   });
 
   it("stops accepting requests once the agent process exits", async () => {
@@ -139,9 +139,9 @@ describe("createAcpAgentPort contract", () => {
 
     connection.emitExit({ code: 1, signal: null });
 
-    await expect(
-      port.prompt({ sessionId: "s1", prompt: [] } as never)
-    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
+      ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
+    );
   });
 
   it("forwards transport state and error events to the port", async () => {
@@ -175,11 +175,10 @@ describe("createAcpAgentPort contract", () => {
     connection.disconnect.mockRejectedValueOnce(new Error("kill failed"));
 
     await expect(port.disconnect()).rejects.toThrow("kill failed");
-    await expect(
-      port.prompt({ sessionId: "s1", prompt: [] } as never)
-    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+    await expect(port.prompt({ sessionId: "s1", prompt: [] } as never)).rejects.toThrow(
+      ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
+    );
   });
-
 });
 
 /** Unused import guard for EventEmitter fake streams in related suites. */

@@ -69,12 +69,20 @@ describe("Session persistence key isolation", () => {
 
     const port = createMockPort("ws-session");
     const wrapped = wrapAgentPortWithLifecycle(port, {
-      persistence: { store: persistence, providerId: PROVIDER_IDS.CLAUDE_CLI_ID, workspace: "/workspace/A" },
+      persistence: {
+        store: persistence,
+        providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+        workspace: "/workspace/A",
+      },
     });
 
     const portB = createMockPort("ws-session-B");
     const wrappedB = wrapAgentPortWithLifecycle(portB, {
-      persistence: { store: persistence, providerId: PROVIDER_IDS.CLAUDE_CLI_ID, workspace: "/workspace/B" },
+      persistence: {
+        store: persistence,
+        providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+        workspace: "/workspace/B",
+      },
     });
 
     await wrapped.newSession({ cwd: "/workspace/A", mcpServers: [] } as Parameters<

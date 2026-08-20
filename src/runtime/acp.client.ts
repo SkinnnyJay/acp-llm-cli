@@ -94,10 +94,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     this.connection.on(CONNECTION_EVENT.STATE, (status) => {
       // Drop the link on terminal transport states only. A transient CONNECTING must not
       // detach, and third-party transports may emit states this client does not model.
-      if (
-        status === CONNECTION_STATUS.DISCONNECTED ||
-        status === CONNECTION_STATUS.ERROR
-      ) {
+      if (status === CONNECTION_STATUS.DISCONNECTED || status === CONNECTION_STATUS.ERROR) {
         this.detach();
       }
       this.emit(AGENT_PORT_EVENT.STATE, status);

@@ -89,9 +89,13 @@ describe("bootstrap", () => {
     );
 
     createHarness(registry, "custom-provider", { command: "cmd", args: [] });
-    createHarness(registry, "custom-provider", { command: "cmd", args: [] }, { providerId: "mine" });
+    createHarness(
+      registry,
+      "custom-provider",
+      { command: "cmd", args: [] },
+      { providerId: "mine" }
+    );
 
     expect(seen).toEqual(["custom-provider", "mine"]);
   });
-
 });

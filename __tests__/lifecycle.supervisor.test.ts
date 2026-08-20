@@ -384,5 +384,4 @@ describe("wrapAgentPortWithLifecycle", () => {
 
     expect(inner.newSession).toHaveBeenCalled();
   });
-
 });
