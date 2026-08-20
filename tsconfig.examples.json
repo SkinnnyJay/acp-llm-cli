@@ -10,12 +10,9 @@
     ]
   },
   "include": [
-    "src/**/*",
-    "__tests__/**/*",
-    "scripts/**/*"
+    "examples/**/*"
   ],
   "exclude": [
-    "node_modules",
-    "dist"
+    "node_modules"
   ]
 }

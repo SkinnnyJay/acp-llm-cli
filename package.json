@@ -45,18 +45,19 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "typecheck:examples": "tsc -p tsconfig.examples.json",
     "lint": "biome check src __tests__",
     "format": "biome format src __tests__",
     "check:fix": "biome check --write src __tests__",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run lint && npm run typecheck && npm run build && npm test",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm run typecheck:examples && npm test",
     "prepublishOnly": "npm run verify:coverage",
     "pack:smoke": "node scripts/pack-smoke.mjs",
     "publint": "node scripts/publint-pack.mjs",
     "update-models": "tsx scripts/update-models.ts",
-    "verify:coverage": "npm run lint && npm run typecheck && npm run build && npm run test:coverage"
+    "verify:coverage": "npm run lint && npm run typecheck && npm run build && npm run typecheck:examples && npm run test:coverage"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.4.0",
