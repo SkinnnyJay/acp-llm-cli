@@ -157,4 +157,26 @@ describe("provider config passthrough", () => {
     expect(promptCall?.args).toContain(CURSOR_CLI_ARG.MODEL);
     expect(promptCall?.args).toContain("claude-sonnet-4.6");
   });
+
+  it("labels OpenAI-style envelopes with the configured model", async () => {
+    const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
+    const captured: Array<Record<string, unknown>> = [];
+    const capturingSchema = {
+      parse: (value: unknown) => {
+        captured.push(value as Record<string, unknown>);
+        return baseCliConfigSchema.parse(value);
+      },
+    } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
+
+    const port = createStandardAcpRuntime(
+      { command: "claude-agent-acp", args: [], env: {}, model: "claude-opus-4.5" } as unknown as BaseCliConfig,
+      { command: "claude-agent-acp", args: [] },
+      { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
+      capturingSchema
+    );
+
+    expect(port).toBeDefined();
+    expect(captured[0]?.model).toBe("claude-opus-4.5");
+  });
+
 });

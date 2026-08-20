@@ -3,9 +3,10 @@
  *
  *   npm run build && npx tsx examples/cursor-print.ts
  *
- * Requires `cursor-agent` on PATH. Pass trust: true only if you intend to enable --trust.
+ * Requires `cursor-agent` on PATH. Pass trust: true only if you intend to enable --trust,
+ * which really does reach the CLI - it is not a no-op.
  */
-import { getDefaultProviderClientFactory, Provider } from "../dist/index.js";
+import { Provider, getDefaultProviderClientFactory } from "../dist/index.js";
 
 async function main(): Promise<void> {
   const factory = getDefaultProviderClientFactory();
@@ -16,14 +17,17 @@ async function main(): Promise<void> {
   });
 
   await client.port.connect();
-  await client.port.initialize();
-  const session = await client.port.newSession({ cwd: process.cwd(), mcpServers: [] });
-  const result = await client.port.prompt({
-    sessionId: session.sessionId,
-    prompt: [{ type: "text", text: "Reply with exactly: ok" }],
-  });
-  console.log(JSON.stringify({ stopReason: result.stopReason }, null, 2));
-  await client.port.disconnect();
+  try {
+    await client.port.initialize();
+    const session = await client.port.newSession({ cwd: process.cwd(), mcpServers: [] });
+    const result = await client.port.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "Reply with exactly: ok" }],
+    });
+    console.log(JSON.stringify({ stopReason: result.stopReason }, null, 2));
+  } finally {
+    await client.port.disconnect();
+  }
 }
 
 main().catch((err) => {

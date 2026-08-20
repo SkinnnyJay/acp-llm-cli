@@ -8,10 +8,10 @@
  */
 import {
   ENVELOPE_MODE,
+  Provider,
   getDefaultProviderClientFactory,
   isNativeEnvelope,
   isOpenAIEnvelope,
-  Provider,
 } from "../dist/index.js";
 
 async function main(): Promise<void> {
@@ -28,25 +28,29 @@ async function main(): Promise<void> {
   }
 
   await port.connect();
-  await port.initialize();
-  const session = await port.newSession({ cwd: process.cwd(), mcpServers: [] });
+  try {
+    await port.initialize();
+    const session = await port.newSession({ cwd: process.cwd(), mcpServers: [] });
 
-  for await (const envelope of port.streamPrompt(
-    {
-      sessionId: session.sessionId,
-      prompt: [{ type: "text", text: "Say hello in one short sentence." }],
-    },
-    { envelopeMode: ENVELOPE_MODE.BOTH }
-  )) {
-    if (isOpenAIEnvelope(envelope)) {
-      const delta = envelope.choices?.[0]?.delta?.content;
-      if (delta) process.stdout.write(delta);
-    } else if (isNativeEnvelope(envelope)) {
-      // native envelopes are available for debugging / custom consumers
+    for await (const envelope of port.streamPrompt(
+      {
+        sessionId: session.sessionId,
+        prompt: [{ type: "text", text: "Say hello in one short sentence." }],
+      },
+      { envelopeMode: ENVELOPE_MODE.BOTH }
+    )) {
+      if (isOpenAIEnvelope(envelope)) {
+        const delta = envelope.choices?.[0]?.delta?.content;
+        if (delta) process.stdout.write(delta);
+      } else if (isNativeEnvelope(envelope)) {
+        // native envelopes are available for debugging / custom consumers
+      }
     }
+    process.stdout.write("\n");
+  } finally {
+    // Abandoning the stream leaves the prompt in flight; disconnect must still run.
+    await port.disconnect();
   }
-  process.stdout.write("\n");
-  await port.disconnect();
 }
 
 main().catch((err) => {

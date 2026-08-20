@@ -30,7 +30,9 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
-  // Enum id or any string (open escape for unlisted models):
+  // Enum id or any string (open escape for unlisted models). For ACP providers this labels
+  // OpenAI-style stream envelopes; select the agent's model with port.setSessionModel(...)
+  // or by passing the flag your CLI expects in `args`.
   model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
 });
 await client.port.connect();
@@ -79,6 +81,12 @@ All env keys are in `ENV_KEY` (see `src/domain/env.keys.ts`). Copy `.env.sample`
 - For `npm run update-models`: set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `XAI_API_KEY` to refresh model enums from provider APIs.
 
 Resolution order: defaults (from `default.commands.ts`) → env (via `ENV_KEY` only) → passed config. All validated with Zod.
+
+`command` is required by the config schema, so a passed config always supplies it and the
+`ACP_LLM_CLI_*_COMMAND` variables only apply when you call `resolveBaseConfig` yourself (exported
+from `@simpill/acp-llm-cli/runtime`). The `ACP_LLM_CLI_*_ARGS` variables apply whenever `args` is
+empty. Provider-specific fields you pass (`model`, `trust`, `mode`, …) are preserved through
+resolution and reach the provider.
 
 ## Provider ids (constants)
 

@@ -9,6 +9,7 @@ Curated exports from the package root. Prefer this surface for applications.
 | `getDefaultProviderClientFactory` | fn | Recommended entry: `getClient(Provider.*, config, runtimeOptions?)` |
 | `getDefaultFactory` | fn | `createRuntime(id, config, runtimeOptions?)` by provider id |
 | `getDefaultRegistry` / `createHarness` / `getAdapter` | fn | Custom registry wiring |
+| `HarnessRegistry` | class | Construct your own registry (`new HarnessRegistry()`) |
 | `Provider` / `PROVIDER_VALUES` / `ProviderSchema` | const/type | Provider enum + Zod |
 | `PROVIDER_IDS` | const | String ids (`claude-cli`, …) |
 | `DEFAULT_COMMANDS` | const | Default binaries/args |
@@ -36,7 +37,7 @@ Curated exports from the package root. Prefer this surface for applications.
 | `StreamEnvelope` / `isNativeEnvelope` / `isOpenAIEnvelope` | type/guard | Dual-envelope stream types |
 | `PORT_CAPABILITY` | const | Capability flag names |
 
-`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`).
+`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
 
 ## Models
 
@@ -64,5 +65,5 @@ Use for custom adapters and decorators: `StreamAgentPort`, `LifecycleAgentPort`,
 ## Safety defaults (0.2.0+)
 
 - Permission requests without a `permissionHandler` are **cancelled** (never auto-allow).
-- Cursor `--trust` is passed only when `trust: true` in config.
+- Cursor `--trust` is passed only when `trust: true` in config (verified end to end by `__tests__/config.passthrough.test.ts`).
 - Stderr in thrown errors is redacted/truncated unless `ACP_LLM_CLI_DEBUG` is set.
