@@ -70,9 +70,14 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
    * session's settings. Everything about a session now lives in one entry with one lifetime.
    */
   private readonly sessions = new Map<string, CursorSessionState>();
-  private activePromptCount = 0;
-  private disconnectionInProgress = false;
-  private readonly activeAbortControllers = new Set<AbortController>();
+  /**
+   * The single in-flight ledger, mutated only by runTracked. Its size replaces a separate
+   * counter, so every spawn kind (connect, newSession, prompt) is tracked and waited on
+   * uniformly rather than only prompts.
+   */
+  private readonly inFlight = new Set<AbortController>();
+  /** Non-undefined while a disconnect is running; makes disconnect() idempotent by construction. */
+  private shutdown: Promise<void> | undefined;
 
   constructor(config: CursorConfig, options?: CursorAgentPortOptions) {
     super();
@@ -117,8 +122,13 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     args: string[],
     timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS
   ) {
+    // Single admission point: this closes connect() and newSession(), which were previously
+    // ungated and could start a process after a disconnect had already begun.
+    if (this.shutdown) {
+      throw new Error(ERROR_MESSAGE.CURSOR_DISCONNECT_IN_PROGRESS);
+    }
     const controller = new AbortController();
-    this.activeAbortControllers.add(controller);
+    this.inFlight.add(controller);
     try {
       return await runCursorSpawnedCommand(command, args, this.config, {
         timeoutMs,
@@ -126,7 +136,8 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
         spawnFn: this.spawnFn,
       });
     } finally {
-      this.activeAbortControllers.delete(controller);
+      // Each caller retires its own entry. Nothing else may clear the ledger.
+      this.inFlight.delete(controller);
     }
   }
 
@@ -164,26 +175,29 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   }
 
   async disconnect(): Promise<void> {
-    this.disconnectionInProgress = true;
-    try {
-      // Abort in-flight spawns first so disconnect cannot hang on a stuck child.
-      for (const controller of this.activeAbortControllers) {
-        controller.abort();
-      }
-      await this.waitForPromptCompletion();
-      this.activeAbortControllers.clear();
-      this.activePromptCount = 0;
-      this.status = CONNECTION_STATUS.DISCONNECTED;
-      this.emit(AGENT_PORT_EVENT.STATE, this.status);
-    } finally {
-      this.disconnectionInProgress = false;
-    }
+    // Overlapping callers share one shutdown, so none of them can clear another's state.
+    // The latch is released when runShutdown settles, before this promise resolves, which
+    // keeps the restart path (disconnect() then connect()) working.
+    this.shutdown ??= this.runShutdown().finally(() => {
+      this.shutdown = undefined;
+    });
+    return this.shutdown;
   }
 
-  private async waitForPromptCompletion(): Promise<void> {
-    if (this.activePromptCount === 0) return;
+  private async runShutdown(): Promise<void> {
+    // Abort in-flight work first so disconnect cannot hang on a stuck child.
+    for (const controller of this.inFlight) {
+      controller.abort();
+    }
+    await this.waitForInFlight();
+    this.status = CONNECTION_STATUS.DISCONNECTED;
+    this.emit(AGENT_PORT_EVENT.STATE, this.status);
+  }
+
+  private async waitForInFlight(): Promise<void> {
+    if (this.inFlight.size === 0) return;
     const deadline = Date.now() + TIMEOUT.CURSOR_GRACEFUL_SHUTDOWN_MS;
-    while (this.activePromptCount > 0 && Date.now() < deadline) {
+    while (this.inFlight.size > 0 && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, TIMEOUT.CURSOR_GRACEFUL_SHUTDOWN_POLL_MS));
     }
   }
@@ -228,49 +242,40 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
-    if (this.disconnectionInProgress) {
-      throw new Error("Disconnection in progress; prompt rejected.");
+    const textBlock = params.prompt?.find((contentBlock) => contentBlock.type === "text");
+    const text =
+      textBlock && "text" in textBlock && typeof textBlock.text === "string" ? textBlock.text : "";
+    const command = this.resolveCliCommand();
+    const baseArgs = this.resolveBaseArgs();
+    const session = this.sessions.get(params.sessionId);
+    const mode = session?.mode ?? this.config.mode ?? undefined;
+    const model = session?.model ?? this.config.model ?? undefined;
+    const resumeId = session?.cursorSessionId;
+    const args = [
+      CURSOR_CLI_ARG.PRINT,
+      CURSOR_CLI_ARG.OUTPUT_FORMAT,
+      CURSOR_CLI_ARG.STREAM_JSON,
+      ...this.trustArgs(),
+      ...(resumeId ? [CURSOR_CLI_ARG.RESUME, resumeId] : []),
+      ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
+      ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
+      ...baseArgs,
+      text,
+    ];
+    // runTracked owns admission and in-flight bookkeeping for every spawn kind.
+    const result = await this.runTracked(command, args);
+    const parsed = parseCursorNdjsonResult(result.stdout);
+    if (parsed === null) {
+      throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
     }
-    this.activePromptCount++;
-    try {
-      const textBlock = params.prompt?.find((contentBlock) => contentBlock.type === "text");
-      const text =
-        textBlock && "text" in textBlock && typeof textBlock.text === "string"
-          ? textBlock.text
-          : "";
-      const command = this.resolveCliCommand();
-      const baseArgs = this.resolveBaseArgs();
-      const session = this.sessions.get(params.sessionId);
-      const mode = session?.mode ?? this.config.mode ?? undefined;
-      const model = session?.model ?? this.config.model ?? undefined;
-      const resumeId = session?.cursorSessionId;
-      const args = [
-        CURSOR_CLI_ARG.PRINT,
-        CURSOR_CLI_ARG.OUTPUT_FORMAT,
-        CURSOR_CLI_ARG.STREAM_JSON,
-        ...this.trustArgs(),
-        ...(resumeId ? [CURSOR_CLI_ARG.RESUME, resumeId] : []),
-        ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
-        ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
-        ...baseArgs,
-        text,
-      ];
-      const result = await this.runTracked(command, args);
-      const parsed = parseCursorNdjsonResult(result.stdout);
-      if (parsed === null) {
-        throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
-      }
-      // Bind the chat the CLI reports back to this session, so later turns resume it.
-      if (parsed.sessionId) {
-        this.sessionState(params.sessionId).cursorSessionId = parsed.sessionId;
-      }
-      return {
-        stopReason: STOP_REASON.END_TURN,
-        ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
-      };
-    } finally {
-      this.activePromptCount--;
+    // Bind the chat the CLI reports back to this session, so later turns resume it.
+    if (parsed.sessionId) {
+      this.sessionState(params.sessionId).cursorSessionId = parsed.sessionId;
     }
+    return {
+      stopReason: STOP_REASON.END_TURN,
+      ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
+    };
   }
 
   async authenticate(_params: AuthenticateRequest): Promise<AuthenticateResponse> {

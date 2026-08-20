@@ -219,4 +219,57 @@ describe("CursorAgentPort spawn contract", () => {
     expect(args).not.toContain(CURSOR_CLI_ARG.MODE);
   });
 
+
+  it("is idempotent when disconnect is called concurrently", async () => {
+    const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+    const states: string[] = [];
+    port.on("state", (s) => states.push(s));
+
+    await Promise.all([port.disconnect(), port.disconnect()]);
+
+    expect(states.filter((s) => s === CONNECTION_STATUS.DISCONNECTED)).toHaveLength(1);
+    expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+  });
+
+  it("rejects newSession issued while a disconnect is in progress", async () => {
+    const hanging = createFakeChild({ hang: true });
+    const spawnFn = vi.fn().mockReturnValue(hanging.child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const inflight = port
+      .prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] })
+      .catch((err: Error) => err);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const disconnecting = port.disconnect();
+    await expect(port.newSession({ cwd: "/tmp", mcpServers: [] })).rejects.toThrow(
+      ERROR_MESSAGE.CURSOR_DISCONNECT_IN_PROGRESS
+    );
+
+    await disconnecting;
+    await inflight;
+    expect(hanging.child.kill).toHaveBeenCalled();
+  });
+
+  it("allows connect again after disconnect so restart works", async () => {
+    const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    await port.connect();
+    await port.disconnect();
+    await port.connect();
+
+    expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+  });
+
 });

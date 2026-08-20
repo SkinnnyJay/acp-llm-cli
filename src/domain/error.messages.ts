@@ -7,6 +7,8 @@ export const ERROR_MESSAGE = {
   FILE_SYSTEM_TOOLS_NOT_CONFIGURED: "File system tools not configured",
   TERMINAL_TOOLS_NOT_CONFIGURED: "Terminal tools not configured",
   CURSOR_CLI_CHECK_FAILED: "Cursor CLI check failed",
+  CURSOR_COMMAND_ABORTED: "Cursor CLI command aborted",
+  CURSOR_DISCONNECT_IN_PROGRESS: "Disconnection in progress; request rejected.",
   CURSOR_COMMAND_TIMEOUT: (timeoutMs: number) =>
     `Cursor CLI command timed out after ${timeoutMs}ms`,
   CURSOR_RESULT_MISSING: "Cursor CLI returned no result line in output",
