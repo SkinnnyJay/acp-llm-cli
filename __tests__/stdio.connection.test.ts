@@ -2,6 +2,8 @@ import { EventEmitter } from "node:events";
 import { Readable, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { SIGNAL } from "../src/domain/signals";
+import { TIMEOUT } from "../src/domain/timeouts";
 import { StdioConnection } from "../src/runtime/stdio.connection";
 
 /**
@@ -348,5 +350,159 @@ describe("StdioConnection", () => {
 
     expect(errors[0]?.message).toMatch(/line-119/);
     expect(errors[0]?.message).not.toMatch(/line-0\b/);
+  });
+
+  // --- per-child ownership: a stale child must never act on the live child's state ---
+
+  it("does not force-kill a replacement child spawned during the previous disconnect", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = createFakeChild();
+      const b = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValueOnce(a.child).mockReturnValueOnce(b.child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      a.triggerExit(0, null);
+      await disconnectPromise;
+
+      await conn.connect();
+      await vi.advanceTimersByTimeAsync(TIMEOUT.DISCONNECT_FORCE_MS * 2);
+
+      expect(b.child.kill).not.toHaveBeenCalledWith(SIGNAL.KILL);
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a stale child's close so the live child keeps its stream", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = createFakeChild();
+      const b = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValueOnce(a.child).mockReturnValueOnce(b.child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(TIMEOUT.DISCONNECT_FORCE_MS);
+      await disconnectPromise;
+
+      await conn.connect();
+      expect(conn.getStream()).toBeDefined();
+
+      a.triggerExit(null, "SIGKILL");
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+      expect(conn.getStream()).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still emits exit for a force-killed child", async () => {
+    vi.useFakeTimers();
+    try {
+      const { child, triggerExit } = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValue(child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const exits: Array<{ code: number | null; signal: string | null }> = [];
+      conn.on("exit", (info) => exits.push(info));
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(TIMEOUT.DISCONNECT_FORCE_MS);
+      await disconnectPromise;
+
+      triggerExit(null, "SIGKILL");
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(exits).toHaveLength(1);
+      expect(exits[0]).toEqual({ code: null, signal: "SIGKILL" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not report an error when a deliberately force-killed child finally closes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { child, triggerExit } = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValue(child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const errors: Error[] = [];
+      conn.on("error", (e) => errors.push(e));
+
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(TIMEOUT.DISCONNECT_FORCE_MS);
+      await disconnectPromise;
+
+      triggerExit(null, "SIGKILL");
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(errors).toHaveLength(0);
+      expect(conn.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tears down an errored child before spawning its replacement", async () => {
+    const a = createFakeChild();
+    const b = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValueOnce(a.child).mockReturnValueOnce(b.child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    a.triggerError(new Error("ENOENT"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(conn.connectionStatus).toBe(CONNECTION_STATUS.ERROR);
+
+    await conn.connect();
+
+    expect(a.child.kill).toHaveBeenCalledWith(SIGNAL.TERM);
+    expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+  });
+
+  // --- state is updated before the event announcing it ---
+
+  it("has already updated status when the error event fires", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    let statusInsideHandler: string | undefined;
+    conn.on("error", () => {
+      statusInsideHandler = conn.connectionStatus;
+    });
+
+    triggerExit(1, null);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(statusInsideHandler).toBe(CONNECTION_STATUS.ERROR);
+  });
+
+  it("has already cleared the stream when the exit event fires", async () => {
+    const { child, triggerExit } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    let streamInsideHandler: unknown = "unset";
+    conn.on("exit", () => {
+      streamInsideHandler = conn.getStream();
+    });
+
+    triggerExit(0, null);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(streamInsideHandler).toBeUndefined();
   });
 });

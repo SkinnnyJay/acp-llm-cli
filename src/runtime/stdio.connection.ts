@@ -35,7 +35,8 @@ export class StdioConnection
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   private child: ChildProcessWithoutNullStreams | undefined;
   private stream: Stream | undefined;
-  private isDisconnecting = false;
+  /** The child a disconnect() is tearing down. Scoped per child so a late exit is still recognised as intentional. */
+  private closingChild: ChildProcessWithoutNullStreams | undefined;
   private readonly stderrLines: string[] = [];
   private readonly spawnFn: SpawnFunction;
   private readonly options: SpawnOptionsType;
@@ -61,7 +62,16 @@ export class StdioConnection
     ) {
       return;
     }
-    this.isDisconnecting = false;
+    // A previous child can still be alive here (e.g. status ERROR after a child error event).
+    // Tear it down first so it is not orphaned by the respawn below.
+    const previous = this.child;
+    if (previous) {
+      this.closingChild = previous;
+      this.child = undefined;
+      this.stream = undefined;
+      previous.kill?.(SIGNAL.TERM);
+    }
+
     this.setStatus(CONNECTION_STATUS.CONNECTING);
     this.stderrLines.length = 0;
 
@@ -83,22 +93,32 @@ export class StdioConnection
   }
 
   async disconnect(): Promise<void> {
-    if (!this.child) {
+    // Capture the child once: every callback below must act on this process, never on
+    // whichever process happens to be current when the callback eventually runs.
+    const child = this.child;
+    if (!child) {
       this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       return;
     }
-    this.isDisconnecting = true;
-    await new Promise<void>((resolve) => {
-      this.child?.once(NODE_EVENT.CLOSE, () => resolve());
-      this.child?.kill?.(SIGNAL.TERM);
-      setTimeout(() => {
-        this.child?.kill?.(SIGNAL.KILL);
-        resolve();
-      }, TIMEOUT.DISCONNECT_FORCE_MS).unref();
-    });
-    this.child = undefined;
-    this.stream = undefined;
-    this.isDisconnecting = false;
+    this.closingChild = child;
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await new Promise<void>((resolve) => {
+        child.once(NODE_EVENT.CLOSE, () => resolve());
+        child.kill?.(SIGNAL.TERM);
+        forceKillTimer = setTimeout(() => {
+          child.kill?.(SIGNAL.KILL);
+          resolve();
+        }, TIMEOUT.DISCONNECT_FORCE_MS);
+        forceKillTimer.unref?.();
+      });
+    } finally {
+      clearTimeout(forceKillTimer);
+    }
+    if (this.child === child) {
+      this.child = undefined;
+      this.stream = undefined;
+    }
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
 
@@ -114,21 +134,36 @@ export class StdioConnection
   }
 
   private bindChildProcessEvents(child: ChildProcessWithoutNullStreams): void {
+    // Both handlers are bound per child but mutate connection-wide state, so each one first
+    // checks that it still owns that state. State is updated before the event announcing it,
+    // so a listener always observes the status the event describes.
     child.on(NODE_EVENT.ERROR, (error: Error) => {
+      if (this.child === child) {
+        this.setStatus(CONNECTION_STATUS.ERROR);
+      }
       this.emit(CONNECTION_EVENT.ERROR, error);
-      this.setStatus(CONNECTION_STATUS.ERROR);
     });
 
     child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
-      const wasDisconnecting = this.isDisconnecting;
-      this.isDisconnecting = false;
+      const isCurrent = this.child === child;
+      const wasDisconnecting = this.closingChild === child;
+      if (wasDisconnecting) {
+        this.closingChild = undefined;
+      }
+      if (isCurrent) {
+        this.child = undefined;
+        this.stream = undefined;
+      }
+      // Emitted for every child, current or stale: this process really did exit, and it is the
+      // only signal distinguishing "died on its own" from "we asked it to stop".
       this.emit(CONNECTION_EVENT.EXIT, { code, signal });
-      this.child = undefined;
-      this.stream = undefined;
+      if (!isCurrent) {
+        return;
+      }
       const hasError = !wasDisconnecting && ((code !== null && code !== 0) || signal !== null);
       if (hasError) {
-        this.emit(CONNECTION_EVENT.ERROR, this.formatExitError(code, signal));
         this.setStatus(CONNECTION_STATUS.ERROR);
+        this.emit(CONNECTION_EVENT.ERROR, this.formatExitError(code, signal));
       } else {
         this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       }
