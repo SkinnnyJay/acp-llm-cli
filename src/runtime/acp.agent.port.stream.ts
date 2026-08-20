@@ -86,8 +86,8 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   get setSessionMode() {
     return this.inner.setSessionMode?.bind(this.inner);
   }
-  get setSessionModel() {
-    return this.inner.setSessionModel?.bind(this.inner);
+  get setSessionConfigOption() {
+    return this.inner.setSessionConfigOption?.bind(this.inner);
   }
 
   async *streamPrompt(

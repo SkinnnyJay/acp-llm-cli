@@ -4,8 +4,8 @@ import {
   ClientSideConnection,
   type CreateTerminalRequest,
   type CreateTerminalResponse,
-  type KillTerminalCommandRequest,
-  type KillTerminalCommandResponse,
+  type KillTerminalRequest,
+  type KillTerminalResponse,
   type ReadTextFileRequest,
   type ReadTextFileResponse,
   type ReleaseTerminalRequest,
@@ -29,10 +29,10 @@ import type {
   PromptRequest,
   PromptResponse,
   SessionNotification,
+  SetSessionConfigOptionRequest,
+  SetSessionConfigOptionResponse,
   SetSessionModeRequest,
   SetSessionModeResponse,
-  SetSessionModelRequest,
-  SetSessionModelResponse,
 } from "@agentclientprotocol/sdk";
 import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
@@ -135,8 +135,10 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     return this.requireConnection().setSessionMode(params);
   }
 
-  async setSessionModel(params: SetSessionModelRequest): Promise<SetSessionModelResponse> {
-    return this.requireConnection().unstable_setSessionModel(params);
+  async setSessionConfigOption(
+    params: SetSessionConfigOptionRequest
+  ): Promise<SetSessionConfigOptionResponse> {
+    return this.requireConnection().setSessionConfigOption(params);
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -178,7 +180,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     return this.requireToolHost("terminal").releaseTerminal(params);
   }
 
-  async killTerminal(params: KillTerminalCommandRequest): Promise<KillTerminalCommandResponse> {
+  async killTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse> {
     return this.requireToolHost("terminal").killTerminal(params);
   }
 

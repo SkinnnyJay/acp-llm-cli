@@ -155,8 +155,8 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     return this.inner.setSessionMode?.bind(this.inner);
   }
 
-  get setSessionModel() {
-    return this.inner.setSessionModel?.bind(this.inner);
+  get setSessionConfigOption() {
+    return this.inner.setSessionConfigOption?.bind(this.inner);
   }
 
   async restart(): Promise<void> {
