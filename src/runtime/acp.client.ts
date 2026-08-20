@@ -43,24 +43,20 @@ import type { ConnectionStatus } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { PERMISSION_OUTCOME } from "../domain/permission.outcome";
 import type { AgentPortEvents, IAgentPort } from "./agent.port";
-import type { IConnection } from "./connection.interface";
+import type { ConnectionEvents, IConnection } from "./connection.interface";
 import type { IPermissionHandler } from "./permission.handler.interface";
 import type { IToolHost } from "./tool.host.interface";
 
+/** Structural subset of IConnection the ACP client needs; deliberately not `extends IConnection`
+ * so minimal third-party transports (and test doubles) can satisfy it. */
 export interface IACPConnectionLike {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   getStream(): ReturnType<IConnection["getStream"]>;
   readonly connectionStatus: ConnectionStatus;
-  on(event: typeof CONNECTION_EVENT.STATE, handler: (status: ConnectionStatus) => void): void;
-  on(event: typeof CONNECTION_EVENT.ERROR, handler: (error: Error) => void): void;
-  on(
-    event: typeof CONNECTION_EVENT.EXIT,
-    handler: (info: {
-      code: number | null;
-      signal: string | null;
-    }) => void
-  ): void;
+  on(event: typeof CONNECTION_EVENT.STATE, handler: ConnectionEvents["state"]): void;
+  on(event: typeof CONNECTION_EVENT.ERROR, handler: ConnectionEvents["error"]): void;
+  on(event: typeof CONNECTION_EVENT.EXIT, handler: ConnectionEvents["exit"]): void;
 }
 
 export interface ACPClientOptions {

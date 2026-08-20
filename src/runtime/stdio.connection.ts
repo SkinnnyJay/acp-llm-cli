@@ -14,7 +14,7 @@ import type { ProcessEnv } from "../domain/process.env";
 import { SIGNAL } from "../domain/signals";
 import { formatStderrForError } from "../domain/stderr.format";
 import { TIMEOUT } from "../domain/timeouts";
-import type { IConnection } from "./connection.interface";
+import type { ConnectionEvents, IConnection } from "./connection.interface";
 import { isDebugEnabled, mergeEnv } from "./env.reader";
 import type { SpawnOptions as SpawnOptionsType } from "./types";
 
@@ -24,14 +24,7 @@ export type SpawnFunction = (
   options: { cwd?: string; env?: ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
-export class StdioConnection
-  extends EventEmitter<{
-    state: (status: ConnectionStatus) => void;
-    error: (error: Error) => void;
-    exit: (info: { code: number | null; signal: string | null }) => void;
-  }>
-  implements IConnection
-{
+export class StdioConnection extends EventEmitter<ConnectionEvents> implements IConnection {
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   private child: ChildProcessWithoutNullStreams | undefined;
   private stream: Stream | undefined;

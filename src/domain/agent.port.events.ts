@@ -8,4 +8,3 @@ export const AGENT_PORT_EVENT = {
   ERROR: "error",
 } as const;
 
-export type AgentPortEvent = (typeof AGENT_PORT_EVENT)[keyof typeof AGENT_PORT_EVENT];
