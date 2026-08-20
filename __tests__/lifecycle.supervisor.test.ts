@@ -1,3 +1,4 @@
+import type { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
@@ -67,7 +68,7 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("delegates open to connect and close to disconnect", async () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
 
     await wrapped.open?.();
     expect(inner.connect).toHaveBeenCalled();
@@ -78,19 +79,19 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("is a named class (not anonymous)", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     expect(wrapped.constructor.name).toBe("LifecycleAgentPort");
   });
 
   it("can be instantiated directly as LifecycleAgentPort", () => {
     const inner = createMockPort();
-    const port = new LifecycleAgentPort(inner, { providerId: "test" });
+    const port = new LifecycleAgentPort(inner, {});
     expect(port).toBeInstanceOf(LifecycleAgentPort);
   });
 
   it("delegates connect, disconnect, initialize, prompt, authenticate to inner", async () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
 
     await wrapped.connect();
     await wrapped.disconnect();
@@ -107,7 +108,7 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("forwards state, error, sessionUpdate, permissionRequest events from inner", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
 
     const stateEvents: unknown[] = [];
     const errorEvents: unknown[] = [];
@@ -183,7 +184,7 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("does not save session on sessionUpdate when no persistence", async () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     await wrapped.sessionUpdate({
       sessionId: "s1",
       update: {},
@@ -272,10 +273,10 @@ describe("wrapAgentPortWithLifecycle", () => {
       .mockImplementation(async function* () {
         yield* envelopes;
       });
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
     const out: unknown[] = [];
-    for await (const env of wrapped.streamPrompt(params)) {
+    for await (const env of wrapped.streamPrompt?.(params) ?? []) {
       out.push(env);
     }
     expect(out).toEqual(envelopes);
@@ -283,7 +284,7 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("streamPrompt throws STREAM_PROMPT_NOT_SUPPORTED when inner has no streamPrompt", async () => {
     const inner = createMockPort();
-    const wrapped = new LifecycleAgentPort(inner, { providerId: "test" });
+    const wrapped = new LifecycleAgentPort(inner, {});
     const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
 
     await expect(async () => {
@@ -295,16 +296,14 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("connectionStatus reflects inner port status", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     expect(wrapped.connectionStatus).toBe(inner.connectionStatus);
   });
 
   it("initialize delegates to inner port", async () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
-    const result = await wrapped.initialize({ protocolVersion: "1" } as Parameters<
-      typeof wrapped.initialize
-    >[0]);
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
+    const result = await wrapped.initialize({ protocolVersion: 1 });
     expect(inner.initialize).toHaveBeenCalled();
     expect(result).toMatchObject({ protocolVersion: "1" });
   });
@@ -312,15 +311,15 @@ describe("wrapAgentPortWithLifecycle", () => {
   it("setSessionMode getter returns bound method from inner when present", () => {
     const inner = createMockPort();
     const modeFn = vi.fn();
-    (inner as Record<string, unknown>).setSessionMode = modeFn;
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    (inner as unknown as Record<string, unknown>).setSessionMode = modeFn;
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionMode;
     expect(typeof getter).toBe("function");
   });
 
   it("setSessionMode getter returns undefined when inner has no setSessionMode", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionMode;
     expect(getter).toBeUndefined();
   });
@@ -328,15 +327,15 @@ describe("wrapAgentPortWithLifecycle", () => {
   it("setSessionConfigOption getter returns bound method from inner when present", () => {
     const inner = createMockPort();
     const modelFn = vi.fn();
-    (inner as Record<string, unknown>).setSessionConfigOption = modelFn;
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    (inner as unknown as Record<string, unknown>).setSessionConfigOption = modelFn;
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionConfigOption;
     expect(typeof getter).toBe("function");
   });
 
   it("setSessionConfigOption getter returns undefined when inner has no setSessionConfigOption", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionConfigOption;
     expect(getter).toBeUndefined();
   });

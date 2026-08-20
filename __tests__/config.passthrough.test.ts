@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { z } from "zod";
 import { CURSOR_CLI_ARG } from "../src/providers/cursor/constants";
-import type { BaseCliConfig } from "../src/runtime/config";
+import type { BaseCliConfig, ConfigSchema } from "../src/runtime/config";
 import { baseCliConfigSchema } from "../src/runtime/config";
 
 const { spawnCalls } = vi.hoisted(() => ({
@@ -47,7 +46,7 @@ describe("provider config passthrough", () => {
         seen.push(value);
         return baseCliConfigSchema.parse(value);
       },
-    } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
+    } as ConfigSchema<BaseCliConfig>;
 
     createStandardAcpRuntime(
       {
@@ -78,7 +77,7 @@ describe("provider config passthrough", () => {
         seen.push(value);
         return baseCliConfigSchema.parse(value);
       },
-    } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
+    } as ConfigSchema<BaseCliConfig>;
 
     createStandardAcpRuntime(
       {
@@ -166,7 +165,7 @@ describe("provider config passthrough", () => {
         captured.push(value as Record<string, unknown>);
         return baseCliConfigSchema.parse(value);
       },
-    } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
+    } as ConfigSchema<BaseCliConfig>;
 
     const port = createStandardAcpRuntime(
       {

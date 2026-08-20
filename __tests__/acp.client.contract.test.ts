@@ -10,6 +10,8 @@ const mockInitialize = vi.fn();
 const mockNewSession = vi.fn();
 const mockPrompt = vi.fn();
 const mockAuthenticate = vi.fn();
+const mockSetSessionMode = vi.fn();
+const mockSetSessionConfigOption = vi.fn();
 const mockConstructed = vi.fn();
 
 vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
@@ -24,6 +26,8 @@ vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
       newSession = mockNewSession;
       prompt = mockPrompt;
       authenticate = mockAuthenticate;
+      setSessionMode = mockSetSessionMode;
+      setSessionConfigOption = mockSetSessionConfigOption;
     },
   };
 });
@@ -46,6 +50,8 @@ describe("createAcpAgentPort contract", () => {
     mockNewSession.mockReset().mockResolvedValue({ sessionId: "sess-contract-1" });
     mockPrompt.mockReset().mockResolvedValue({ stopReason: "end_turn" });
     mockAuthenticate.mockReset().mockResolvedValue({});
+    mockSetSessionMode.mockReset().mockResolvedValue({});
+    mockSetSessionConfigOption.mockReset().mockResolvedValue({ configOptions: [] });
     mockConstructed.mockReset();
   });
 
@@ -199,3 +205,83 @@ describe("createAcpAgentPort contract", () => {
 void EventEmitter;
 void Readable;
 void Writable;
+
+describe("createAcpAgentPort session methods", () => {
+  beforeEach(() => {
+    mockInitialize.mockReset().mockResolvedValue({ protocolVersion: 1, agentCapabilities: {} });
+    mockAuthenticate.mockReset().mockResolvedValue({});
+    mockSetSessionMode.mockReset().mockResolvedValue({});
+    mockSetSessionConfigOption.mockReset().mockResolvedValue({ configOptions: [] });
+  });
+
+  const connected = async () => {
+    const port = createAcpAgentPort(createMockConnection());
+    await port.connect();
+    return port;
+  };
+
+  it("delegates authenticate to the connection", async () => {
+    const port = await connected();
+    const params = { methodId: "api-key" };
+    await port.authenticate(params);
+    expect(mockAuthenticate).toHaveBeenCalledWith(params);
+  });
+
+  it("delegates setSessionMode to the connection", async () => {
+    const port = await connected();
+    const params = { sessionId: "s1", modeId: "read-only" };
+    await port.setSessionMode?.(params);
+    expect(mockSetSessionMode).toHaveBeenCalledWith(params);
+    expect(mockSetSessionConfigOption).not.toHaveBeenCalled();
+  });
+
+  // ACP 1.x replaced the removed session/set_model with the general
+  // session/set_config_option. Mode and model are sibling categories, so a
+  // config-option call must never be routed at setSessionMode.
+  it("delegates setSessionConfigOption to the connection, not setSessionMode", async () => {
+    const port = await connected();
+    const params = { sessionId: "s1", configId: "model", value: "claude-sonnet-4.6" };
+    mockSetSessionConfigOption.mockResolvedValue({
+      configOptions: [
+        {
+          id: "model",
+          name: "Model",
+          category: "model",
+          type: "select",
+          currentValue: "claude-sonnet-4.6",
+          options: [],
+        },
+      ],
+    });
+
+    const result = await port.setSessionConfigOption?.(params);
+
+    expect(mockSetSessionConfigOption).toHaveBeenCalledWith(params);
+    expect(mockSetSessionMode).not.toHaveBeenCalled();
+    expect(result?.configOptions[0]?.currentValue).toBe("claude-sonnet-4.6");
+  });
+
+  it("re-emits an inbound sessionUpdate on the port", async () => {
+    const port = await connected();
+    const seen: unknown[] = [];
+    port.on("sessionUpdate", (u) => seen.push(u));
+
+    const update = {
+      sessionId: "s1",
+      update: {
+        sessionUpdate: "agent_message_chunk" as const,
+        content: { type: "text" as const, text: "hi" },
+      },
+    };
+    await port.sessionUpdate(update);
+
+    expect(seen).toEqual([update]);
+  });
+
+  it("rejects session methods before connect", async () => {
+    const port = createAcpAgentPort(createMockConnection());
+    await expect(
+      port.setSessionConfigOption?.({ sessionId: "s1", configId: "model", value: "x" })
+    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+  });
+});

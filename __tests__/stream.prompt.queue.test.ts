@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createStreamPromptQueue } from "../src/runtime/stream.prompt.queue";
+import { agentMessageChunk, toolCall } from "./helpers/session.notification";
 
 describe("createStreamPromptQueue", () => {
   it("delivers updates in order when producer pushes then closes after consumer started", async () => {
     const q = createStreamPromptQueue();
-    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
-    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
-    const c = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const a = agentMessageChunk("s1");
+    const b = toolCall("s1");
+    const c = agentMessageChunk("s1");
 
     const _out: unknown[] = [];
     q.push(a);
@@ -36,7 +37,7 @@ describe("createStreamPromptQueue", () => {
 
   it("close() ends consume after draining queued updates", async () => {
     const q = createStreamPromptQueue();
-    const one = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const one = agentMessageChunk("s1");
     const out: unknown[] = [];
     const consumePromise = (async () => {
       for await (const u of q.consume()) {
@@ -62,7 +63,7 @@ describe("createStreamPromptQueue", () => {
     })();
 
     q.close();
-    q.push({ sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } });
+    q.push(agentMessageChunk("s1"));
     await consumePromise;
 
     expect(out).toHaveLength(0);
@@ -70,7 +71,7 @@ describe("createStreamPromptQueue", () => {
 
   it("pushError causes consume to reject after draining prior updates", async () => {
     const q = createStreamPromptQueue();
-    const one = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const one = agentMessageChunk("s1");
     const out: unknown[] = [];
     const consumePromise = (async () => {
       for await (const u of q.consume()) {
@@ -88,8 +89,8 @@ describe("createStreamPromptQueue", () => {
 
   it("drains updates queued before close when the consumer starts late", async () => {
     const q = createStreamPromptQueue();
-    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
-    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+    const a = agentMessageChunk("s1");
+    const b = toolCall("s1");
 
     q.push(a);
     q.push(b);
@@ -105,8 +106,8 @@ describe("createStreamPromptQueue", () => {
 
   it("delivers an update pushed while the consumer was busy before closing", async () => {
     const q = createStreamPromptQueue();
-    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
-    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+    const a = agentMessageChunk("s1");
+    const b = toolCall("s1");
 
     const out: unknown[] = [];
     const consumer = (async () => {
@@ -138,7 +139,7 @@ describe("createStreamPromptQueue", () => {
     })();
 
     q.pushError(new Error("stream error"));
-    q.push({ sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } });
+    q.push(agentMessageChunk("s1"));
 
     await expect(consumePromise).rejects.toThrow("stream error");
     expect(out).toHaveLength(0);
@@ -163,8 +164,8 @@ describe("createStreamPromptQueue", () => {
 describe("createStreamPromptQueue drain-before-done", () => {
   it("delivers updates queued before close() to a consumer that starts after close", async () => {
     const q = createStreamPromptQueue();
-    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
-    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+    const a = agentMessageChunk("s1");
+    const b = toolCall("s1");
 
     q.push(a);
     q.push(b);
@@ -180,7 +181,7 @@ describe("createStreamPromptQueue drain-before-done", () => {
 
   it("delivers updates queued before pushError() before rejecting", async () => {
     const q = createStreamPromptQueue();
-    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const a = agentMessageChunk("s1");
 
     q.push(a);
     q.pushError(new Error("late error"));

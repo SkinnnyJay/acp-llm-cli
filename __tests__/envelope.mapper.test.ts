@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
+import type { StreamEnvelope } from "../src/domain/stream.envelopes";
 import { isNativeEnvelope, isOpenAIEnvelope } from "../src/domain/stream.envelopes";
 import {
   createOpenAIFinishEnvelope,
@@ -14,10 +15,10 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "hello" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.NATIVE);
     expect(envelopes).toHaveLength(1);
-    expect(isNativeEnvelope(envelopes[0])).toBe(true);
+    expect(isNativeEnvelope(envelopes[0] as StreamEnvelope)).toBe(true);
     expect((envelopes[0] as { kind: string; update: unknown }).update).toEqual(update);
   });
 
@@ -28,7 +29,7 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "hi" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.BOTH);
     expect(envelopes.length).toBeGreaterThanOrEqual(1);
     expect(envelopes.some(isNativeEnvelope)).toBe(true);
@@ -41,10 +42,10 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "world" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopes).toHaveLength(1);
-    expect(isOpenAIEnvelope(envelopes[0])).toBe(true);
+    expect(isOpenAIEnvelope(envelopes[0] as StreamEnvelope)).toBe(true);
     expect((envelopes[0] as { choices: unknown[] }).choices[0]).toMatchObject({
       delta: { content: "world" },
       finish_reason: null,
@@ -58,7 +59,7 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "both" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.BOTH);
     expect(envelopes).toHaveLength(2);
     expect(envelopes.some(isNativeEnvelope)).toBe(true);
@@ -72,7 +73,7 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "x" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI, {
       modelId: "custom-model",
     });
@@ -88,10 +89,10 @@ describe("sessionUpdateToEnvelopes", () => {
         title: "run_terminal_cmd",
         status: "in_progress",
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopesNative = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.NATIVE);
     expect(envelopesNative).toHaveLength(1);
-    expect(isNativeEnvelope(envelopesNative[0])).toBe(true);
+    expect(isNativeEnvelope(envelopesNative[0] as StreamEnvelope)).toBe(true);
     const envelopesOpenAI = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopesOpenAI).toHaveLength(0);
   });
@@ -103,10 +104,10 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_thought_chunk",
         content: { type: "text", text: "thinking" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopesNative = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.NATIVE);
     expect(envelopesNative).toHaveLength(1);
-    expect(isNativeEnvelope(envelopesNative[0])).toBe(true);
+    expect(isNativeEnvelope(envelopesNative[0] as StreamEnvelope)).toBe(true);
     const envelopesOpenAI = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopesOpenAI).toHaveLength(0);
   });
@@ -119,10 +120,10 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "code", text: "console.log()" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopes).toHaveLength(1);
-    expect(isOpenAIEnvelope(envelopes[0])).toBe(true);
+    expect(isOpenAIEnvelope(envelopes[0] as StreamEnvelope)).toBe(true);
     expect(
       (envelopes[0] as { choices: Array<{ delta: { content: string } }> }).choices[0]?.delta.content
     ).toBe("console.log()");
@@ -136,7 +137,7 @@ describe("sessionUpdateToEnvelopes", () => {
         sessionUpdate: "agent_message_chunk",
         content: { type: "image", url: "http://example.com/img.png" },
       },
-    } as Parameters<typeof sessionUpdateToEnvelopes>[0];
+    } as unknown as Parameters<typeof sessionUpdateToEnvelopes>[0];
     const envelopes = sessionUpdateToEnvelopes(update, ENVELOPE_MODE.OPENAI);
     expect(envelopes).toHaveLength(0);
   });
@@ -147,7 +148,7 @@ describe("createOpenAIFinishEnvelope", () => {
     const env = createOpenAIFinishEnvelope({});
     expect(env.object).toBe("chat.completion.chunk");
     expect(env.model).toBe("acp-agent");
-    expect(env.choices[0].finish_reason).toBe("stop");
+    expect(env.choices[0]?.finish_reason).toBe("stop");
   });
 
   it("creates finish envelope with custom options", () => {
@@ -156,6 +157,6 @@ describe("createOpenAIFinishEnvelope", () => {
       finishReason: "length",
     });
     expect(env.model).toBe("gpt-4");
-    expect(env.choices[0].finish_reason).toBe("length");
+    expect(env.choices[0]?.finish_reason).toBe("length");
   });
 });
