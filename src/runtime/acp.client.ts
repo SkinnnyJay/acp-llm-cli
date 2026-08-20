@@ -38,6 +38,7 @@ import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../domain/agent.port.events";
 import { CONNECTION_EVENT } from "../domain/connection.events";
+import { CONNECTION_STATUS } from "../domain/connection.status";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { PERMISSION_OUTCOME } from "../domain/permission.outcome";
@@ -75,8 +76,15 @@ export function createAcpAgentPort(
   return new ACPClient(connection, options);
 }
 
+type AcpStream = NonNullable<ReturnType<IConnection["getStream"]>>;
+
 class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Client {
-  private clientConnection: ClientSideConnection | undefined;
+  /**
+   * The live RPC link and the stream it was built on, held together so "am I usable" has exactly
+   * one representation. Keeping the stream lets connect() recognise that it is already attached
+   * to it, instead of stacking a second reader loop on the same pipe.
+   */
+  private attached: { rpc: ClientSideConnection; stream: AcpStream } | undefined;
   private readonly toolHost: IToolHost | undefined;
   private readonly clientCapabilities: ClientCapabilities;
 
@@ -87,10 +95,25 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     super();
     this.toolHost = options.toolHost;
     this.clientCapabilities = options.clientCapabilities ?? {};
-    this.connection.on(CONNECTION_EVENT.STATE, (status) =>
-      this.emit(AGENT_PORT_EVENT.STATE, status)
-    );
+    this.connection.on(CONNECTION_EVENT.STATE, (status) => {
+      // Drop the link on terminal transport states only. A transient CONNECTING must not
+      // detach, and third-party transports may emit states this client does not model.
+      if (
+        status === CONNECTION_STATUS.DISCONNECTED ||
+        status === CONNECTION_STATUS.ERROR
+      ) {
+        this.detach();
+      }
+      this.emit(AGENT_PORT_EVENT.STATE, status);
+    });
     this.connection.on(CONNECTION_EVENT.ERROR, (error) => this.emit(AGENT_PORT_EVENT.ERROR, error));
+    // The transport declares and emits EXIT; nothing used to subscribe, so the client kept a
+    // link to a process that had already gone away.
+    this.connection.on(CONNECTION_EVENT.EXIT, () => this.detach());
+  }
+
+  private detach(): void {
+    this.attached = undefined;
   }
 
   get connectionStatus(): ConnectionStatus {
@@ -101,14 +124,23 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     await this.connection.connect();
     const stream = this.connection.getStream();
     if (!stream) {
+      this.detach();
+      // Do not leave a spawned child behind with no usable link to it.
+      await this.connection.disconnect().catch(() => undefined);
       throw new Error(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
     }
-    this.clientConnection = new ClientSideConnection(() => this, stream);
+    // Constructing a ClientSideConnection starts a reader loop, so re-attaching to a stream we
+    // are already reading would leave two loops competing on one pipe.
+    if (this.attached?.stream === stream) {
+      return;
+    }
+    this.attached = { rpc: new ClientSideConnection(() => this, stream), stream };
   }
 
   async disconnect(): Promise<void> {
+    // Detach first: a rejecting transport disconnect must not leave the port looking usable.
+    this.detach();
     await this.connection.disconnect();
-    this.clientConnection = undefined;
   }
 
   async initialize(params?: Partial<InitializeRequest>): Promise<InitializeResponse> {
@@ -194,9 +226,9 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
   }
 
   private requireConnection(): ClientSideConnection {
-    if (!this.clientConnection) {
+    if (!this.attached) {
       throw new Error(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
     }
-    return this.clientConnection;
+    return this.attached.rpc;
   }
 }

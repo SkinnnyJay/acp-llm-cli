@@ -1,14 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { createAcpAgentPort } from "../src/runtime/acp.client";
+import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
 
-const createMockConnection = () => ({
-  connect: vi.fn().mockResolvedValue(undefined),
-  disconnect: vi.fn().mockResolvedValue(undefined),
-  getStream: vi.fn().mockReturnValue(null),
-  connectionStatus: "disconnected" as const,
-  on: vi.fn(),
-});
+const createMockConnection = () => createFakeAcpConnection(null);
 
 /** ACPClient implements Client; IAgentPort type does not expose tool/permission methods. */
 type PortWithClient = Awaited<ReturnType<typeof createAcpAgentPort>> & {

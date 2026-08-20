@@ -1,19 +1,25 @@
 import { EventEmitter } from "node:events";
 import { Readable, Writable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PERMISSION_OUTCOME } from "../src/domain/permission.outcome";
+import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
 
 const mockInitialize = vi.fn();
 const mockNewSession = vi.fn();
 const mockPrompt = vi.fn();
 const mockAuthenticate = vi.fn();
+const mockConstructed = vi.fn();
 
 vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentclientprotocol/sdk")>();
   return {
     ...actual,
     ClientSideConnection: class {
+      constructor() {
+        mockConstructed();
+      }
       initialize = mockInitialize;
       newSession = mockNewSession;
       prompt = mockPrompt;
@@ -24,15 +30,8 @@ vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
 
 const { createAcpAgentPort } = await import("../src/runtime/acp.client");
 
-function createMockConnection(stream: unknown = { readable: true, writable: true }) {
-  return {
-    connect: vi.fn().mockResolvedValue(undefined),
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    getStream: vi.fn().mockReturnValue(stream),
-    connectionStatus: "disconnected" as const,
-    on: vi.fn(),
-  };
-}
+const createMockConnection = (stream: unknown = { readable: true, writable: true }) =>
+  createFakeAcpConnection(stream);
 
 type PortWithPermission = Awaited<ReturnType<typeof createAcpAgentPort>> & {
   requestPermission?(r: unknown): Promise<unknown>;
@@ -47,6 +46,7 @@ describe("createAcpAgentPort contract", () => {
     mockNewSession.mockReset().mockResolvedValue({ sessionId: "sess-contract-1" });
     mockPrompt.mockReset().mockResolvedValue({ stopReason: "end_turn" });
     mockAuthenticate.mockReset().mockResolvedValue({});
+    mockConstructed.mockReset();
   });
 
   it("connect → initialize → newSession → prompt happy path", async () => {
@@ -109,6 +109,77 @@ describe("createAcpAgentPort contract", () => {
     const connection = createMockConnection();
     expect(() => createAcpAgentPort(connection)).not.toThrow();
   });
+
+  it("attaches one reader loop even when connect is called twice", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+
+    await port.connect();
+    await port.connect();
+
+    expect(mockConstructed).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops accepting requests once the transport reports a terminal state", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+
+    connection.setStatus(CONNECTION_STATUS.ERROR);
+
+    await expect(
+      port.prompt({ sessionId: "s1", prompt: [] } as never)
+    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+  });
+
+  it("stops accepting requests once the agent process exits", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+
+    connection.emitExit({ code: 1, signal: null });
+
+    await expect(
+      port.prompt({ sessionId: "s1", prompt: [] } as never)
+    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+  });
+
+  it("forwards transport state and error events to the port", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    const states: string[] = [];
+    const errors: Error[] = [];
+    port.on("state", (s) => states.push(s));
+    port.on("error", (e) => errors.push(e));
+
+    connection.setStatus(CONNECTION_STATUS.CONNECTED);
+    connection.emitError(new Error("transport blew up"));
+
+    expect(states).toEqual([CONNECTION_STATUS.CONNECTED]);
+    expect(errors[0]?.message).toBe("transport blew up");
+  });
+
+  it("tears down the transport when the stream is unavailable", async () => {
+    const connection = createMockConnection(null);
+    const port = createAcpAgentPort(connection);
+
+    await expect(port.connect()).rejects.toThrow(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
+
+    expect(connection.disconnect).toHaveBeenCalled();
+  });
+
+  it("does not stay usable when the transport disconnect rejects", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+    connection.disconnect.mockRejectedValueOnce(new Error("kill failed"));
+
+    await expect(port.disconnect()).rejects.toThrow("kill failed");
+    await expect(
+      port.prompt({ sessionId: "s1", prompt: [] } as never)
+    ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+  });
+
 });
 
 /** Unused import guard for EventEmitter fake streams in related suites. */
