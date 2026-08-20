@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Every session record was persisted twice.** `sessionUpdate()` wrote directly and the inner
+  ACP client's re-emission drove the constructor listener to write again - same key, same
+  payload. Harmless for the in-memory store, real write amplification for a file or database
+  `ISessionPersistence`. Both triggers are load-bearing (the listener is the only path for
+  agent-initiated updates, the method the only one for an inner port that does not re-emit), so
+  the write is now idempotent per notification instead.
+- **`tsconfig.test.json` type-checked 3 files out of 133.** It inherited
+  `"exclude": ["**/*.test.ts"]` from the base config, and an inherited `exclude` filters the
+  child's `include`, so every actual test was dropped. Fixing it surfaced 85 pre-existing errors,
+  including tests using the pre-breaking-change `LifecycleSupervisorOptions` shape, five casts to
+  `Parameters<fn>[5]` on a five-parameter function, and a `config.passthrough` fixture that would
+  have failed the `peer-zod` matrix on zod 4.
 - **The declared zod peer range was false.** `peerDependencies` advertised
   `"^3.25.0 || ^4.0.0"`, but the package only ever compiled against zod 3 - under zod 4 the
   typecheck failed in 15 places. Nothing caught it because vitest does not typecheck. It
@@ -102,6 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that type compiles under both majors: `z.ZodType<T, z.ZodTypeDef, unknown>` fails on 4, and
   `z.ZodType<T>` fails on 3, where `Input` defaults to `Output` and rejects `.default()`.
 - `CliArgsInput` is exported and describes what `ICliSpec.buildArgs` accepts.
+- Coverage for the ACP client tool-host surface, the adapter `providerId` branch, and the
+  session methods, taking the suite from 95.2% to 98.7% functions.
 
 ### Deprecated
 
