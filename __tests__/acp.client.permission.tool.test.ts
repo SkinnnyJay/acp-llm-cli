@@ -6,12 +6,31 @@ import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
 const createMockConnection = () => createFakeAcpConnection(null);
 
 /** ACPClient implements Client; IAgentPort type does not expose tool/permission methods. */
+type ToolHostMethod =
+  | "readTextFile"
+  | "writeTextFile"
+  | "createTerminal"
+  | "terminalOutput"
+  | "waitForTerminalExit"
+  | "releaseTerminal"
+  | "killTerminal";
+
 type PortWithClient = Awaited<ReturnType<typeof createAcpAgentPort>> & {
   requestPermission?(r: unknown): Promise<unknown>;
-  readTextFile?(r: unknown): Promise<unknown>;
-  writeTextFile?(r: unknown): Promise<unknown>;
-  createTerminal?(r: unknown): Promise<unknown>;
+} & {
+  [K in ToolHostMethod]?: (r: unknown) => Promise<unknown>;
 };
+
+/** A tool host whose methods are all spies, so any one of them can be asserted on. */
+const createSpyToolHost = () => ({
+  readTextFile: vi.fn(),
+  writeTextFile: vi.fn(),
+  createTerminal: vi.fn(),
+  terminalOutput: vi.fn(),
+  waitForTerminalExit: vi.fn(),
+  releaseTerminal: vi.fn(),
+  killTerminal: vi.fn(),
+});
 
 describe("ACPClient permission handling", () => {
   it("uses permissionHandler when provided", async () => {
@@ -122,4 +141,76 @@ describe("ACPClient tool host handling", () => {
     expect(readTextFile).toHaveBeenCalledWith(params);
     expect(result).toEqual({ content: "file content" });
   });
+});
+
+describe("ACPClient tool host delegation", () => {
+  // Every method the agent can invoke on the client, with a params shape and a
+  // reply distinct enough that a mis-wired delegation shows up as a wrong call
+  // rather than a passing test.
+  const FILE_ERR = ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED;
+  const TERM_ERR = ERROR_MESSAGE.TERMINAL_TOOLS_NOT_CONFIGURED;
+
+  const cases: ReadonlyArray<{
+    method: ToolHostMethod;
+    params: unknown;
+    reply: unknown;
+    unconfigured: string;
+  }> = [
+    {
+      method: "readTextFile",
+      params: { path: "/tmp/a" },
+      reply: { content: "a" },
+      unconfigured: FILE_ERR,
+    },
+    {
+      method: "writeTextFile",
+      params: { path: "/tmp/b", content: "b" },
+      reply: {},
+      unconfigured: FILE_ERR,
+    },
+    {
+      method: "createTerminal",
+      params: { command: "ls", args: [] },
+      reply: { terminalId: "t1" },
+      unconfigured: TERM_ERR,
+    },
+    {
+      method: "terminalOutput",
+      params: { terminalId: "t1" },
+      reply: { output: "out" },
+      unconfigured: TERM_ERR,
+    },
+    {
+      method: "waitForTerminalExit",
+      params: { terminalId: "t1" },
+      reply: { exitCode: 0, signal: null },
+      unconfigured: TERM_ERR,
+    },
+    { method: "releaseTerminal", params: { terminalId: "t1" }, reply: {}, unconfigured: TERM_ERR },
+    { method: "killTerminal", params: { terminalId: "t1" }, reply: {}, unconfigured: TERM_ERR },
+  ];
+
+  for (const { method, params, reply, unconfigured } of cases) {
+    it(`delegates ${method} to the tool host and returns its result`, async () => {
+      const toolHost = createSpyToolHost();
+      toolHost[method].mockResolvedValue(reply);
+      const port = createAcpAgentPort(createMockConnection(), { toolHost });
+
+      const result = await (port as PortWithClient)[method]?.(params);
+
+      expect(toolHost[method]).toHaveBeenCalledWith(params);
+      expect(result).toEqual(reply);
+      // Delegation must be exact: no other tool-host method may be touched.
+      for (const other of cases.map((c) => c.method).filter((m) => m !== method)) {
+        expect(toolHost[other]).not.toHaveBeenCalled();
+      }
+    });
+
+    it(`${method} throws the right not-configured error with no tool host`, async () => {
+      const port = createAcpAgentPort(createMockConnection());
+      // File and terminal report separately; a delegation wired to the wrong
+      // requireToolHost kind would still throw, just with the other message.
+      await expect((port as PortWithClient)[method]?.(params)).rejects.toThrow(unconfigured);
+    });
+  }
 });

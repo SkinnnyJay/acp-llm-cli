@@ -113,7 +113,7 @@ describe("ProviderFactory metrics", () => {
           success: false as const,
           error: { issues: [], message: "validation failed" },
         }),
-      } as typeof baseCliConfigSchema,
+      } as unknown as typeof baseCliConfigSchema,
       createHarness: vi.fn(),
     });
     const factory = new ProviderFactory({ registry, logger: silentLogger, collectMetrics: true });

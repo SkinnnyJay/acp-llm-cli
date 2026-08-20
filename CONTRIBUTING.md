@@ -11,7 +11,7 @@ Be respectful and constructive. See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 1. **Search existing issues and PRs** to avoid duplicate work.
 2. For larger changes, **open an issue first** to align on design (optional but recommended).
 3. **Set up locally:**
-   - Node.js **20+**
+   - Node.js **22+** (matches `engines`; CI runs 22 and 24)
    - `npm ci`
    - `npm run verify` (lint, typecheck, build, test) — use `npm run verify:coverage` for the coverage gate
 

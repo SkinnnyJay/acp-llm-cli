@@ -59,7 +59,7 @@ describe("StdioConnection", () => {
   it("defaults args to an empty array when options.args is omitted", async () => {
     const { child } = createFakeChild();
     const spawnFn = vi.fn().mockReturnValue(child);
-    const conn = new StdioConnection({ command: "fake" }, spawnFn);
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
 
     await conn.connect();
 
@@ -191,8 +191,8 @@ describe("StdioConnection", () => {
     const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
     await conn.connect();
 
-    const exitEvents: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
-    conn.on("exit", (info) => exitEvents.push(info));
+    const exitEvents: Array<{ code: number | null; signal: string | null }> = [];
+    conn.on("exit", (info) => exitEvents.push({ ...info }));
 
     triggerExit(0, null);
     await new Promise((r) => setTimeout(r, 0));

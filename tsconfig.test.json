@@ -5,7 +5,17 @@
     "rootDir": ".",
     "declaration": false,
     "declarationMap": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src/**/*", "__tests__/**/*", "scripts/**/*"]
+  "include": [
+    "src/**/*",
+    "__tests__/**/*",
+    "scripts/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

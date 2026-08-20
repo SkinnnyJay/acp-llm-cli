@@ -168,7 +168,7 @@ describe("buildGenericArgs", () => {
         inputFormat: "text",
         stream: true,
         trust: true,
-        sandbox: "docker",
+        sandbox: "enabled",
       },
       {},
       ["--base"]

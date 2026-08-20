@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
+import type { StreamEnvelope } from "../src/domain/stream.envelopes";
 import { isNativeEnvelope, isOpenAIEnvelope } from "../src/domain/stream.envelopes";
 import { sessionUpdateToEnvelopes } from "../src/runtime/envelope.mapper";
 
@@ -41,7 +42,7 @@ describe("ACP session update fixtures", () => {
     if (!firstUpdate) throw new Error("fixture missing first line");
     const first = sessionUpdateToEnvelopes(firstUpdate, ENVELOPE_MODE.OPENAI);
     expect(first).toHaveLength(1);
-    expect(isOpenAIEnvelope(first[0])).toBe(true);
+    expect(isOpenAIEnvelope(first[0] as StreamEnvelope)).toBe(true);
     expect(first[0]).toMatchObject({
       choices: [{ delta: { content: "Hello" } }],
     });

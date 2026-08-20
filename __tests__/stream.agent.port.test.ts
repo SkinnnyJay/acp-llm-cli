@@ -1,3 +1,4 @@
+import type { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
@@ -157,8 +158,8 @@ describe("StreamAgentPort", () => {
     const inner = createMockPort();
     const modeFn = vi.fn();
     const modelFn = vi.fn();
-    (inner as Record<string, unknown>).setSessionMode = modeFn;
-    (inner as Record<string, unknown>).setSessionConfigOption = modelFn;
+    (inner as unknown as Record<string, unknown>).setSessionMode = modeFn;
+    (inner as unknown as Record<string, unknown>).setSessionConfigOption = modelFn;
     const port = new StreamAgentPort(inner);
     expect(typeof port.setSessionMode).toBe("function");
     expect(typeof port.setSessionConfigOption).toBe("function");

@@ -33,28 +33,28 @@ const CASES: Case[] = [
     providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
     command: DEFAULT_COMMANDS.CLAUDE_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.CLAUDE_DEFAULT_ARGS],
-    mode: "acp",
+    mode: "acp" as const,
   },
   {
     id: "codex",
     providerId: PROVIDER_IDS.CODEX_CLI_ID,
     command: DEFAULT_COMMANDS.CODEX_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.CODEX_DEFAULT_ARGS],
-    mode: "acp",
+    mode: "acp" as const,
   },
   {
     id: "gemini",
     providerId: PROVIDER_IDS.GEMINI_CLI_ID,
     command: DEFAULT_COMMANDS.GEMINI_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.GEMINI_DEFAULT_ARGS],
-    mode: "acp",
+    mode: "acp" as const,
   },
   {
     id: "cursor",
     providerId: PROVIDER_IDS.CURSOR_CLI_ID,
     command: DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS],
-    mode: "cursor-print",
+    mode: "cursor-print" as const,
   },
 ].filter((c) => !FILTER || FILTER === c.id);
 
