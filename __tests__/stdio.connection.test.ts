@@ -538,3 +538,74 @@ describe("StdioConnection", () => {
     }
   });
 });
+
+describe("StdioConnection disconnect force-kill timer", () => {
+  it("force-kills the child with SIGKILL when it does not close in time", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValue(fake.child);
+
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      // Child never emits close: disconnect resolves via the force-kill path.
+      const disconnectPromise = conn.disconnect();
+      await vi.advanceTimersByTimeAsync(500);
+      await disconnectPromise;
+
+      expect(fake.child.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(fake.child.kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never SIGKILLs a freshly reconnected child from a previous disconnect's timer", async () => {
+    vi.useFakeTimers();
+    try {
+      const first = createFakeChild();
+      const second = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValueOnce(first.child).mockReturnValueOnce(second.child);
+
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      // The old child closes well inside DISCONNECT_FORCE_MS, so disconnect()
+      // resolves through the close path while the force-kill timer is still armed.
+      // That armed timer is the bug: it must not outlive this disconnect.
+      const disconnectPromise = conn.disconnect();
+      first.triggerExit(0, null);
+      await disconnectPromise;
+
+      // Reconnect, then run well past DISCONNECT_FORCE_MS so a stale timer fires.
+      await conn.connect();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(first.child.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(second.child.kill).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the force-kill timer when the child closes in time", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = createFakeChild();
+      const spawnFn = vi.fn().mockReturnValue(fake.child);
+      const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+      await conn.connect();
+
+      const disconnectPromise = conn.disconnect();
+      fake.triggerExit(0, null);
+      await disconnectPromise;
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fake.child.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(fake.child.kill).not.toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

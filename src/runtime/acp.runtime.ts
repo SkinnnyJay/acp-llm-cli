@@ -1,17 +1,16 @@
-import type { z } from "zod";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import type { ISessionPersistence } from "../domain/session.persistence";
 import { wrapAgentPortWithStream } from "./acp.agent.port.stream";
-import { createAcpAgentPort } from "./acp.client";
 import type { ACPClientOptions } from "./acp.client";
+import { createAcpAgentPort } from "./acp.client";
 import type { IAgentPort } from "./agent.port";
-import type { BaseCliConfig } from "./config";
+import type { BaseCliConfig, ConfigSchema } from "./config";
 import { resolveBaseConfig } from "./config.resolve";
 import type { IConnectionFactory } from "./connection.factory.interface";
 import type { IConnection } from "./connection.interface";
-import { wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 import type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
+import { wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 import { StdioConnectionFactory } from "./stdio.connection.factory";
 
 /** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */
@@ -88,7 +87,7 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   config: TConfig,
   defaults: Parameters<typeof resolveBaseConfig>[0],
   configKeys: Parameters<typeof resolveBaseConfig>[1],
-  schema: z.ZodType<TConfig, z.ZodTypeDef, unknown>,
+  schema: ConfigSchema<TConfig>,
   runtimeOptions?: AcpSharedRuntimeOptions
 ): IAgentPort {
   const resolved = resolveBaseConfig(defaults, configKeys, config);

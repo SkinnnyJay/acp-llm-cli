@@ -1,7 +1,7 @@
 import { EventEmitter } from "eventemitter3";
 import { vi } from "vitest";
-import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { ConnectionStatus } from "../../src/domain/connection.status";
+import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { IAgentPort } from "../../src/runtime/agent.port";
 
 export interface MockAgentPortOptions {

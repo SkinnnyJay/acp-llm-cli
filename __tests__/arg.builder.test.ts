@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { getAdapter, getDefaultRegistry } from "../src/bootstrap";
 import { buildGenericArgs } from "../src/cli/arg.builder";
 import type { GenericFlagMap } from "../src/cli/generic.options";
 import { GENERIC_OPTION_KEY } from "../src/cli/generic.options";
+import { PROVIDER_IDS } from "../src/domain/provider.ids";
 
 const flagMap: GenericFlagMap = {
   [GENERIC_OPTION_KEY.MODEL]: "--model",
@@ -172,5 +174,40 @@ describe("buildGenericArgs", () => {
       ["--base"]
     );
     expect(result).toEqual(["--base"]);
+  });
+});
+
+describe("cliSpec.buildArgs through the registry", () => {
+  it("accepts generic options on a spec whose config type has been erased", () => {
+    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CLAUDE_CLI_ID);
+    const spec = adapter?.cliSpec;
+    expect(spec).toBeDefined();
+
+    // Reaching a spec this way erases it to ICliSpec<BaseCliConfig>. The
+    // generic options below are the whole point of the builder, so they must
+    // survive that erasure - both at the type level and at runtime.
+    const argv = spec?.buildArgs({
+      command: "claude-agent-acp",
+      args: [],
+      model: "claude-sonnet-4-20250514",
+      outputFormat: "stream-json",
+      print: true,
+    });
+
+    expect(argv).toEqual([
+      "--model",
+      "claude-sonnet-4-20250514",
+      "--output-format",
+      "stream-json",
+      "--print",
+    ]);
+  });
+
+  it("falls back to defaultArgs when args is omitted", () => {
+    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
+    const spec = adapter?.cliSpec;
+    // `args` and `env` carry schema defaults, so a caller holding an unparsed
+    // config has neither. Omitting args must fall back rather than fail.
+    expect(spec?.buildArgs({ command: "gemini" })).toEqual(spec?.defaultArgs);
   });
 });

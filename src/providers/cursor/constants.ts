@@ -28,6 +28,15 @@ export const CURSOR_CLI_ARG = {
   CREATE_CHAT: "create-chat",
 } as const;
 
+/**
+ * Session config option ids Cursor understands. ACP 1.x replaced the removed
+ * `session/set_model` method with the general `session/set_config_option`,
+ * where the model selector is just an option carrying `category: "model"`.
+ */
+export const CURSOR_CONFIG_OPTION = {
+  MODEL: "model",
+} as const;
+
 export const CURSOR_MODE = {
   AGENT: "agent",
   PLAN: "plan",

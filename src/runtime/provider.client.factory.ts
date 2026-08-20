@@ -1,9 +1,12 @@
-import { PROVIDER_VALUES } from "../domain/provider";
 import type { Provider } from "../domain/provider";
+import { PROVIDER_VALUES } from "../domain/provider";
 import { VALIDATION_ERROR } from "../domain/validation.errors";
 import type { AcpSharedRuntimeOptions } from "./acp.runtime";
-import type { IProviderFactory } from "./interfaces/provider.types";
-import type { IProviderClient, IProviderClientFactory } from "./interfaces/provider.types";
+import type {
+  IProviderClient,
+  IProviderClientFactory,
+  IProviderFactory,
+} from "./interfaces/provider.types";
 import { ProviderClient } from "./provider.client";
 
 /**

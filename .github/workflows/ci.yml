@@ -17,12 +17,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22]
+        node-version: [22, 24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -34,21 +34,50 @@ jobs:
         run: npm run verify
 
       - name: Coverage
-        if: matrix.node-version == 20
+        if: matrix.node-version == 22
         run: npm run test:coverage
 
       - name: Upload coverage
-        if: matrix.node-version == 20
-        uses: actions/upload-artifact@v4
+        if: matrix.node-version == 22
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage
           if-no-files-found: ignore
 
       - name: Pack and import smoke
-        if: matrix.node-version == 20
+        if: matrix.node-version == 22
         run: npm run pack:smoke
 
       - name: Publint packed tarball
-        if: matrix.node-version == 20
+        if: matrix.node-version == 22
         run: npm run publint
+
+  # `zod` is a peerDependency spanning two majors with incompatible type
+  # surfaces. The unit tests do not typecheck, so only this job can prove the
+  # declared range is honest. See ConfigSchema in src/runtime/config.ts.
+  peer-zod:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        zod: ["3", "4"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install zod ${{ matrix.zod }}
+        run: npm install --no-save zod@${{ matrix.zod }}
+
+      - name: Typecheck against zod ${{ matrix.zod }}
+        run: npm run typecheck
+
+      - name: Test against zod ${{ matrix.zod }}
+        run: npm test

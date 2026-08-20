@@ -7,8 +7,8 @@ import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { cursorCliSpec } from "./cli.definition";
 import { CURSOR_CONFIG_KEYS } from "./constants";
 import { CursorAgentPort } from "./cursor.agent.port";
-import { cursorConfigSchema } from "./schema";
 import type { CursorConfig } from "./schema";
+import { cursorConfigSchema } from "./schema";
 
 function createRuntime(
   config: CursorConfig,

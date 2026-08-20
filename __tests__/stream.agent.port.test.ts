@@ -153,22 +153,22 @@ describe("StreamAgentPort", () => {
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
   });
 
-  it("setSessionMode and setSessionModel getters bind inner methods when present", () => {
+  it("setSessionMode and setSessionConfigOption getters bind inner methods when present", () => {
     const inner = createMockPort();
     const modeFn = vi.fn();
     const modelFn = vi.fn();
     (inner as Record<string, unknown>).setSessionMode = modeFn;
-    (inner as Record<string, unknown>).setSessionModel = modelFn;
+    (inner as Record<string, unknown>).setSessionConfigOption = modelFn;
     const port = new StreamAgentPort(inner);
     expect(typeof port.setSessionMode).toBe("function");
-    expect(typeof port.setSessionModel).toBe("function");
+    expect(typeof port.setSessionConfigOption).toBe("function");
   });
 
-  it("setSessionMode and setSessionModel getters are undefined when inner lacks them", () => {
+  it("setSessionMode and setSessionConfigOption getters are undefined when inner lacks them", () => {
     const inner = createMockPort();
     const port = new StreamAgentPort(inner);
     expect(port.setSessionMode).toBeUndefined();
-    expect(port.setSessionModel).toBeUndefined();
+    expect(port.setSessionConfigOption).toBeUndefined();
   });
 
   it("streamPrompt in NATIVE mode does not emit an OpenAI finish envelope", async () => {

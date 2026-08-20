@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import type { IAgentPort } from "../src/runtime/agent.port";
-import { baseCliConfigSchema } from "../src/runtime/config";
 import type { BaseCliConfig } from "../src/runtime/config";
+import { baseCliConfigSchema } from "../src/runtime/config";
 import { createCliHarnessAdapter } from "../src/runtime/create.cli.harness.adapter";
 import { HarnessRegistry } from "../src/runtime/registry";
 

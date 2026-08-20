@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The declared zod peer range was false.** `peerDependencies` advertised
+  `"^3.25.0 || ^4.0.0"`, but the package only ever compiled against zod 3 - under zod 4 the
+  typecheck failed in 15 places. Nothing caught it because vitest does not typecheck. It
+  mattered because zod is a peer, so the consumer's copy wins, and `@simpill/async.utils`
+  already requires `zod@^4.3.6`.
+- **`tsconfig` did not declare `types: ["node"]`.** TypeScript 6 and 7 stop picking up
+  `@types/node` without it and fail with 36 "Cannot find name" errors across `process`,
+  `crypto`, `setTimeout` and the `node:` specifiers - identically on `@types/node` 22 and 26,
+  so it reads like a types-package problem and is not.
 - **Provider config was silently discarded.** `resolveBaseConfig` returns only
   `command`/`args`/`cwd`/`env`, and both adapter paths handed that reduced object to
   `schema.parse`, dropping every other field before it could reach the CLI. Cursor's `trust`,
@@ -59,9 +68,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The model generator now fails on a constant-name collision instead of renaming an existing
   entry, which could have silently repointed a published `*_MODEL_IDS` key at a different model.
 - `model` on an ACP provider labels OpenAI-style stream envelopes; select the agent's model with
-  `setSessionModel` or by passing the flag your CLI expects in `args`.
+  `setSessionConfigOption` or by passing the flag your CLI expects in `args`.
 - The test suite is type-checked (`tsconfig.test.json`), and provider adapters are no longer
   excluded from coverage.
+
+- **Breaking:** `IAgentPort.setSessionModel` is now `setSessionConfigOption`. ACP SDK 1.x
+  removed `session/set_model` in favour of the general `session/set_config_option`, where the
+  model selector is an option carrying `category: "model"`. It takes `configId` + `value` and
+  returns the full option set. Note the compiler suggests `SetSessionMode*` here and is wrong -
+  mode and model are sibling categories, not the same concept.
+- **Breaking:** minimum Node is 22. Node 20 reached EOL on 2026-04-30, so CI had been verifying
+  an unsupported runtime.
+- `@agentclientprotocol/sdk` 0.12 -> 1.3; `KillTerminalCommandRequest`/`Response` are now
+  `KillTerminalRequest`/`Response`.
+- `ICliSpec.buildArgs` takes the new exported `CliArgsInput<TConfig>`: generic options are
+  spelled out, and `args`/`env` are optional. A spec reached through the registry erases to
+  `ICliSpec<BaseCliConfig>`, which previously rejected the very options the builder maps - the
+  arg-building example in the README had never compiled.
+- Biome 1.9 -> 2.5 with a migrated config. TypeScript stays at 5.9: with the tsconfig fixed, 6
+  and 7 typecheck clean but cannot emit declarations, because tsup 8.5.1 (already latest)
+  bundles rollup-plugin-dts 6.1.1, which crashes on 7 and errors on 6. `@types/node` tracks the
+  engines floor rather than latest, since types ahead of the supported runtime compile code that
+  throws for consumers on that floor. `.github/dependabot.yml` records all three pins.
+
+### Added
+
+- `peer-zod` CI matrix, which typechecks *and* tests against both ends of the declared zod
+  range. Nothing else can catch a type-level regression here.
+- `ConfigSchema`, `ConfigSchemaError`, `ConfigSchemaIssue` and `ConfigSchemaResult` are exported.
+  `ConfigSchema` is declared structurally rather than as `z.ZodType<...>` because no spelling of
+  that type compiles under both majors: `z.ZodType<T, z.ZodTypeDef, unknown>` fails on 4, and
+  `z.ZodType<T>` fails on 3, where `Input` defaults to `Output` and rejects `.default()`.
+- `CliArgsInput` is exported and describes what `ICliSpec.buildArgs` accepts.
 
 ### Deprecated
 
@@ -74,7 +112,7 @@ Fixing the config drop means `trust: true` now genuinely reaches `cursor-agent` 
 every spawn. It previously did nothing, so a config that already sets it will start granting
 that permission on upgrade. Check for existing `trust: true` before deploying.
 
-- CI: `verify` is lint/typecheck/build/test; coverage + pack smoke run on Node 20 only.
+- CI: `verify` is lint/typecheck/build/test; coverage + pack smoke run on Node 22 only.
 - StreamAgentPort owns streaming only; restart/open/close remain on LifecycleAgentPort.
 - Validation failures log at `warn` (not `error`); shared test helpers for fake children / mock ports.
 - Stream queue uses O(1) read-index dequeue; OpenAI chunk ids/timestamps reused per stream.

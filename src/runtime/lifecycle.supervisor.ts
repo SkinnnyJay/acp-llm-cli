@@ -12,8 +12,12 @@ import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import { notificationSessionId } from "../domain/session.notification";
 import type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
 import type { StreamEnvelope } from "../domain/stream.envelopes";
-import type { AgentPortCapabilities, AgentPortEvents, StreamPromptOptions } from "./agent.port";
-import type { IAgentPort } from "./agent.port";
+import type {
+  AgentPortCapabilities,
+  AgentPortEvents,
+  IAgentPort,
+  StreamPromptOptions,
+} from "./agent.port";
 import type { RestartWithBackoffOptions } from "./restart.with.backoff";
 import { restartWithBackoff } from "./restart.with.backoff";
 
@@ -145,8 +149,8 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     return this.inner.setSessionMode?.bind(this.inner);
   }
 
-  get setSessionModel() {
-    return this.inner.setSessionModel?.bind(this.inner);
+  get setSessionConfigOption() {
+    return this.inner.setSessionConfigOption?.bind(this.inner);
   }
 
   async restart(): Promise<void> {

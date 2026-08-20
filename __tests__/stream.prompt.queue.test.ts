@@ -159,3 +159,40 @@ describe("createStreamPromptQueue", () => {
     await expect(consumePromise).rejects.toThrow("first");
   });
 });
+
+describe("createStreamPromptQueue drain-before-done", () => {
+  it("delivers updates queued before close() to a consumer that starts after close", async () => {
+    const q = createStreamPromptQueue();
+    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+
+    q.push(a);
+    q.push(b);
+    q.close();
+
+    const out: unknown[] = [];
+    for await (const u of q.consume()) {
+      out.push(u);
+    }
+
+    expect(out).toEqual([a, b]);
+  });
+
+  it("delivers updates queued before pushError() before rejecting", async () => {
+    const q = createStreamPromptQueue();
+    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+
+    q.push(a);
+    q.pushError(new Error("late error"));
+
+    const out: unknown[] = [];
+    const consume = (async () => {
+      for await (const u of q.consume()) {
+        out.push(u);
+      }
+    })();
+
+    await expect(consume).rejects.toThrow("late error");
+    expect(out).toEqual([a]);
+  });
+});

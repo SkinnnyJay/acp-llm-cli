@@ -1,8 +1,8 @@
 import type {
   CreateTerminalRequest,
   CreateTerminalResponse,
-  KillTerminalCommandRequest,
-  KillTerminalCommandResponse,
+  KillTerminalRequest,
+  KillTerminalResponse,
   ReadTextFileRequest,
   ReadTextFileResponse,
   ReleaseTerminalRequest,
@@ -25,5 +25,5 @@ export interface IToolHost {
   terminalOutput(params: TerminalOutputRequest): Promise<TerminalOutputResponse>;
   waitForTerminalExit(params: WaitForTerminalExitRequest): Promise<WaitForTerminalExitResponse>;
   releaseTerminal(params: ReleaseTerminalRequest): Promise<ReleaseTerminalResponse>;
-  killTerminal(params: KillTerminalCommandRequest): Promise<KillTerminalCommandResponse>;
+  killTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse>;
 }

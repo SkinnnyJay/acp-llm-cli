@@ -2,8 +2,8 @@ import { EventEmitter } from "eventemitter3";
 import type { Mock } from "vitest";
 import { vi } from "vitest";
 import { CONNECTION_EVENT } from "../../src/domain/connection.events";
-import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { ConnectionStatus } from "../../src/domain/connection.status";
+import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { IACPConnectionLike } from "../../src/runtime/acp.client";
 
 type ExitInfo = { code: number | null; signal: string | null };

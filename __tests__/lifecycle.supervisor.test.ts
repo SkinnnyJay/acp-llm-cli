@@ -325,19 +325,19 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(getter).toBeUndefined();
   });
 
-  it("setSessionModel getter returns bound method from inner when present", () => {
+  it("setSessionConfigOption getter returns bound method from inner when present", () => {
     const inner = createMockPort();
     const modelFn = vi.fn();
-    (inner as Record<string, unknown>).setSessionModel = modelFn;
+    (inner as Record<string, unknown>).setSessionConfigOption = modelFn;
     const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
-    const getter = wrapped.setSessionModel;
+    const getter = wrapped.setSessionConfigOption;
     expect(typeof getter).toBe("function");
   });
 
-  it("setSessionModel getter returns undefined when inner has no setSessionModel", () => {
+  it("setSessionConfigOption getter returns undefined when inner has no setSessionConfigOption", () => {
     const inner = createMockPort();
     const wrapped = wrapAgentPortWithLifecycle(inner, { providerId: "test" });
-    const getter = wrapped.setSessionModel;
+    const getter = wrapped.setSessionConfigOption;
     expect(getter).toBeUndefined();
   });
 

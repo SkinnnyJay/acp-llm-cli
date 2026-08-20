@@ -1,13 +1,12 @@
-import type { z } from "zod";
 import type { AcpSharedRuntimeOptions } from "./acp.runtime";
 import type { IAgentPort } from "./agent.port";
-import type { BaseCliConfig } from "./config";
+import type { BaseCliConfig, ConfigSchema } from "./config";
 import type { IHarnessAdapter } from "./harness.adapter";
 
 export interface CreateCliHarnessAdapterParams<TConfig extends BaseCliConfig> {
   id: string;
   name: string;
-  configSchema: z.ZodType<TConfig, z.ZodTypeDef, unknown>;
+  configSchema: ConfigSchema<TConfig>;
   createRuntime: (config: TConfig, runtimeOptions?: AcpSharedRuntimeOptions) => IAgentPort;
   /** Optional: expose default args, buildArgs, getHelp, known flags. */
   cliSpec?: IHarnessAdapter<TConfig>["cliSpec"];

@@ -12,15 +12,55 @@ describe("CursorAgentPort", () => {
     expect(port.capabilities?.sessionPersistence).toBe(false);
   });
 
-  it("setSessionMode accepts modeId and setSessionModel accepts modelId", async () => {
+  it("setSessionMode accepts modeId and setSessionConfigOption selects a model", async () => {
     const port = new CursorAgentPort({ command: "cursor-agent", args: [] });
     const modeRes = await port.setSessionMode?.({ sessionId: "s1", modeId: "read-only" });
     expect(modeRes).toEqual({});
-    const modelRes = await port.setSessionModel?.({
+
+    const modelRes = await port.setSessionConfigOption?.({
       sessionId: "s1",
-      modelId: "claude-3-5-sonnet",
+      configId: "model",
+      value: "claude-3-5-sonnet",
     });
-    expect(modelRes).toEqual({});
+    expect(modelRes).toEqual({
+      configOptions: [
+        {
+          id: "model",
+          name: "Model",
+          category: "model",
+          type: "select",
+          currentValue: "claude-3-5-sonnet",
+          options: [{ value: "claude-3-5-sonnet", name: "claude-3-5-sonnet" }],
+        },
+      ],
+    });
+  });
+
+  it("setSessionConfigOption ignores config ids it does not own", async () => {
+    const port = new CursorAgentPort({ command: "cursor-agent", args: [] });
+    await port.setSessionConfigOption?.({
+      sessionId: "s1",
+      configId: "model",
+      value: "gpt-5",
+    });
+    const res = await port.setSessionConfigOption?.({
+      sessionId: "s1",
+      configId: "reasoning_level",
+      value: "high",
+    });
+    // the model selection survives an unrelated option
+    expect(res?.configOptions[0]?.currentValue).toBe("gpt-5");
+  });
+
+  it("setSessionConfigOption keeps model selections isolated per session", async () => {
+    const port = new CursorAgentPort({ command: "cursor-agent", args: [] });
+    await port.setSessionConfigOption?.({ sessionId: "s1", configId: "model", value: "gpt-5" });
+    const other = await port.setSessionConfigOption?.({
+      sessionId: "s2",
+      configId: "model",
+      value: "opus-5",
+    });
+    expect(other?.configOptions[0]?.currentValue).toBe("opus-5");
   });
 
   it("setSessionMode with unknown modeId clears session mode", async () => {
