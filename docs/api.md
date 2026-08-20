@@ -20,7 +20,8 @@ Curated exports from the package root. Prefer this surface for applications.
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `IAgentPort` / `AgentPortCapabilities` / `StreamPromptOptions` | type | Agent port contract |
-| `IProviderClient` / `IProviderClientFactory` / `IProviderFactory` | type | Factory interfaces |
+| `IProviderClient` / `IProviderClientFactory` / `IProviderFactory` / `IProviderMetrics` | type | Factory interfaces |
+| `ProviderMetricsCollector` | class | Holds `invocations`, `lastError`, `lastInvocationMs`; reached via `factory.getMetrics(id)` when `collectMetrics` is on |
 | `ProviderFactory` / `ProviderClientFactory` / `ProviderClient` | class | Explicit factory construction |
 | `createAcpCliHarnessRuntime` / `createStandardAcpRuntime` | fn | Build ACP ports (also on `./runtime`) |
 | `AcpSharedRuntimeOptions` | type | Persistence, permissions, envelope, lifecycle |
@@ -35,8 +36,9 @@ Curated exports from the package root. Prefer this surface for applications.
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `ENVELOPE_MODE` / `EnvelopeMode` | const/type | `openai` \| `native` \| `both` |
+| `OpenAIStyleChunkEnvelope` | type | The OpenAI-compatible chunk shape |
 | `StreamEnvelope` / `isNativeEnvelope` / `isOpenAIEnvelope` | type/guard | Dual-envelope stream types |
-| `PORT_CAPABILITY` | const | Capability flag names |
+| `PORT_CAPABILITY` / `PortCapabilityName` | const/type | Capability flag names |
 
 `streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
 
@@ -56,13 +58,62 @@ Provider `model` config accepts the provider enum **or any string** (open escape
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `buildGenericArgs` / `genericLlmCliOptionsSchema` | fn/schema | Generic flag builder |
-| `extractHelp` / `HELP_FLAG` | fn/const | `--help` extraction |
+| `GenericLlmCliOptions` / `GENERIC_OPTION_KEY` / `GenericOptionKey` | type/const | The shared option set and its keys |
+| `GenericFlagMap` | type | Option key -> this provider's flag string |
+| `BuiltCliInvocation` | type | A built command plus argv |
+| `extractHelp` / `HELP_FLAG` / `HelpExtractorOptions` | fn/const/type | `--help` extraction |
 | `ICliSpec` / `GetHelpOptions` | type | Adapter CLI surface |
 | `CliArgsInput` | type | What `ICliSpec.buildArgs` accepts: the provider config plus generic options, with `args`/`env` optional |
 
 ## Extension API (`@simpill/acp-llm-cli/runtime`)
 
-Use for custom adapters and decorators: `StreamAgentPort`, `LifecycleAgentPort`, `StdioConnection`, `StdioConnectionFactory`, envelope mapper, session persistence, and the shared ACP runtime builders above.
+Everything above is re-exported here. What follows is available *only* from `/runtime` — reach for it when building a custom port, adapter, or connection rather than consuming one.
+
+### Decorators
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `StreamAgentPort` / `wrapAgentPortWithStream` | class/fn | Adds `streamPrompt` to a port |
+| `WrapAgentPortOptions` | type | Envelope mode and model label for the stream decorator |
+| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close`, backoff, and session resume |
+| `LifecycleSupervisorOptions` / `LifecycleSessionPersistence` | type | Lifecycle tuning; persistence is grouped under `persistence` |
+
+### Connections
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `StdioConnection` / `StdioConnectionFactory` | class | Default stdio transport and its factory |
+| `SpawnFunction` | type | Inject a spawn implementation, mainly for tests |
+| `IConnection` / `IConnectionFactory` | type | Implement these for a non-stdio transport |
+| `ConnectionStatus` | type | Port and connection state |
+| `IACPConnectionLike` | type | The connection surface the ACP client needs |
+
+### Adapters and config
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `createCliHarnessAdapter` / `CreateCliHarnessAdapterParams` | fn/type | Build an `IHarnessAdapter` from a schema and a runtime factory |
+| `HarnessRegistry` | class | Register adapters; a value export, so `new HarnessRegistry()` works |
+| `HarnessRuntime` | type | Alias for `IAgentPort` |
+| `resolveBaseConfig` | fn | Apply defaults and `ENV_KEY` overrides ahead of `schema.parse` |
+
+### Ports, envelopes, hosts
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `AgentPortEvents` | type | The event map an `IAgentPort` emits |
+| `sessionUpdateToEnvelopes` / `createOpenAIFinishEnvelope` | fn | Map ACP session updates to stream envelopes |
+| `IPermissionHandler` | type | Decide permission requests; **absent means cancel**, never auto-allow |
+| `IToolHost` | type | Terminal and filesystem operations an agent may request |
+
+### Deprecated
+
+Scheduled for removal together in the next major. Each carries an `@deprecated` JSDoc note that reaches editors through the shipped declarations.
+
+| Export | Why |
+|--------|-----|
+| `GENERIC_OPTION_DEFAULTS` | Unread. The arg builder never consults it, so `stream: true` here is a default that is never applied |
+| `ANTHROPIC_MODEL_ID_LIST`, `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST` | Unread, and lossier than their source — `readonly string[]` discards the literal union the `*_MODEL_IDS` objects preserve |
 
 ## Peer dependencies
 
