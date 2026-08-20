@@ -1,4 +1,5 @@
 import { EventEmitter } from "eventemitter3";
+import type { Mock } from "vitest";
 import { vi } from "vitest";
 import { CONNECTION_EVENT } from "../../src/domain/connection.events";
 import { CONNECTION_STATUS } from "../../src/domain/connection.status";
@@ -17,9 +18,9 @@ type ExitInfo = { code: number | null; signal: string | null };
  * that is a real signal rather than something to paper over.
  */
 export interface FakeAcpConnection extends IACPConnectionLike {
-  connect: ReturnType<typeof vi.fn>;
-  disconnect: ReturnType<typeof vi.fn>;
-  getStream: ReturnType<typeof vi.fn>;
+  connect: Mock<() => Promise<void>>;
+  disconnect: Mock<() => Promise<void>>;
+  getStream: Mock<() => ReturnType<IACPConnectionLike["getStream"]>>;
   /** Drives a status change the way a real transport would: mutate, then announce. */
   setStatus(status: ConnectionStatus): void;
   emitError(error: Error): void;

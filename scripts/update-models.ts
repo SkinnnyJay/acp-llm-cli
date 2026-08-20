@@ -215,7 +215,7 @@ async function main(): Promise<void> {
   ): string[] => {
     if (fromApi.length) return fromApi;
     if (fromOpenRouter.length) return fromOpenRouter;
-    return FALLBACKS[provider];
+    return FALLBACKS[provider] ?? [];
   };
 
   const anthropicList = pick("anthropic", anthropic, openRouter.anthropic ?? []);

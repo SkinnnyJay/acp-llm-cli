@@ -44,7 +44,7 @@
   "homepage": "https://github.com/SkinnnyJay/acp-llm-cli#readme",
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "lint": "biome check src __tests__",
     "format": "biome format src __tests__",
     "check:fix": "biome check --write src __tests__",
