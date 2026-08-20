@@ -7,6 +7,7 @@ export {
 } from "./bootstrap";
 export type {
   BuiltCliInvocation,
+  CliArgsInput,
   GenericFlagMap,
   GenericLlmCliOptions,
   GenericOptionKey,

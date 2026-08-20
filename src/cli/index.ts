@@ -12,4 +12,4 @@ export {
 } from "./generic.options";
 export type { HelpExtractorOptions } from "./help.extractor";
 export { extractHelp, HELP_FLAG } from "./help.extractor";
-export type { GetHelpOptions, ICliSpec } from "./types";
+export type { CliArgsInput, GetHelpOptions, ICliSpec } from "./types";
