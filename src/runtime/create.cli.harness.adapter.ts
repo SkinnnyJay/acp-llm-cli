@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
+import type { AcpSharedRuntimeOptions } from "./acp.runtime";
 import type { IAgentPort } from "./agent.port";
 import type { BaseCliConfig } from "./config";
 import type { IHarnessAdapter } from "./harness.adapter";

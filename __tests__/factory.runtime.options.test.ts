@@ -28,10 +28,15 @@ describe("ProviderFactory runtime options composition", () => {
       createRuntime: (_config, runtimeOptions) => {
         captured.push(runtimeOptions ?? {});
         inner = createMockPort();
+        const store = runtimeOptions?.sessionPersistence;
         return wrapAgentPortWithLifecycle(inner, {
-          sessionPersistence: runtimeOptions?.sessionPersistence,
-          providerId: runtimeOptions?.providerId ?? "comp-test",
-          workspace: runtimeOptions?.workspace,
+          persistence: store
+            ? {
+                store,
+                providerId: runtimeOptions?.providerId ?? "comp-test",
+                workspace: runtimeOptions?.workspace,
+              }
+            : undefined,
         });
       },
     });

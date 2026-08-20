@@ -71,8 +71,8 @@ export type { ACPClientOptions } from "./runtime/acp.client";
 export {
   createAcpCliHarnessRuntime,
   createStandardAcpRuntime,
-} from "./providers/acp.shared";
-export type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
+} from "./runtime/acp.runtime";
+export type { AcpSharedRuntimeOptions } from "./runtime/acp.runtime";
 export { createMemorySessionPersistence } from "./runtime/session.persistence.memory";
 export type { ISessionPersistence, PersistedSession } from "./domain/session.persistence";
 

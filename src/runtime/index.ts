@@ -12,7 +12,10 @@ export type { WrapAgentPortOptions } from "./acp.agent.port.stream";
 
 // Lifecycle decorator — named class + factory
 export { LifecycleAgentPort, wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
-export type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
+export type {
+  LifecycleSessionPersistence,
+  LifecycleSupervisorOptions,
+} from "./lifecycle.supervisor";
 
 // ACP client factory
 export { createAcpAgentPort } from "./acp.client";
@@ -70,5 +73,5 @@ export type { ISessionPersistence, PersistedSession } from "../domain/session.pe
 export {
   createAcpCliHarnessRuntime,
   createStandardAcpRuntime,
-} from "../providers/acp.shared";
-export type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
+} from "./acp.runtime";
+export type { AcpSharedRuntimeOptions } from "./acp.runtime";

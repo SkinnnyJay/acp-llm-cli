@@ -1,5 +1,5 @@
 import { VALIDATION_ERROR } from "../domain/validation.errors";
-import type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
+import type { AcpSharedRuntimeOptions } from "./acp.runtime";
 import type { IAgentPort } from "./agent.port";
 import type { BaseCliConfig } from "./config";
 import type { IProvider, IProviderFactory } from "./interfaces/provider.types";

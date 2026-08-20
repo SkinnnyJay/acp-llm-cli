@@ -17,8 +17,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "test-provider",
+      persistence: { store: persistence, providerId: "test-provider" },
     });
 
     expect(wrapped.capabilities).toBeDefined();
@@ -29,9 +28,7 @@ describe("wrapAgentPortWithLifecycle", () => {
 
   it("sets sessionPersistence capability to false when no persistence", () => {
     const inner = createMockPort();
-    const wrapped = wrapAgentPortWithLifecycle(inner, {
-      providerId: "test-provider",
-    });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {});
 
     expect(wrapped.capabilities?.[PORT_CAPABILITY.SESSION_PERSISTENCE]).toBe(false);
   });
@@ -40,8 +37,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "claude-cli",
+      persistence: { store: persistence, providerId: "claude-cli" },
     });
 
     await wrapped.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
@@ -59,8 +55,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const persistence = createMemorySessionPersistence();
     const saveSpy = vi.spyOn(persistence, "saveSession");
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "claude-cli",
+      persistence: { store: persistence, providerId: "claude-cli" },
     });
 
     await wrapped.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
@@ -139,8 +134,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "gemini-cli",
+      persistence: { store: persistence, providerId: "gemini-cli" },
     });
 
     await wrapped.sessionUpdate({
@@ -158,8 +152,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "event-provider",
+      persistence: { store: persistence, providerId: "event-provider" },
     });
 
     (inner as unknown as EventEmitter).emit("sessionUpdate", {
@@ -177,9 +170,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "cwd-provider",
-      workspace: "/ws",
+      persistence: { store: persistence, providerId: "cwd-provider", workspace: "/ws" },
     });
 
     await wrapped.newSession({ cwd: "/original/cwd", mcpServers: [] } as Parameters<
@@ -206,8 +197,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const persistence = createMemorySessionPersistence();
     const saveSpy = vi.spyOn(persistence, "saveSession");
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "test",
+      persistence: { store: persistence, providerId: "test" },
     });
 
     await wrapped.sessionUpdate({
@@ -228,9 +218,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     });
 
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "claude-cli",
-      resumeOnRestart: true,
+      persistence: { store: persistence, providerId: "claude-cli", resumeOnRestart: true },
       restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
     });
 
@@ -246,9 +234,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "claude-cli",
-      resumeOnRestart: true,
+      persistence: { store: persistence, providerId: "claude-cli", resumeOnRestart: true },
       restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
     });
 
@@ -268,9 +254,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     });
 
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      sessionPersistence: persistence,
-      providerId: "claude-cli",
-      resumeOnRestart: false,
+      persistence: { store: persistence, providerId: "claude-cli", resumeOnRestart: false },
       restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
     });
 
@@ -356,4 +340,49 @@ describe("wrapAgentPortWithLifecycle", () => {
     const getter = wrapped.setSessionModel;
     expect(getter).toBeUndefined();
   });
+
+  it("keeps the restored cwd when a vendor notification arrives after a restart", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    await persistence.saveSession({
+      providerId: "cwd-restart",
+      sessionId: "sess-restored",
+      cwd: "/original/cwd",
+      updatedAt: Date.now(),
+    });
+
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      persistence: { store: persistence, providerId: "cwd-restart" },
+    });
+
+    await wrapped.restart?.();
+    expect((await persistence.loadSession("cwd-restart"))?.cwd).toBe("/original/cwd");
+
+    // A vendor session_id notification used to persist cwd: undefined here, wiping it.
+    await wrapped.sessionUpdate({
+      sessionId: "s1",
+      update: {},
+      session_id: "sess-restored",
+    } as unknown as Parameters<IAgentPort["sessionUpdate"]>[0]);
+
+    expect((await persistence.loadSession("cwd-restart"))?.cwd).toBe("/original/cwd");
+  });
+
+  it("defaults resumeOnRestart to true when a store is present", async () => {
+    const inner = createMockPort();
+    const persistence = createMemorySessionPersistence();
+    await persistence.saveSession({
+      providerId: "resume-default",
+      sessionId: "sess-x",
+      updatedAt: Date.now(),
+    });
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      persistence: { store: persistence, providerId: "resume-default" },
+    });
+
+    await wrapped.restart?.();
+
+    expect(inner.newSession).toHaveBeenCalled();
+  });
+
 });
