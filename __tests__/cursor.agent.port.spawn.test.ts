@@ -140,4 +140,83 @@ describe("CursorAgentPort spawn contract", () => {
     expect(hangingKill).toHaveBeenCalled();
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
   });
+
+  it("routes a prompt to its own session, not the most recently created chat", async () => {
+    const UUID_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const UUID_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const chats = [UUID_A, UUID_B];
+    const promptArgs: string[][] = [];
+
+    const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
+      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+        return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
+      }
+      if (args.includes("hello")) {
+        promptArgs.push(args);
+        const ndjson = JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "ok",
+          session_id: UUID_A,
+        });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    const b = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    expect(a.sessionId).toBe(UUID_A);
+    expect(b.sessionId).toBe(UUID_B);
+
+    await port.setSessionMode?.({ sessionId: a.sessionId, modeId: "read-only" });
+    await port.prompt({
+      sessionId: a.sessionId,
+      prompt: [{ type: "text", text: "hello" }],
+    });
+
+    const args = promptArgs[0] ?? [];
+    expect(args[args.indexOf(CURSOR_CLI_ARG.RESUME) + 1]).toBe(UUID_A);
+    expect(args[args.indexOf(CURSOR_CLI_ARG.MODE) + 1]).toBe("ask");
+  });
+
+  it("does not leak one session's mode into another session's argv", async () => {
+    const UUID_A = "11111111-1111-4111-8111-111111111111";
+    const UUID_B = "22222222-2222-4222-8222-222222222222";
+    const chats = [UUID_A, UUID_B];
+    const promptArgs: string[][] = [];
+
+    const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
+      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+        return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
+      }
+      if (args.includes("hi")) {
+        promptArgs.push(args);
+        const ndjson = JSON.stringify({ type: "result", subtype: "success", result: "ok" });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    const b = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+
+    await port.setSessionMode?.({ sessionId: a.sessionId, modeId: "read-only" });
+    await port.prompt({ sessionId: b.sessionId, prompt: [{ type: "text", text: "hi" }] });
+
+    const args = promptArgs[0] ?? [];
+    expect(args[args.indexOf(CURSOR_CLI_ARG.RESUME) + 1]).toBe(UUID_B);
+    expect(args).not.toContain(CURSOR_CLI_ARG.MODE);
+  });
+
 });

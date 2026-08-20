@@ -47,6 +47,14 @@ export interface CursorAgentPortOptions {
   spawnFn?: CursorSpawnFn;
 }
 
+/** Everything the port knows about one ACP session. */
+interface CursorSessionState {
+  /** The cursor chat id to resume, once one has been minted or echoed back by the CLI. */
+  cursorSessionId?: string;
+  mode?: string;
+  model?: string;
+}
+
 /**
  * IAgentPort for Cursor CLI: spawns process per prompt, parses NDJSON result.
  * Supports setSessionMode/setSessionModel, runCommand timeout, and graceful disconnect.
@@ -54,11 +62,14 @@ export interface CursorAgentPortOptions {
 export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities = CURSOR_CAPABILITIES;
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
-  private sessionId: string | undefined;
   private readonly config: CursorConfig;
   private readonly spawnFn: CursorSpawnFn | undefined;
-  private readonly sessionModeById = new Map<string, string>();
-  private readonly sessionModelById = new Map<string, string>();
+  /**
+   * Per-ACP-session state. Previously the cursor chat id was a single process-wide field while
+   * mode and model were per-session maps, so a prompt could resume one chat with another
+   * session's settings. Everything about a session now lives in one entry with one lifetime.
+   */
+  private readonly sessions = new Map<string, CursorSessionState>();
   private activePromptCount = 0;
   private disconnectionInProgress = false;
   private readonly activeAbortControllers = new Set<AbortController>();
@@ -183,27 +194,36 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     };
   }
 
+  /** Returns the entry for a session, creating it on first use. */
+  private sessionState(sessionId: string): CursorSessionState {
+    let state = this.sessions.get(sessionId);
+    if (!state) {
+      state = {};
+      this.sessions.set(sessionId, state);
+    }
+    return state;
+  }
+
   async newSession(_params: NewSessionRequest): Promise<NewSessionResponse> {
     const command = this.resolveCliCommand();
     const baseArgs = this.resolveBaseArgs();
     const result = await this.runTracked(command, [...baseArgs, CURSOR_CLI_ARG.CREATE_CHAT]);
-    const match = result.stdout.match(CURSOR_UUID_PATTERN);
-    this.sessionId = match?.[0] ?? undefined;
-    return { sessionId: this.sessionId ?? "" };
+    const cursorSessionId = result.stdout.match(CURSOR_UUID_PATTERN)?.[0];
+    if (!cursorSessionId) {
+      return { sessionId: "" };
+    }
+    // The ACP session id is the cursor chat id, so the entry is keyed by what we return.
+    this.sessionState(cursorSessionId).cursorSessionId = cursorSessionId;
+    return { sessionId: cursorSessionId };
   }
 
   async setSessionMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
-    const resolved = resolveCursorMode(params.modeId);
-    if (resolved) {
-      this.sessionModeById.set(params.sessionId, resolved);
-    } else {
-      this.sessionModeById.delete(params.sessionId);
-    }
+    this.sessionState(params.sessionId).mode = resolveCursorMode(params.modeId);
     return {};
   }
 
   async setSessionModel(params: SetSessionModelRequest): Promise<SetSessionModelResponse> {
-    this.sessionModelById.set(params.sessionId, params.modelId);
+    this.sessionState(params.sessionId).model = params.modelId;
     return {};
   }
 
@@ -220,14 +240,16 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
           : "";
       const command = this.resolveCliCommand();
       const baseArgs = this.resolveBaseArgs();
-      const mode = this.sessionModeById.get(params.sessionId) ?? this.config.mode ?? undefined;
-      const model = this.sessionModelById.get(params.sessionId) ?? this.config.model ?? undefined;
+      const session = this.sessions.get(params.sessionId);
+      const mode = session?.mode ?? this.config.mode ?? undefined;
+      const model = session?.model ?? this.config.model ?? undefined;
+      const resumeId = session?.cursorSessionId;
       const args = [
         CURSOR_CLI_ARG.PRINT,
         CURSOR_CLI_ARG.OUTPUT_FORMAT,
         CURSOR_CLI_ARG.STREAM_JSON,
         ...this.trustArgs(),
-        ...(this.sessionId ? [CURSOR_CLI_ARG.RESUME, this.sessionId] : []),
+        ...(resumeId ? [CURSOR_CLI_ARG.RESUME, resumeId] : []),
         ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
         ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
         ...baseArgs,
@@ -238,7 +260,10 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
       if (parsed === null) {
         throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
       }
-      if (parsed.sessionId) this.sessionId = parsed.sessionId;
+      // Bind the chat the CLI reports back to this session, so later turns resume it.
+      if (parsed.sessionId) {
+        this.sessionState(params.sessionId).cursorSessionId = parsed.sessionId;
+      }
       return {
         stopReason: STOP_REASON.END_TURN,
         ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
