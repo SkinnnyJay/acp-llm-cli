@@ -21,7 +21,17 @@ try {
     [
       "--input-type=module",
       "-e",
-      "import('@simpill/acp-llm-cli').then((m) => { if (!m.getDefaultFactory) throw new Error('missing export'); console.log('pack-smoke-ok'); })",
+      [
+        "const root = await import('@simpill/acp-llm-cli');",
+        "if (!root.getDefaultFactory) throw new Error('missing root export: getDefaultFactory');",
+        "if (typeof root.HarnessRegistry !== 'function') throw new Error('HarnessRegistry is not a value export');",
+        // The ./runtime export condition was never imported end to end, so a module that threw on
+        // import - or a broken subpath - would have shipped undetected.
+        "const runtime = await import('@simpill/acp-llm-cli/runtime');",
+        "if (!runtime.StdioConnection) throw new Error('missing runtime export: StdioConnection');",
+        "if (runtime.HarnessRegistry !== root.HarnessRegistry) throw new Error('shared symbol has two identities');",
+        "console.log('pack-smoke-ok');",
+      ].join("\n"),
     ],
     { cwd: tmp, stdio: "inherit" }
   );

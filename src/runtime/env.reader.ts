@@ -8,20 +8,41 @@ import type { EnvKey } from "../domain/env.keys";
 import { ENV_KEY } from "../domain/env.keys";
 import type { ProcessEnv } from "../domain/process.env";
 
+/**
+ * Resolve the raw value for a key from one place: the caller's override if it has one, otherwise
+ * the ambient environment (which @simpill/env.utils backs with .env files). Parsing then happens
+ * once, here, with this package's own rules.
+ *
+ * Previously each getter branched to a different library on the override path, so the two paths
+ * disagreed: `ACP_LLM_CLI_DEBUG=yes` was truthy via config.env and falsy from the shell, because
+ * only the override path used BOOLEAN_TRUTHY_PATTERN.
+ */
+function readRaw(key: EnvKey, override?: ProcessEnv): string | undefined {
+  const fromOverride = override?.[key];
+  // An empty override is treated as absent rather than as a value, so it falls through to the
+  // ambient environment instead of shadowing it - the behaviour callers had before.
+  if (fromOverride !== undefined && fromOverride !== "") return String(fromOverride);
+  return Env.getValue(key);
+}
+
 export function getEnvString(key: EnvKey, defaultValue: string, override?: ProcessEnv): string {
-  if (override && key in override && override[key] !== undefined && override[key] !== "") {
-    return String(override[key]);
-  }
-  return Env.getString(key, defaultValue);
+  const raw = readRaw(key, override);
+  // An empty ambient value also means "unset", so it cannot produce a config that fails
+  // `command: z.string().min(1)` with a confusing message.
+  return raw === undefined || raw === "" ? defaultValue : raw;
 }
 
 export function getEnvBoolean(key: EnvKey, defaultValue: boolean, override?: ProcessEnv): boolean {
-  if (override && key in override) {
-    const raw = override[key];
-    if (raw === undefined) return defaultValue;
-    return BOOLEAN_TRUTHY_PATTERN.test(String(raw).trim());
+  const fromOverride = override?.[key];
+  if (fromOverride !== undefined) {
+    // An explicitly supplied override is authoritative, including "". Falling through to the
+    // ambient environment here would let `env: { ACP_LLM_CLI_DEBUG: "" }` silently pick up a
+    // shell `ACP_LLM_CLI_DEBUG=1` and stop redacting child stderr in thrown errors.
+    return BOOLEAN_TRUTHY_PATTERN.test(String(fromOverride).trim());
   }
-  return Env.getBoolean(key, defaultValue);
+  const ambient = Env.getValue(key);
+  if (ambient === undefined || ambient.trim() === "") return defaultValue;
+  return BOOLEAN_TRUTHY_PATTERN.test(ambient.trim());
 }
 
 export function mergeEnv(overrides?: ProcessEnv, baseEnv: ProcessEnv = process.env): ProcessEnv {

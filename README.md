@@ -45,6 +45,10 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
+  // Enum id or any string, so a model released today is never blocked. For ACP
+  // providers this labels OpenAI-style stream envelopes rather than selecting
+  // the agent's model — for that use port.setSessionConfigOption(...) or pass
+  // the flag your CLI expects in `args`.
   model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
 });
 
@@ -90,6 +94,8 @@ DEFAULT_COMMANDS  →  environment (ENV_KEY)  →  config you pass
 ```
 
 The result is validated against the provider's Zod schema before a process is spawned.
+
+That arrow is a simplification worth unpacking, because the env layer is narrower than it looks. `command` is required by the config schema, so a config you pass always supplies it — which means `ACP_LLM_CLI_*_COMMAND` only takes effect when you call `resolveBaseConfig` yourself (exported from `@simpill/acp-llm-cli/runtime`). `ACP_LLM_CLI_*_ARGS` applies whenever `args` is empty. Provider-specific fields you pass — `model`, `trust`, `mode` — survive resolution untouched and reach the provider.
 
 Copy `.env.sample` to `.env`. Every key this package reads is declared in `ENV_KEY` (`src/domain/env.keys.ts`):
 

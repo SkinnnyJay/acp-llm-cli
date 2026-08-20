@@ -1,18 +1,18 @@
 // Public agent port types and interfaces
 
 export type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
-export type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
-// Shared ACP CLI runtime builders (extension API)
-export {
-  createAcpCliHarnessRuntime,
-  createStandardAcpRuntime,
-} from "../providers/acp.shared";
 export type { WrapAgentPortOptions } from "./acp.agent.port.stream";
 // Stream decorator — named class + factory
 export { StreamAgentPort, wrapAgentPortWithStream } from "./acp.agent.port.stream";
 export type { ACPClientOptions, IACPConnectionLike } from "./acp.client";
 // ACP client factory
 export { createAcpAgentPort } from "./acp.client";
+export type { AcpSharedRuntimeOptions } from "./acp.runtime";
+// Shared ACP CLI runtime builders (extension API)
+export {
+  createAcpCliHarnessRuntime,
+  createStandardAcpRuntime,
+} from "./acp.runtime";
 export type {
   AgentPortCapabilities,
   AgentPortEvents,
@@ -47,7 +47,10 @@ export type {
   IProviderFactory,
   IProviderMetrics,
 } from "./interfaces/provider.types";
-export type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
+export type {
+  LifecycleSessionPersistence,
+  LifecycleSupervisorOptions,
+} from "./lifecycle.supervisor";
 // Lifecycle decorator — named class + factory
 export { LifecycleAgentPort, wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 export { ProviderMetricsCollector } from "./metrics";

@@ -58,4 +58,17 @@ describe("ProviderClientFactory", () => {
       })
     ).toThrow(/Unknown provider id/);
   });
+
+  it("lists only providers the injected factory actually has registered", async () => {
+    const { HarnessRegistry } = await import("../src/runtime/registry");
+    const { ProviderFactory } = await import("../src/runtime/provider.factory");
+    const { ProviderClientFactory } = await import("../src/runtime/provider.client.factory");
+    const { claudeAdapter } = await import("../src/providers/claude/adapter");
+
+    const registry = new HarnessRegistry();
+    registry.register(claudeAdapter);
+    const factory = new ProviderClientFactory(new ProviderFactory({ registry }));
+
+    expect(factory.listProviders()).toEqual([Provider.CLAUDE]);
+  });
 });

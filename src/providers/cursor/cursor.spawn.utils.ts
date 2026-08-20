@@ -4,6 +4,7 @@ import { ENCODING } from "../../domain/encoding";
 import { ERROR_MESSAGE } from "../../domain/error.messages";
 import { NODE_EVENT } from "../../domain/node.events";
 import type { ProcessEnv } from "../../domain/process.env";
+import { SIGNAL } from "../../domain/signals";
 import { TIMEOUT } from "../../domain/timeouts";
 import { mergeEnv } from "../../runtime/env.reader";
 import type { CursorConfig } from "./schema";
@@ -48,7 +49,7 @@ export function runCursorSpawnedCommand(
 
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new Error("Cursor CLI command aborted"));
+      reject(new Error(ERROR_MESSAGE.CURSOR_COMMAND_ABORTED));
       return;
     }
 
@@ -83,13 +84,13 @@ export function runCursorSpawnedCommand(
 
     const killChild = () => {
       try {
-        child.kill("SIGTERM");
+        child.kill(SIGNAL.TERM);
       } catch {
         // process may have already exited
       }
       forceKillTimer = setTimeout(() => {
         try {
-          child.kill("SIGKILL");
+          child.kill(SIGNAL.KILL);
         } catch {
           // process may have already exited
         }
@@ -99,7 +100,7 @@ export function runCursorSpawnedCommand(
     const onAbort = () => {
       clearTimeout(timeoutTimer);
       killChild();
-      settleReject(new Error("Cursor CLI command aborted"));
+      settleReject(new Error(ERROR_MESSAGE.CURSOR_COMMAND_ABORTED));
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });

@@ -21,28 +21,23 @@ import type {
 import type { RestartWithBackoffOptions } from "./restart.with.backoff";
 import { restartWithBackoff } from "./restart.with.backoff";
 
-export interface LifecycleSupervisorOptions {
-  sessionPersistence?: ISessionPersistence;
+/**
+ * Session persistence travels as one group: the store, the key it is written under, and the
+ * resume policy. Grouping them makes `resumeOnRestart` unstateable without a store and lets
+ * `providerId` be required exactly where it is used, so no placeholder id is ever fabricated.
+ */
+export interface LifecycleSessionPersistence {
+  store: ISessionPersistence;
+  /** Persistence key. Required here because this object only exists when persisting. */
   providerId: string;
   workspace?: string;
-  restartOptions?: RestartWithBackoffOptions;
+  /** Resume the persisted session after a restart. Default: true. */
   resumeOnRestart?: boolean;
 }
 
-function persistActiveSession(
-  persistence: ISessionPersistence,
-  providerId: string,
-  workspace: string | undefined,
-  sessionId: string,
-  cwd?: string
-): Promise<void> {
-  return persistence.saveSession({
-    providerId,
-    workspace,
-    cwd,
-    sessionId,
-    updatedAt: Date.now(),
-  });
+export interface LifecycleSupervisorOptions {
+  persistence?: LifecycleSessionPersistence;
+  restartOptions?: RestartWithBackoffOptions;
 }
 
 /**
@@ -53,27 +48,23 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   readonly capabilities: AgentPortCapabilities;
 
   private readonly inner: IAgentPort;
-  private readonly sessionPersistence: ISessionPersistence | undefined;
-  private readonly providerId: string;
-  private readonly workspace: string | undefined;
-  private readonly restartOptions: RestartWithBackoffOptions | undefined;
+  private readonly persistence: LifecycleSessionPersistence | undefined;
   private readonly resumeOnRestart: boolean;
+  private readonly restartOptions: RestartWithBackoffOptions | undefined;
   private lastSessionCwd: string | undefined;
 
   constructor(inner: IAgentPort, options: LifecycleSupervisorOptions) {
     super();
     this.inner = inner;
-    this.sessionPersistence = options.sessionPersistence;
-    this.providerId = options.providerId;
-    this.workspace = options.workspace;
+    this.persistence = options.persistence;
+    this.resumeOnRestart = options.persistence?.resumeOnRestart ?? true;
     this.restartOptions = options.restartOptions;
-    this.resumeOnRestart = options.resumeOnRestart ?? !!options.sessionPersistence;
 
     this.capabilities = {
       ...inner.capabilities,
       [PORT_CAPABILITY.RESTART]: true,
       [PORT_CAPABILITY.OPEN_CLOSE]: true,
-      [PORT_CAPABILITY.SESSION_PERSISTENCE]: !!options.sessionPersistence,
+      [PORT_CAPABILITY.SESSION_PERSISTENCE]: !!options.persistence,
     };
 
     inner.on("state", (status: ConnectionStatus) => this.emit("state", status));
@@ -87,17 +78,23 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     inner.on("error", (error: Error) => this.emit("error", error));
   }
 
+  /** Single write path: every persisted record is assembled here. */
+  private async persist(sessionId: string, cwd: string | undefined): Promise<void> {
+    const persistence = this.persistence;
+    if (!persistence) return;
+    await persistence.store.saveSession({
+      providerId: persistence.providerId,
+      workspace: persistence.workspace,
+      cwd,
+      sessionId,
+      updatedAt: Date.now(),
+    });
+  }
+
   private async maybePersistFromNotification(update: SessionNotification): Promise<void> {
     const sessionId = notificationSessionId(update, { vendorOnly: true });
-    if (this.sessionPersistence && sessionId) {
-      await persistActiveSession(
-        this.sessionPersistence,
-        this.providerId,
-        this.workspace,
-        sessionId,
-        this.lastSessionCwd
-      );
-    }
+    if (!sessionId) return;
+    await this.persist(sessionId, this.lastSessionCwd);
   }
 
   get connectionStatus(): ConnectionStatus {
@@ -118,16 +115,9 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
 
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
     const response = await this.inner.newSession(params);
-    const sessionId = response.sessionId;
     this.lastSessionCwd = params.cwd;
-    if (this.sessionPersistence && sessionId) {
-      await persistActiveSession(
-        this.sessionPersistence,
-        this.providerId,
-        this.workspace,
-        sessionId,
-        params.cwd
-      );
+    if (response.sessionId) {
+      await this.persist(response.sessionId, params.cwd);
     }
     return response;
   }
@@ -164,25 +154,30 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   }
 
   async restart(): Promise<void> {
+    const persistence = this.persistence;
     let sessionToResume: PersistedSession | null = null;
-    if (this.sessionPersistence && this.resumeOnRestart) {
-      sessionToResume = await this.sessionPersistence.loadSession(this.providerId, this.workspace);
+    if (persistence && this.resumeOnRestart) {
+      sessionToResume = await persistence.store.loadSession(
+        persistence.providerId,
+        persistence.workspace
+      );
     }
 
     await restartWithBackoff(this.inner, this.restartOptions);
 
-    if (sessionToResume?.sessionId && this.sessionPersistence) {
+    if (persistence && sessionToResume?.sessionId) {
+      const cwd = sessionToResume.cwd ?? persistence.workspace ?? process.cwd();
       const resumeParams = {
-        cwd: sessionToResume.cwd ?? this.workspace ?? process.cwd(),
+        cwd,
         mcpServers: [] as NewSessionRequest["mcpServers"],
         sessionId: sessionToResume.sessionId,
       } as NewSessionRequest;
       await this.inner.newSession(resumeParams);
-      await this.sessionPersistence.saveSession({
-        ...sessionToResume,
-        cwd: resumeParams.cwd,
-        updatedAt: Date.now(),
-      });
+      // Keep the in-memory cwd in step with what was just restored. Without this the next
+      // inbound vendor session_id notification persists cwd: undefined and wipes it, so the
+      // following restart resumes in the wrong directory.
+      this.lastSessionCwd = cwd;
+      await persistence.store.saveSession({ ...sessionToResume, cwd, updatedAt: Date.now() });
     }
   }
 

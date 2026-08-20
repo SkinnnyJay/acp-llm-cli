@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { getDefaultFactory, resetDefaultFactoriesForTests } from "../src/bootstrap";
+import {
+  getDefaultFactory,
+  getDefaultProviderClientFactory,
+  resetDefaultFactoriesForTests,
+} from "../src/bootstrap";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import type { AcpSharedRuntimeOptions } from "../src/providers/acp.shared";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -24,10 +28,15 @@ describe("ProviderFactory runtime options composition", () => {
       createRuntime: (_config, runtimeOptions) => {
         captured.push(runtimeOptions ?? {});
         inner = createMockPort();
+        const store = runtimeOptions?.sessionPersistence;
         return wrapAgentPortWithLifecycle(inner, {
-          sessionPersistence: runtimeOptions?.sessionPersistence,
-          providerId: runtimeOptions?.providerId ?? "comp-test",
-          workspace: runtimeOptions?.workspace,
+          persistence: store
+            ? {
+                store,
+                providerId: runtimeOptions?.providerId ?? "comp-test",
+                workspace: runtimeOptions?.workspace,
+              }
+            : undefined,
         });
       },
     });
@@ -81,21 +90,24 @@ describe("ProviderFactory runtime options composition", () => {
   });
 });
 
-describe("getDefaultFactory options honesty", () => {
-  it("throws when collectMetrics differs after first init", () => {
+describe("shared default factory", () => {
+  it("returns the same instance regardless of which accessor initialises it first", () => {
     resetDefaultFactoriesForTests();
-    getDefaultFactory({ collectMetrics: true });
-    expect(() => getDefaultFactory({ collectMetrics: false })).toThrow(
-      /already initialized with collectMetrics=true/
-    );
+    const viaClient = getDefaultProviderClientFactory();
+    const direct = getDefaultFactory();
+    expect(viaClient).toBeDefined();
+    expect(getDefaultFactory()).toBe(direct);
     resetDefaultFactoriesForTests();
   });
 
-  it("allows repeated calls with the same collectMetrics", () => {
+  it("collects metrics on the shared factory", () => {
     resetDefaultFactoriesForTests();
-    const a = getDefaultFactory({ collectMetrics: true });
-    const b = getDefaultFactory({ collectMetrics: true });
-    expect(a).toBe(b);
+    const factory = getDefaultFactory();
+    factory.createRuntime(PROVIDER_IDS.CODEX_CLI_ID, {
+      command: "codex-acp",
+      args: [],
+    });
+    expect(factory.getMetrics?.(PROVIDER_IDS.CODEX_CLI_ID)?.invocations).toBeGreaterThanOrEqual(1);
     resetDefaultFactoriesForTests();
   });
 });

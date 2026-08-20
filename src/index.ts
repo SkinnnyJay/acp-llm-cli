@@ -12,6 +12,7 @@ export type {
   GenericLlmCliOptions,
   GenericOptionKey,
   GetHelpOptions,
+  HelpExtractorOptions,
   ICliSpec,
 } from "./cli/index";
 export {
@@ -63,13 +64,13 @@ export type {
 } from "./domain/stream.envelopes";
 export { isNativeEnvelope, isOpenAIEnvelope } from "./domain/stream.envelopes";
 export { VALIDATION_ERROR } from "./domain/validation.errors";
-export type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
+export type { ACPClientOptions } from "./runtime/acp.client";
+export { createAcpAgentPort } from "./runtime/acp.client";
+export type { AcpSharedRuntimeOptions } from "./runtime/acp.runtime";
 export {
   createAcpCliHarnessRuntime,
   createStandardAcpRuntime,
-} from "./providers/acp.shared";
-export type { ACPClientOptions } from "./runtime/acp.client";
-export { createAcpAgentPort } from "./runtime/acp.client";
+} from "./runtime/acp.runtime";
 export type {
   AgentPortCapabilities,
   IAgentPort,
@@ -96,5 +97,8 @@ export { ProviderMetricsCollector } from "./runtime/metrics";
 export { ProviderClient } from "./runtime/provider.client";
 export { ProviderClientFactory } from "./runtime/provider.client.factory";
 export { ProviderFactory } from "./runtime/provider.factory";
-export type { HarnessRegistry } from "./runtime/registry";
+// Value export: docs/api.md and README advertise custom-registry wiring from the root entry
+// point, but this was type-only, so `new HarnessRegistry()` was impossible from "." and callers
+// were pushed into mutating the shared default registry instead.
+export { HarnessRegistry } from "./runtime/registry";
 export { createMemorySessionPersistence } from "./runtime/session.persistence.memory";

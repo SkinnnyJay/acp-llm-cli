@@ -14,7 +14,7 @@ import type { ProcessEnv } from "../domain/process.env";
 import { SIGNAL } from "../domain/signals";
 import { formatStderrForError } from "../domain/stderr.format";
 import { TIMEOUT } from "../domain/timeouts";
-import type { IConnection } from "./connection.interface";
+import type { ConnectionEvents, IConnection } from "./connection.interface";
 import { isDebugEnabled, mergeEnv } from "./env.reader";
 import type { SpawnOptions as SpawnOptionsType } from "./types";
 
@@ -24,18 +24,12 @@ export type SpawnFunction = (
   options: { cwd?: string; env?: ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
-export class StdioConnection
-  extends EventEmitter<{
-    state: (status: ConnectionStatus) => void;
-    error: (error: Error) => void;
-    exit: (info: { code: number | null; signal: string | null }) => void;
-  }>
-  implements IConnection
-{
+export class StdioConnection extends EventEmitter<ConnectionEvents> implements IConnection {
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   private child: ChildProcessWithoutNullStreams | undefined;
   private stream: Stream | undefined;
-  private isDisconnecting = false;
+  /** The child a disconnect() is tearing down. Scoped per child so a late exit is still recognised as intentional. */
+  private closingChild: ChildProcessWithoutNullStreams | undefined;
   private readonly stderrLines: string[] = [];
   private readonly spawnFn: SpawnFunction;
   private readonly options: SpawnOptionsType;
@@ -61,7 +55,16 @@ export class StdioConnection
     ) {
       return;
     }
-    this.isDisconnecting = false;
+    // A previous child can still be alive here (e.g. status ERROR after a child error event).
+    // Tear it down first so it is not orphaned by the respawn below.
+    const previous = this.child;
+    if (previous) {
+      this.closingChild = previous;
+      this.child = undefined;
+      this.stream = undefined;
+      previous.kill?.(SIGNAL.TERM);
+    }
+
     this.setStatus(CONNECTION_STATUS.CONNECTING);
     this.stderrLines.length = 0;
 
@@ -83,30 +86,32 @@ export class StdioConnection
   }
 
   async disconnect(): Promise<void> {
-    if (!this.child) {
+    // Capture the child once: every callback below must act on this process, never on
+    // whichever process happens to be current when the callback eventually runs.
+    const child = this.child;
+    if (!child) {
       this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       return;
     }
-    this.isDisconnecting = true;
-    // Capture the child being torn down: `this.child` may already point at a
-    // freshly spawned process by the time the force-kill timer fires (restart
-    // path), and that new child must never receive this disconnect's SIGKILL.
-    const child = this.child;
-    await new Promise<void>((resolve) => {
-      const forceKill = setTimeout(() => {
-        child.kill?.(SIGNAL.KILL);
-        resolve();
-      }, TIMEOUT.DISCONNECT_FORCE_MS);
-      forceKill.unref();
-      child.once(NODE_EVENT.CLOSE, () => {
-        clearTimeout(forceKill);
-        resolve();
+    this.closingChild = child;
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await new Promise<void>((resolve) => {
+        child.once(NODE_EVENT.CLOSE, () => resolve());
+        child.kill?.(SIGNAL.TERM);
+        forceKillTimer = setTimeout(() => {
+          child.kill?.(SIGNAL.KILL);
+          resolve();
+        }, TIMEOUT.DISCONNECT_FORCE_MS);
+        forceKillTimer.unref?.();
       });
-      child.kill?.(SIGNAL.TERM);
-    });
-    this.child = undefined;
-    this.stream = undefined;
-    this.isDisconnecting = false;
+    } finally {
+      clearTimeout(forceKillTimer);
+    }
+    if (this.child === child) {
+      this.child = undefined;
+      this.stream = undefined;
+    }
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
 
@@ -122,21 +127,39 @@ export class StdioConnection
   }
 
   private bindChildProcessEvents(child: ChildProcessWithoutNullStreams): void {
+    // Both handlers are bound per child but mutate connection-wide state, so each one first
+    // checks that it still owns that state. State is updated before the event announcing it,
+    // so a listener always observes the status the event describes.
     child.on(NODE_EVENT.ERROR, (error: Error) => {
-      this.emit(CONNECTION_EVENT.ERROR, error);
+      // A child this connection no longer owns cannot put it into an error state, and reporting
+      // its failure would hand listeners an error that contradicts connectionStatus.
+      if (this.child !== child) {
+        return;
+      }
       this.setStatus(CONNECTION_STATUS.ERROR);
+      this.emit(CONNECTION_EVENT.ERROR, error);
     });
 
     child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
-      const wasDisconnecting = this.isDisconnecting;
-      this.isDisconnecting = false;
+      const isCurrent = this.child === child;
+      const wasDisconnecting = this.closingChild === child;
+      if (wasDisconnecting) {
+        this.closingChild = undefined;
+      }
+      if (isCurrent) {
+        this.child = undefined;
+        this.stream = undefined;
+      }
+      // Emitted for every child, current or stale: this process really did exit, and it is the
+      // only signal distinguishing "died on its own" from "we asked it to stop".
       this.emit(CONNECTION_EVENT.EXIT, { code, signal });
-      this.child = undefined;
-      this.stream = undefined;
+      if (!isCurrent) {
+        return;
+      }
       const hasError = !wasDisconnecting && ((code !== null && code !== 0) || signal !== null);
       if (hasError) {
-        this.emit(CONNECTION_EVENT.ERROR, this.formatExitError(code, signal));
         this.setStatus(CONNECTION_STATUS.ERROR);
+        this.emit(CONNECTION_EVENT.ERROR, this.formatExitError(code, signal));
       } else {
         this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       }

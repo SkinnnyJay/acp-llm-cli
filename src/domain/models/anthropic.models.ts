@@ -21,6 +21,10 @@ export const MODEL_IDS = {
   CLAUDE_SONNET_4_6: "claude-sonnet-4.6",
 } as const;
 
+/**
+ * @deprecated Unread anywhere, and lossier than its source: `readonly string[]` discards the
+ * literal union MODEL_IDS already carries. Use `Object.values(MODEL_IDS)`. Removed next major.
+ */
 export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
 
 export const ModelIdSchema = z.enum([

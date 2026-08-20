@@ -8,9 +8,10 @@ export default defineConfig({
       include: ["src/**"],
       exclude: [
         "**/*.md",
+        // Generated constant tables with no branches. The provider adapters used to be excluded
+        // by the same glob, which conflated "data" with "wiring" and hid the config-drop bug -
+        // two of the four adapters' createRuntime bodies executed in no test at all.
         "src/domain/models/**",
-        "src/providers/*/adapter.ts",
-        "src/providers/cursor/cli.definition.ts",
       ],
       thresholds: {
         branches: 80,

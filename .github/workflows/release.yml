@@ -27,11 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # prepublishOnly runs this too, so it is deliberate duplication: a
-      # failure here reads as its own red step instead of being buried in
-      # npm publish output.
-      - name: Verify
-        run: npm run verify:coverage
+      # `npm publish` fires prepublishOnly -> verify:coverage (lint, typecheck, build,
+      # test:coverage), so running verify here as well would gate twice. What that path does NOT
+      # cover is the packaging checks CI runs, so those go here.
+      - name: Pack and import smoke
+        run: npm run pack:smoke
+
+      - name: Publint packed tarball
+        run: npm run publint
 
       - name: Publish
         run: npm publish --access public --provenance

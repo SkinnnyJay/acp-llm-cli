@@ -53,6 +53,14 @@ export interface CursorAgentPortOptions {
   spawnFn?: CursorSpawnFn;
 }
 
+/** Everything the port knows about one ACP session. */
+interface CursorSessionState {
+  /** The cursor chat id to resume, once one has been minted or echoed back by the CLI. */
+  cursorSessionId?: string;
+  mode?: string;
+  model?: string;
+}
+
 /**
  * IAgentPort for Cursor CLI: spawns process per prompt, parses NDJSON result.
  * Supports setSessionMode/setSessionConfigOption, runCommand timeout, and graceful disconnect.
@@ -60,14 +68,22 @@ export interface CursorAgentPortOptions {
 export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities = CURSOR_CAPABILITIES;
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
-  private sessionId: string | undefined;
   private readonly config: CursorConfig;
   private readonly spawnFn: CursorSpawnFn | undefined;
-  private readonly sessionModeById = new Map<string, string>();
-  private readonly sessionModelById = new Map<string, string>();
-  private activePromptCount = 0;
-  private disconnectionInProgress = false;
-  private readonly activeAbortControllers = new Set<AbortController>();
+  /**
+   * Per-ACP-session state. Previously the cursor chat id was a single process-wide field while
+   * mode and model were per-session maps, so a prompt could resume one chat with another
+   * session's settings. Everything about a session now lives in one entry with one lifetime.
+   */
+  private readonly sessions = new Map<string, CursorSessionState>();
+  /**
+   * The single in-flight ledger, mutated only by runTracked. Its size replaces a separate
+   * counter, so every spawn kind (connect, newSession, prompt) is tracked and waited on
+   * uniformly rather than only prompts.
+   */
+  private readonly inFlight = new Set<AbortController>();
+  /** Non-undefined while a disconnect is running; makes disconnect() idempotent by construction. */
+  private shutdown: Promise<void> | undefined;
 
   constructor(config: CursorConfig, options?: CursorAgentPortOptions) {
     super();
@@ -77,14 +93,6 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
 
   get connectionStatus(): ConnectionStatus {
     return this.status;
-  }
-
-  private resolveConnectCommand(): string {
-    return getEnvString(
-      ENV_KEY.ACP_LLM_CLI_CURSOR_COMMAND,
-      DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
-      this.config.env
-    );
   }
 
   private resolveCliCommand(): string {
@@ -112,8 +120,13 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     args: string[],
     timeoutMs: number = TIMEOUT.CURSOR_PROMPT_MS
   ) {
+    // Single admission point: this closes connect() and newSession(), which were previously
+    // ungated and could start a process after a disconnect had already begun.
+    if (this.shutdown) {
+      throw new Error(ERROR_MESSAGE.CURSOR_DISCONNECT_IN_PROGRESS);
+    }
     const controller = new AbortController();
-    this.activeAbortControllers.add(controller);
+    this.inFlight.add(controller);
     try {
       return await runCursorSpawnedCommand(command, args, this.config, {
         timeoutMs,
@@ -121,18 +134,24 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
         spawnFn: this.spawnFn,
       });
     } finally {
-      this.activeAbortControllers.delete(controller);
+      // Each caller retires its own entry. Nothing else may clear the ledger.
+      this.inFlight.delete(controller);
     }
   }
 
   async connect(): Promise<void> {
     this.status = CONNECTION_STATUS.CONNECTING;
-    const command = this.resolveConnectCommand();
+    // Health-check the exact binary and base args every prompt will use. These used to differ:
+    // connect resolved env-then-default and ignored config.command entirely, and omitted the
+    // configured args, so a custom `command` was probed as the default binary - connect could
+    // pass while every real invocation failed, or the reverse.
+    const command = this.resolveCliCommand();
     const args = [
       CURSOR_CLI_ARG.PRINT,
       CURSOR_CLI_ARG.OUTPUT_FORMAT,
       CURSOR_CLI_ARG.STREAM_JSON,
       ...this.trustArgs(),
+      ...this.resolveBaseArgs(),
       CURSOR_HEALTH_CHECK_PROMPT,
     ];
     try {
@@ -159,26 +178,29 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   }
 
   async disconnect(): Promise<void> {
-    this.disconnectionInProgress = true;
-    try {
-      // Abort in-flight spawns first so disconnect cannot hang on a stuck child.
-      for (const controller of this.activeAbortControllers) {
-        controller.abort();
-      }
-      await this.waitForPromptCompletion();
-      this.activeAbortControllers.clear();
-      this.activePromptCount = 0;
-      this.status = CONNECTION_STATUS.DISCONNECTED;
-      this.emit(AGENT_PORT_EVENT.STATE, this.status);
-    } finally {
-      this.disconnectionInProgress = false;
-    }
+    // Overlapping callers share one shutdown, so none of them can clear another's state.
+    // The latch is released when runShutdown settles, before this promise resolves, which
+    // keeps the restart path (disconnect() then connect()) working.
+    this.shutdown ??= this.runShutdown().finally(() => {
+      this.shutdown = undefined;
+    });
+    return this.shutdown;
   }
 
-  private async waitForPromptCompletion(): Promise<void> {
-    if (this.activePromptCount === 0) return;
+  private async runShutdown(): Promise<void> {
+    // Abort in-flight work first so disconnect cannot hang on a stuck child.
+    for (const controller of this.inFlight) {
+      controller.abort();
+    }
+    await this.waitForInFlight();
+    this.status = CONNECTION_STATUS.DISCONNECTED;
+    this.emit(AGENT_PORT_EVENT.STATE, this.status);
+  }
+
+  private async waitForInFlight(): Promise<void> {
+    if (this.inFlight.size === 0) return;
     const deadline = Date.now() + TIMEOUT.CURSOR_GRACEFUL_SHUTDOWN_MS;
-    while (this.activePromptCount > 0 && Date.now() < deadline) {
+    while (this.inFlight.size > 0 && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, TIMEOUT.CURSOR_GRACEFUL_SHUTDOWN_POLL_MS));
     }
   }
@@ -189,22 +211,31 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     };
   }
 
+  /** Returns the entry for a session, creating it on first use. */
+  private sessionState(sessionId: string): CursorSessionState {
+    let state = this.sessions.get(sessionId);
+    if (!state) {
+      state = {};
+      this.sessions.set(sessionId, state);
+    }
+    return state;
+  }
+
   async newSession(_params: NewSessionRequest): Promise<NewSessionResponse> {
     const command = this.resolveCliCommand();
     const baseArgs = this.resolveBaseArgs();
     const result = await this.runTracked(command, [...baseArgs, CURSOR_CLI_ARG.CREATE_CHAT]);
-    const match = result.stdout.match(CURSOR_UUID_PATTERN);
-    this.sessionId = match?.[0] ?? undefined;
-    return { sessionId: this.sessionId ?? "" };
+    const cursorSessionId = result.stdout.match(CURSOR_UUID_PATTERN)?.[0];
+    if (!cursorSessionId) {
+      return { sessionId: "" };
+    }
+    // The ACP session id is the cursor chat id, so the entry is keyed by what we return.
+    this.sessionState(cursorSessionId).cursorSessionId = cursorSessionId;
+    return { sessionId: cursorSessionId };
   }
 
   async setSessionMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
-    const resolved = resolveCursorMode(params.modeId);
-    if (resolved) {
-      this.sessionModeById.set(params.sessionId, resolved);
-    } else {
-      this.sessionModeById.delete(params.sessionId);
-    }
+    this.sessionState(params.sessionId).mode = resolveCursorMode(params.modeId);
     return {};
   }
 
@@ -212,7 +243,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     params: SetSessionConfigOptionRequest
   ): Promise<SetSessionConfigOptionResponse> {
     if (params.configId === CURSOR_CONFIG_OPTION.MODEL && typeof params.value === "string") {
-      this.sessionModelById.set(params.sessionId, params.value);
+      this.sessionState(params.sessionId).model = params.value;
     }
     return { configOptions: this.describeConfigOptions(params.sessionId) };
   }
@@ -224,7 +255,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
    * that could drift from what the CLI actually accepts.
    */
   private describeConfigOptions(sessionId: string): SessionConfigOption[] {
-    const current = this.sessionModelById.get(sessionId) ?? this.config.model ?? "";
+    const current = this.sessionState(sessionId).model ?? this.config.model ?? "";
     return [
       {
         id: CURSOR_CONFIG_OPTION.MODEL,
@@ -238,44 +269,40 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
-    if (this.disconnectionInProgress) {
-      throw new Error("Disconnection in progress; prompt rejected.");
+    const textBlock = params.prompt?.find((contentBlock) => contentBlock.type === "text");
+    const text =
+      textBlock && "text" in textBlock && typeof textBlock.text === "string" ? textBlock.text : "";
+    const command = this.resolveCliCommand();
+    const baseArgs = this.resolveBaseArgs();
+    const session = this.sessions.get(params.sessionId);
+    const mode = session?.mode ?? this.config.mode ?? undefined;
+    const model = session?.model ?? this.config.model ?? undefined;
+    const resumeId = session?.cursorSessionId;
+    const args = [
+      CURSOR_CLI_ARG.PRINT,
+      CURSOR_CLI_ARG.OUTPUT_FORMAT,
+      CURSOR_CLI_ARG.STREAM_JSON,
+      ...this.trustArgs(),
+      ...(resumeId ? [CURSOR_CLI_ARG.RESUME, resumeId] : []),
+      ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
+      ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
+      ...baseArgs,
+      text,
+    ];
+    // runTracked owns admission and in-flight bookkeeping for every spawn kind.
+    const result = await this.runTracked(command, args);
+    const parsed = parseCursorNdjsonResult(result.stdout);
+    if (parsed === null) {
+      throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
     }
-    this.activePromptCount++;
-    try {
-      const textBlock = params.prompt?.find((contentBlock) => contentBlock.type === "text");
-      const text =
-        textBlock && "text" in textBlock && typeof textBlock.text === "string"
-          ? textBlock.text
-          : "";
-      const command = this.resolveCliCommand();
-      const baseArgs = this.resolveBaseArgs();
-      const mode = this.sessionModeById.get(params.sessionId) ?? this.config.mode ?? undefined;
-      const model = this.sessionModelById.get(params.sessionId) ?? this.config.model ?? undefined;
-      const args = [
-        CURSOR_CLI_ARG.PRINT,
-        CURSOR_CLI_ARG.OUTPUT_FORMAT,
-        CURSOR_CLI_ARG.STREAM_JSON,
-        ...this.trustArgs(),
-        ...(this.sessionId ? [CURSOR_CLI_ARG.RESUME, this.sessionId] : []),
-        ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),
-        ...(model ? [CURSOR_CLI_ARG.MODEL, model] : []),
-        ...baseArgs,
-        text,
-      ];
-      const result = await this.runTracked(command, args);
-      const parsed = parseCursorNdjsonResult(result.stdout);
-      if (parsed === null) {
-        throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
-      }
-      if (parsed.sessionId) this.sessionId = parsed.sessionId;
-      return {
-        stopReason: STOP_REASON.END_TURN,
-        ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
-      };
-    } finally {
-      this.activePromptCount--;
+    // Bind the chat the CLI reports back to this session, so later turns resume it.
+    if (parsed.sessionId) {
+      this.sessionState(params.sessionId).cursorSessionId = parsed.sessionId;
     }
+    return {
+      stopReason: STOP_REASON.END_TURN,
+      ...(parsed.result ? { content: [{ type: "text" as const, text: parsed.result }] } : {}),
+    };
   }
 
   async authenticate(_params: AuthenticateRequest): Promise<AuthenticateResponse> {

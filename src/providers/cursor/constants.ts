@@ -1,4 +1,4 @@
-import type { GenericFlagMap } from "../../cli/generic.options";
+import type { ProviderFlagMap } from "../../cli/generic.options";
 import { GENERIC_OPTION_KEY } from "../../cli/generic.options";
 import type { ENV_KEY } from "../../domain/env.keys";
 
@@ -18,6 +18,7 @@ export const CURSOR_CLI_ARG = {
   RESUME: "--resume",
   MODEL: "--model",
   MODE: "--mode",
+  SANDBOX: "--sandbox",
   WORKSPACE: "--workspace",
   TRUST: "--trust",
   VERSION: "--version",
@@ -55,11 +56,11 @@ export const CURSOR_UUID_PATTERN = /[0-9a-f-]{36}/;
 export const CURSOR_HEALTH_CHECK_PROMPT = "echo ok";
 
 /** Map generic option keys to Cursor CLI flag names. */
-export const CURSOR_GENERIC_FLAG_MAP: GenericFlagMap = {
+export const CURSOR_GENERIC_FLAG_MAP: ProviderFlagMap<typeof CURSOR_CLI_ARG> = {
   [GENERIC_OPTION_KEY.MODEL]: CURSOR_CLI_ARG.MODEL,
   [GENERIC_OPTION_KEY.OUTPUT_FORMAT]: CURSOR_CLI_ARG.OUTPUT_FORMAT,
   [GENERIC_OPTION_KEY.TRUST]: CURSOR_CLI_ARG.TRUST,
-  [GENERIC_OPTION_KEY.SANDBOX]: "--sandbox",
+  [GENERIC_OPTION_KEY.SANDBOX]: CURSOR_CLI_ARG.SANDBOX,
   [GENERIC_OPTION_KEY.WORKSPACE]: CURSOR_CLI_ARG.WORKSPACE,
   [GENERIC_OPTION_KEY.RESUME]: CURSOR_CLI_ARG.RESUME,
   [GENERIC_OPTION_KEY.PRINT]: CURSOR_CLI_ARG.PRINT,

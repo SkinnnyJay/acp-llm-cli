@@ -13,7 +13,7 @@ Be respectful and constructive. See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 3. **Set up locally:**
    - Node.js **20+**
    - `npm ci`
-   - `npm run verify` (lint, typecheck, build, test:coverage)
+   - `npm run verify` (lint, typecheck, build, test) — use `npm run verify:coverage` for the coverage gate
 
 ## Source layout and file naming
 

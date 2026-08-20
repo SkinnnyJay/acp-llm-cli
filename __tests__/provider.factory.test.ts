@@ -52,7 +52,7 @@ describe("ProviderFactory", () => {
   });
 
   it("getMetrics returns metrics after createRuntime when collectMetrics true", () => {
-    const factory = getDefaultFactory({ collectMetrics: true });
+    const factory = getDefaultFactory();
     factory.createRuntime(PROVIDER_IDS.CODEX_CLI_ID, {
       command: "codex",
       args: ["--experimental-acp"],

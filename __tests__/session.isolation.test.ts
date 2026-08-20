@@ -41,14 +41,12 @@ describe("Session persistence key isolation", () => {
 
     const claudePort = createMockPort("claude-session-1");
     const wrappedClaude = wrapAgentPortWithLifecycle(claudePort, {
-      sessionPersistence: persistence,
-      providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+      persistence: { store: persistence, providerId: PROVIDER_IDS.CLAUDE_CLI_ID },
     });
 
     const geminiPort = createMockPort("gemini-session-2");
     const wrappedGemini = wrapAgentPortWithLifecycle(geminiPort, {
-      sessionPersistence: persistence,
-      providerId: PROVIDER_IDS.GEMINI_CLI_ID,
+      persistence: { store: persistence, providerId: PROVIDER_IDS.GEMINI_CLI_ID },
     });
 
     await wrappedClaude.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
@@ -71,16 +69,20 @@ describe("Session persistence key isolation", () => {
 
     const port = createMockPort("ws-session");
     const wrapped = wrapAgentPortWithLifecycle(port, {
-      sessionPersistence: persistence,
-      providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
-      workspace: "/workspace/A",
+      persistence: {
+        store: persistence,
+        providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+        workspace: "/workspace/A",
+      },
     });
 
     const portB = createMockPort("ws-session-B");
     const wrappedB = wrapAgentPortWithLifecycle(portB, {
-      sessionPersistence: persistence,
-      providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
-      workspace: "/workspace/B",
+      persistence: {
+        store: persistence,
+        providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+        workspace: "/workspace/B",
+      },
     });
 
     await wrapped.newSession({ cwd: "/workspace/A", mcpServers: [] } as Parameters<
@@ -104,9 +106,7 @@ describe("createAcpCliHarnessRuntime sessionPersistence guard", () => {
     expect(() =>
       createAcpCliHarnessRuntime(
         { command: "claude-code-acp", args: [], env: {} },
-        {
-          sessionPersistence: createMemorySessionPersistence(),
-        }
+        { sessionPersistence: createMemorySessionPersistence() }
       )
     ).toThrow(ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED);
   });

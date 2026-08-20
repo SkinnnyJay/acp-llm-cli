@@ -140,4 +140,158 @@ describe("CursorAgentPort spawn contract", () => {
     expect(hangingKill).toHaveBeenCalled();
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
   });
+
+  it("routes a prompt to its own session, not the most recently created chat", async () => {
+    const UUID_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const UUID_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const chats = [UUID_A, UUID_B];
+    const promptArgs: string[][] = [];
+
+    const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
+      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+        return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
+      }
+      if (args.includes("hello")) {
+        promptArgs.push(args);
+        const ndjson = JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "ok",
+          session_id: UUID_A,
+        });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    const b = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    expect(a.sessionId).toBe(UUID_A);
+    expect(b.sessionId).toBe(UUID_B);
+
+    await port.setSessionMode?.({ sessionId: a.sessionId, modeId: "read-only" });
+    await port.prompt({
+      sessionId: a.sessionId,
+      prompt: [{ type: "text", text: "hello" }],
+    });
+
+    const args = promptArgs[0] ?? [];
+    expect(args[args.indexOf(CURSOR_CLI_ARG.RESUME) + 1]).toBe(UUID_A);
+    expect(args[args.indexOf(CURSOR_CLI_ARG.MODE) + 1]).toBe("ask");
+  });
+
+  it("does not leak one session's mode into another session's argv", async () => {
+    const UUID_A = "11111111-1111-4111-8111-111111111111";
+    const UUID_B = "22222222-2222-4222-8222-222222222222";
+    const chats = [UUID_A, UUID_B];
+    const promptArgs: string[][] = [];
+
+    const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
+      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+        return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
+      }
+      if (args.includes("hi")) {
+        promptArgs.push(args);
+        const ndjson = JSON.stringify({ type: "result", subtype: "success", result: "ok" });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+    const b = await port.newSession({ cwd: "/tmp", mcpServers: [] });
+
+    await port.setSessionMode?.({ sessionId: a.sessionId, modeId: "read-only" });
+    await port.prompt({ sessionId: b.sessionId, prompt: [{ type: "text", text: "hi" }] });
+
+    const args = promptArgs[0] ?? [];
+    expect(args[args.indexOf(CURSOR_CLI_ARG.RESUME) + 1]).toBe(UUID_B);
+    expect(args).not.toContain(CURSOR_CLI_ARG.MODE);
+  });
+
+  it("is idempotent when disconnect is called concurrently", async () => {
+    const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+    const states: string[] = [];
+    port.on("state", (s) => states.push(s));
+
+    await Promise.all([port.disconnect(), port.disconnect()]);
+
+    expect(states.filter((s) => s === CONNECTION_STATUS.DISCONNECTED)).toHaveLength(1);
+    expect(port.connectionStatus).toBe(CONNECTION_STATUS.DISCONNECTED);
+  });
+
+  it("rejects newSession issued while a disconnect is in progress", async () => {
+    const hanging = createFakeChild({ hang: true });
+    const spawnFn = vi.fn().mockReturnValue(hanging.child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    const inflight = port
+      .prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] })
+      .catch((err: Error) => err);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const disconnecting = port.disconnect();
+    await expect(port.newSession({ cwd: "/tmp", mcpServers: [] })).rejects.toThrow(
+      ERROR_MESSAGE.CURSOR_DISCONNECT_IN_PROGRESS
+    );
+
+    await disconnecting;
+    await inflight;
+    expect(hanging.child.kill).toHaveBeenCalled();
+  });
+
+  it("allows connect again after disconnect so restart works", async () => {
+    const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
+    const port = new CursorAgentPort(
+      { command: "cursor-agent", args: [], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    await port.connect();
+    await port.disconnect();
+    await port.connect();
+
+    expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+  });
+
+  it("health-checks the same binary and args a prompt will use", async () => {
+    const calls: { command: string; args: string[] }[] = [];
+    const spawnFn = vi.fn().mockImplementation((command: string, args: string[]) => {
+      calls.push({ command, args });
+      if (args.includes("hi")) {
+        const ndjson = JSON.stringify({ type: "result", subtype: "success", result: "ok" });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "/custom/path/cursor-agent", args: ["--flag"], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    await port.connect();
+    await port.prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] });
+
+    expect(calls[0]?.command).toBe("/custom/path/cursor-agent");
+    expect(calls[0]?.args).toContain("--flag");
+    expect(calls.at(-1)?.command).toBe("/custom/path/cursor-agent");
+  });
 });

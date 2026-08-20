@@ -52,8 +52,19 @@ export type GenericOptionKey = (typeof GENERIC_OPTION_KEY)[keyof typeof GENERIC_
 export type GenericFlagMap = Partial<Record<GenericOptionKey, string>>;
 
 /**
- * Default values for generic options when not set.
- * Used by arg builder to decide whether to emit a flag (e.g. stream: true => emit --stream).
+ * A provider's flag map, constrained to flags that provider actually declares. Assignable to
+ * GenericFlagMap, so nothing downstream changes - it just stops an undeclared flag string from
+ * being invented at the map.
+ */
+export type ProviderFlagMap<TFlags extends Record<string, string>> = Partial<
+  Record<GenericOptionKey, TFlags[keyof TFlags]>
+>;
+
+/**
+ * @deprecated Unread and misleading. The arg builder does not consult this, and no schema applies
+ * these values, so `stream: true` here is a default that is never applied - `--stream` is emitted
+ * only for an explicit `stream: true` on the options passed to buildGenericArgs. Scheduled for
+ * removal in the next major, together with the `*_MODEL_ID_LIST` exports.
  */
 export const GENERIC_OPTION_DEFAULTS: GenericLlmCliOptions = {
   stream: true,

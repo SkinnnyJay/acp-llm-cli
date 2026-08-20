@@ -1,5 +1,6 @@
 import { EventEmitter } from "eventemitter3";
 import { vi } from "vitest";
+import type { ConnectionStatus } from "../../src/domain/connection.status";
 import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { IAgentPort } from "../../src/runtime/agent.port";
 
@@ -11,7 +12,7 @@ export interface MockAgentPortOptions {
 /** Shared mock IAgentPort for decorator / factory composition tests. */
 export function createMockAgentPort(options: MockAgentPortOptions = {}): IAgentPort {
   const emitter = new EventEmitter();
-  let status = CONNECTION_STATUS.DISCONNECTED;
+  let status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
   const sessionId = options.sessionId ?? "sess-1";
 
   const port = {
