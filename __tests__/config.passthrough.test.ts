@@ -169,7 +169,12 @@ describe("provider config passthrough", () => {
     } as unknown as z.ZodType<BaseCliConfig, z.ZodTypeDef, unknown>;
 
     const port = createStandardAcpRuntime(
-      { command: "claude-agent-acp", args: [], env: {}, model: "claude-opus-4.5" } as unknown as BaseCliConfig,
+      {
+        command: "claude-agent-acp",
+        args: [],
+        env: {},
+        model: "claude-opus-4.5",
+      } as unknown as BaseCliConfig,
       { command: "claude-agent-acp", args: [] },
       { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
       capturingSchema
@@ -178,5 +183,4 @@ describe("provider config passthrough", () => {
     expect(port).toBeDefined();
     expect(captured[0]?.model).toBe("claude-opus-4.5");
   });
-
 });
