@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     command: "claude-agent-acp",
     args: [],
     // `model` labels OpenAI-style stream envelopes. ACP agents select the model over the
-    // protocol (setSessionModel, below) - this package does not invent CLI flags for the binary.
+    // protocol (setSessionConfigOption, below) - this package does not invent CLI flags for the binary.
     model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
   });
 
@@ -23,9 +23,12 @@ async function main(): Promise<void> {
     await client.port.initialize();
     const session = await client.port.newSession({ cwd: process.cwd(), mcpServers: [] });
 
-    await client.port.setSessionModel?.({
+    // ACP 1.x replaced session/set_model with the general session/set_config_option,
+    // where the model selector is an option carrying `category: "model"`.
+    await client.port.setSessionConfigOption?.({
       sessionId: session.sessionId,
-      modelId: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
+      configId: "model",
+      value: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
     });
 
     const result = await client.port.prompt({
