@@ -27,6 +27,7 @@ Curated exports from the package root. Prefer this surface for applications.
 | `ISessionPersistence` / `PersistedSession` | type | Session save/restore |
 | `createAcpAgentPort` / `ACPClientOptions` | fn/type | Low-level ACP client over a connection |
 | `baseCliConfigSchema` / `BaseCliConfig` | schema/type | Shared CLI config |
+| `ConfigSchema` / `ConfigSchemaResult` / `ConfigSchemaError` / `ConfigSchemaIssue` | type | The `parse`/`safeParse` surface an adapter config schema must provide, spelled structurally so it holds across both supported zod majors |
 
 ## Streaming
 
@@ -56,10 +57,15 @@ Provider `model` config accepts the provider enum **or any string** (open escape
 | `buildGenericArgs` / `genericLlmCliOptionsSchema` | fn/schema | Generic flag builder |
 | `extractHelp` / `HELP_FLAG` | fn/const | `--help` extraction |
 | `ICliSpec` / `GetHelpOptions` | type | Adapter CLI surface |
+| `CliArgsInput` | type | What `ICliSpec.buildArgs` accepts: the provider config plus generic options, with `args`/`env` optional |
 
 ## Extension API (`@simpill/acp-llm-cli/runtime`)
 
 Use for custom adapters and decorators: `StreamAgentPort`, `LifecycleAgentPort`, `StdioConnection`, `StdioConnectionFactory`, envelope mapper, session persistence, and the shared ACP runtime builders above.
+
+## Peer dependencies
+
+`zod` (`^3.25.0 || ^4.0.0`) and `eventemitter3` (`^5.0.1`) are peers. Both zod majors are typechecked and tested in CI, so either satisfies the range.
 
 ## Safety defaults (0.2.0+)
 

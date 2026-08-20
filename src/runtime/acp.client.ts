@@ -1,11 +1,27 @@
+import type {
+  AuthenticateRequest,
+  AuthenticateResponse,
+  InitializeRequest,
+  InitializeResponse,
+  NewSessionRequest,
+  NewSessionResponse,
+  PromptRequest,
+  PromptResponse,
+  SessionNotification,
+  SetSessionConfigOptionRequest,
+  SetSessionConfigOptionResponse,
+  SetSessionModeRequest,
+  SetSessionModeResponse,
+} from "@agentclientprotocol/sdk";
 import {
   type Client,
   type ClientCapabilities,
   ClientSideConnection,
   type CreateTerminalRequest,
   type CreateTerminalResponse,
-  type KillTerminalCommandRequest,
-  type KillTerminalCommandResponse,
+  type KillTerminalRequest,
+  type KillTerminalResponse,
+  PROTOCOL_VERSION,
   type ReadTextFileRequest,
   type ReadTextFileResponse,
   type ReleaseTerminalRequest,
@@ -19,22 +35,6 @@ import {
   type WriteTextFileRequest,
   type WriteTextFileResponse,
 } from "@agentclientprotocol/sdk";
-import type {
-  AuthenticateRequest,
-  AuthenticateResponse,
-  InitializeRequest,
-  InitializeResponse,
-  NewSessionRequest,
-  NewSessionResponse,
-  PromptRequest,
-  PromptResponse,
-  SessionNotification,
-  SetSessionModeRequest,
-  SetSessionModeResponse,
-  SetSessionModelRequest,
-  SetSessionModelResponse,
-} from "@agentclientprotocol/sdk";
-import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../domain/agent.port.events";
 import { CONNECTION_EVENT } from "../domain/connection.events";
@@ -55,10 +55,7 @@ export interface IACPConnectionLike {
   on(event: typeof CONNECTION_EVENT.ERROR, handler: (error: Error) => void): void;
   on(
     event: typeof CONNECTION_EVENT.EXIT,
-    handler: (info: {
-      code: number | null;
-      signal: string | null;
-    }) => void
+    handler: (info: { code: number | null; signal: string | null }) => void
   ): void;
 }
 
@@ -135,8 +132,10 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     return this.requireConnection().setSessionMode(params);
   }
 
-  async setSessionModel(params: SetSessionModelRequest): Promise<SetSessionModelResponse> {
-    return this.requireConnection().unstable_setSessionModel(params);
+  async setSessionConfigOption(
+    params: SetSessionConfigOptionRequest
+  ): Promise<SetSessionConfigOptionResponse> {
+    return this.requireConnection().setSessionConfigOption(params);
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -178,7 +177,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     return this.requireToolHost("terminal").releaseTerminal(params);
   }
 
-  async killTerminal(params: KillTerminalCommandRequest): Promise<KillTerminalCommandResponse> {
+  async killTerminal(params: KillTerminalRequest): Promise<KillTerminalResponse> {
     return this.requireToolHost("terminal").killTerminal(params);
   }
 

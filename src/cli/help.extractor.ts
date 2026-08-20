@@ -1,5 +1,5 @@
-import { spawn as nodeSpawn } from "node:child_process";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn as nodeSpawn } from "node:child_process";
 import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { NODE_EVENT } from "../domain/node.events";

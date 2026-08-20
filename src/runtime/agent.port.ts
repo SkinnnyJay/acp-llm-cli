@@ -9,10 +9,10 @@ import type {
   PromptResponse,
   RequestPermissionRequest,
   SessionNotification,
+  SetSessionConfigOptionRequest,
+  SetSessionConfigOptionResponse,
   SetSessionModeRequest,
   SetSessionModeResponse,
-  SetSessionModelRequest,
-  SetSessionModelResponse,
 } from "@agentclientprotocol/sdk";
 import type { EventEmitter } from "eventemitter3";
 import type { ConnectionStatus } from "../domain/connection.status";
@@ -50,7 +50,9 @@ export interface IAgentPort extends EventEmitter<AgentPortEvents> {
   authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse>;
   sessionUpdate(params: SessionNotification): Promise<void>;
   setSessionMode?(params: SetSessionModeRequest): Promise<SetSessionModeResponse>;
-  setSessionModel?(params: SetSessionModelRequest): Promise<SetSessionModelResponse>;
+  setSessionConfigOption?(
+    params: SetSessionConfigOptionRequest
+  ): Promise<SetSessionConfigOptionResponse>;
   /** Optional: stream prompt with dual envelope output (OpenAI + native). */
   streamPrompt?(
     params: PromptRequest,

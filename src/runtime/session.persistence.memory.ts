@@ -1,5 +1,4 @@
-import type { ISessionPersistence } from "../domain/session.persistence";
-import type { PersistedSession } from "../domain/session.persistence";
+import type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
 
 /**
  * In-memory session persistence. Useful for tests or single-process use.

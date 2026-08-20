@@ -35,9 +35,7 @@ export function getDefaultRegistry(): HarnessRegistry {
  * Use createRuntime(id, config, options?) for Zod-validated config and clear errors.
  * Throws if called again with a different collectMetrics value after first init.
  */
-export function getDefaultFactory(options?: {
-  collectMetrics?: boolean;
-}): IProviderFactory {
+export function getDefaultFactory(options?: { collectMetrics?: boolean }): IProviderFactory {
   const collectMetrics = options?.collectMetrics ?? true;
   if (!defaultFactory) {
     defaultFactoryCollectMetrics = collectMetrics;

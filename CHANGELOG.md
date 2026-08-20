@@ -7,12 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `peer-zod` CI matrix typechecks and tests against both ends of the declared zod peer range.
+- `ConfigSchema`, `ConfigSchemaError`, `ConfigSchemaIssue`, and `ConfigSchemaResult` are exported.
+- `CliArgsInput` is exported and describes what `ICliSpec.buildArgs` accepts.
+
 ### Changed
 
-- CI: `verify` is lint/typecheck/build/test; coverage + pack smoke run on Node 20 only.
+- **Breaking:** `IAgentPort.setSessionModel` is now `setSessionConfigOption`, following
+  `@agentclientprotocol/sdk` 1.x, which replaced the removed `session/set_model` with the general
+  `session/set_config_option`. It takes `configId` + `value` and returns the full option set.
+- **Breaking:** minimum Node is 22. Node 20 reached EOL on 2026-04-30.
+- `@agentclientprotocol/sdk` 0.12 -> 1.3. `KillTerminalCommandRequest`/`Response` are now
+  `KillTerminalRequest`/`Response`.
+- The declared zod peer range is now honoured: the package compiles against zod 3 and 4. It had
+  only ever compiled against 3, and the test suite could not catch it because vitest does not
+  typecheck.
+- `ICliSpec.buildArgs` accepts generic options and treats `args`/`env` as optional, so a spec
+  reached through the registry can build the arguments it documents.
+- Biome 1.9 -> 2.5, TypeScript pinned at 5.9 pending tsup declaration-emit support for 6/7,
+  and `@types/node` tracks the engines floor rather than latest.
+- CI: `verify` is lint/typecheck/build/test; coverage + pack smoke run on Node 22 only.
 - StreamAgentPort owns streaming only; restart/open/close remain on LifecycleAgentPort.
 - Validation failures log at `warn` (not `error`); shared test helpers for fake children / mock ports.
 - Stream queue uses O(1) read-index dequeue; OpenAI chunk ids/timestamps reused per stream.
+
+### Fixed
+
+- `tsconfig` declares `types: ["node"]`; without it TypeScript 6 and 7 drop the Node types entirely.
 
 ## [0.2.0] - 2026-07-30
 

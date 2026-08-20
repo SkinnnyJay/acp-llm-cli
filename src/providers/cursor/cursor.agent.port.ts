@@ -1,4 +1,3 @@
-import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type {
   AuthenticateRequest,
   AuthenticateResponse,
@@ -8,16 +7,18 @@ import type {
   NewSessionResponse,
   PromptRequest,
   PromptResponse,
+  SessionConfigOption,
   SessionNotification,
+  SetSessionConfigOptionRequest,
+  SetSessionConfigOptionResponse,
   SetSessionModeRequest,
   SetSessionModeResponse,
-  SetSessionModelRequest,
-  SetSessionModelResponse,
 } from "@agentclientprotocol/sdk";
+import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../../domain/agent.port.events";
-import { CONNECTION_STATUS } from "../../domain/connection.status";
 import type { ConnectionStatus } from "../../domain/connection.status";
+import { CONNECTION_STATUS } from "../../domain/connection.status";
 import { DEFAULT_COMMANDS } from "../../domain/default.commands";
 import { ENV_KEY } from "../../domain/env.keys";
 import { ERROR_MESSAGE } from "../../domain/error.messages";
@@ -27,7 +28,12 @@ import { STOP_REASON } from "../../domain/stop.reason";
 import { TIMEOUT } from "../../domain/timeouts";
 import type { AgentPortCapabilities, AgentPortEvents, IAgentPort } from "../../runtime/agent.port";
 import { getEnvString, isDebugEnabled } from "../../runtime/env.reader";
-import { CURSOR_CLI_ARG, CURSOR_HEALTH_CHECK_PROMPT, CURSOR_UUID_PATTERN } from "./constants";
+import {
+  CURSOR_CLI_ARG,
+  CURSOR_CONFIG_OPTION,
+  CURSOR_HEALTH_CHECK_PROMPT,
+  CURSOR_UUID_PATTERN,
+} from "./constants";
 import { resolveCursorMode } from "./cursor.mode.utils";
 import { parseCursorNdjsonResult } from "./cursor.ndjson.utils";
 import type { CursorSpawnFn } from "./cursor.spawn.utils";
@@ -49,7 +55,7 @@ export interface CursorAgentPortOptions {
 
 /**
  * IAgentPort for Cursor CLI: spawns process per prompt, parses NDJSON result.
- * Supports setSessionMode/setSessionModel, runCommand timeout, and graceful disconnect.
+ * Supports setSessionMode/setSessionConfigOption, runCommand timeout, and graceful disconnect.
  */
 export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IAgentPort {
   readonly capabilities = CURSOR_CAPABILITIES;
@@ -202,9 +208,33 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     return {};
   }
 
-  async setSessionModel(params: SetSessionModelRequest): Promise<SetSessionModelResponse> {
-    this.sessionModelById.set(params.sessionId, params.modelId);
-    return {};
+  async setSessionConfigOption(
+    params: SetSessionConfigOptionRequest
+  ): Promise<SetSessionConfigOptionResponse> {
+    if (params.configId === CURSOR_CONFIG_OPTION.MODEL && typeof params.value === "string") {
+      this.sessionModelById.set(params.sessionId, params.value);
+    }
+    return { configOptions: this.describeConfigOptions(params.sessionId) };
+  }
+
+  /**
+   * Cursor exposes one session config option: the model. `cursor-agent` has no
+   * command that enumerates models for a session, so the selector reports the
+   * active value as its only known option rather than inventing a catalogue
+   * that could drift from what the CLI actually accepts.
+   */
+  private describeConfigOptions(sessionId: string): SessionConfigOption[] {
+    const current = this.sessionModelById.get(sessionId) ?? this.config.model ?? "";
+    return [
+      {
+        id: CURSOR_CONFIG_OPTION.MODEL,
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: current,
+        options: current ? [{ value: current, name: current }] : [],
+      },
+    ];
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {

@@ -1,5 +1,5 @@
-import { getLogger } from "@simpill/logger.utils";
 import type { LogMetadata } from "@simpill/logger.utils";
+import { getLogger } from "@simpill/logger.utils";
 import type { ProcessEnv } from "../domain/process.env";
 import { isDebugEnabled } from "./env.reader";
 

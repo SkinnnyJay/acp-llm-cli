@@ -6,8 +6,8 @@ import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { claudeCliSpec } from "./cli.definition";
 import { CLAUDE_CONFIG_KEYS } from "./constants";
-import { claudeConfigSchema } from "./schema";
 import type { ClaudeConfig } from "./schema";
+import { claudeConfigSchema } from "./schema";
 
 const createRuntime = (
   config: ClaudeConfig,
