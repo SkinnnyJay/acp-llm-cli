@@ -86,6 +86,64 @@ describe("createStreamPromptQueue", () => {
     expect(out[0]).toEqual(one);
   });
 
+  it("drains updates queued before close when the consumer starts late", async () => {
+    const q = createStreamPromptQueue();
+    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+
+    q.push(a);
+    q.push(b);
+    q.close();
+
+    const out: unknown[] = [];
+    for await (const u of q.consume()) {
+      out.push(u);
+    }
+
+    expect(out).toEqual([a, b]);
+  });
+
+  it("delivers an update pushed while the consumer was busy before closing", async () => {
+    const q = createStreamPromptQueue();
+    const a = { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } };
+    const b = { sessionId: "s1", update: { sessionUpdate: "tool_call" as const } };
+
+    const out: unknown[] = [];
+    const consumer = (async () => {
+      for await (const u of q.consume()) {
+        out.push(u);
+        // Simulates a consumer slower than the producer: while it is in here there is no
+        // waiter registered, so anything pushed lands in the buffer with nobody parked on it.
+        await new Promise((r) => setTimeout(r, 5));
+      }
+    })();
+
+    q.push(a);
+    await new Promise((r) => setTimeout(r, 0));
+    q.push(b);
+    q.close();
+
+    await consumer;
+
+    expect(out).toEqual([a, b]);
+  });
+
+  it("does not buffer updates pushed after an error", async () => {
+    const q = createStreamPromptQueue();
+    const out: unknown[] = [];
+    const consumePromise = (async () => {
+      for await (const u of q.consume()) {
+        out.push(u);
+      }
+    })();
+
+    q.pushError(new Error("stream error"));
+    q.push({ sessionId: "s1", update: { sessionUpdate: "agent_message_chunk" as const } });
+
+    await expect(consumePromise).rejects.toThrow("stream error");
+    expect(out).toHaveLength(0);
+  });
+
   it("close after pushError is a no-op for done state", async () => {
     const q = createStreamPromptQueue();
     const consumePromise = (async () => {
