@@ -1,8 +1,7 @@
-import type { z } from "zod";
 import type { ICliSpec } from "../cli/types";
 import type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
 import type { IAgentPort } from "./agent.port";
-import type { BaseCliConfig } from "./config";
+import type { BaseCliConfig, ConfigSchema } from "./config";
 
 /**
  * Harness adapter: creates an IAgentPort (HarnessRuntime) from validated config.
@@ -11,7 +10,7 @@ import type { BaseCliConfig } from "./config";
 export interface IHarnessAdapter<TConfig extends BaseCliConfig = BaseCliConfig> {
   readonly id: string;
   readonly name: string;
-  readonly configSchema: z.ZodType<TConfig, z.ZodTypeDef, unknown>;
+  readonly configSchema: ConfigSchema<TConfig>;
   createHarness(config: TConfig, runtimeOptions?: AcpSharedRuntimeOptions): IAgentPort;
   /** Optional: CLI commands/args discovery and building. */
   readonly cliSpec?: ICliSpec<TConfig>;

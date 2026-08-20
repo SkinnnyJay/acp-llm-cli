@@ -35,7 +35,13 @@ export { ENVELOPE_MODE } from "./domain/envelope.mode";
 export type { EnvelopeMode } from "./domain/envelope.mode";
 export { PORT_CAPABILITY } from "./domain/port.capabilities";
 export type { PortCapabilityName } from "./domain/port.capabilities";
-export type { BaseCliConfig } from "./runtime/config";
+export type {
+  BaseCliConfig,
+  ConfigSchema,
+  ConfigSchemaError,
+  ConfigSchemaIssue,
+  ConfigSchemaResult,
+} from "./runtime/config";
 export type { IConnection } from "./runtime/connection.interface";
 export type { ConnectionStatus } from "./domain/connection.status";
 export { PROVIDER_IDS } from "./domain/provider.ids";

@@ -23,7 +23,13 @@ export { sessionUpdateToEnvelopes, createOpenAIFinishEnvelope } from "./envelope
 
 // Config types and schema
 export { baseCliConfigSchema } from "./config";
-export type { BaseCliConfig } from "./config";
+export type {
+  BaseCliConfig,
+  ConfigSchema,
+  ConfigSchemaError,
+  ConfigSchemaIssue,
+  ConfigSchemaResult,
+} from "./config";
 export { resolveBaseConfig } from "./config.resolve";
 
 // Provider factory stack
