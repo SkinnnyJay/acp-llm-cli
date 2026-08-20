@@ -13,7 +13,6 @@ import { HarnessRegistry as RegistryClass } from "./runtime/registry";
 
 let defaultRegistry: HarnessRegistry | null = null;
 let defaultFactory: IProviderFactory | null = null;
-let defaultFactoryCollectMetrics: boolean | null = null;
 let defaultClientFactory: IProviderClientFactory | null = null;
 
 /**
@@ -33,25 +32,17 @@ export function getDefaultRegistry(): HarnessRegistry {
 /**
  * Creates a ProviderFactory with default registry, metrics, and logging.
  * Use createRuntime(id, config, options?) for Zod-validated config and clear errors.
- * Throws if called again with a different collectMetrics value after first init.
+ *
+ * Metrics are always collected on the shared factory. To opt out, construct your own:
+ * `new ProviderFactory({ registry: getDefaultRegistry(), collectMetrics: false })` - both are
+ * public exports, so no option is needed here.
  */
-export function getDefaultFactory(options?: {
-  collectMetrics?: boolean;
-}): IProviderFactory {
-  const collectMetrics = options?.collectMetrics ?? true;
+export function getDefaultFactory(): IProviderFactory {
   if (!defaultFactory) {
-    defaultFactoryCollectMetrics = collectMetrics;
     defaultFactory = new ProviderFactory({
       registry: getDefaultRegistry(),
-      collectMetrics,
+      collectMetrics: true,
     });
-    return defaultFactory;
-  }
-  if (defaultFactoryCollectMetrics !== collectMetrics) {
-    throw new Error(
-      `getDefaultFactory already initialized with collectMetrics=${String(defaultFactoryCollectMetrics)}; ` +
-        `cannot reinitialize with collectMetrics=${String(collectMetrics)}`
-    );
   }
   return defaultFactory;
 }
@@ -82,7 +73,13 @@ export function createHarness(
     throw new Error(VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id));
   }
   const parsed = adapter.configSchema.parse(config);
-  return adapter.createHarness(parsed, runtimeOptions);
+  // Default providerId the same way ProviderFactory.createRuntime does. Without it, a custom
+  // registry whose adapter does not self-default would throw
+  // SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED on the documented custom-registry path.
+  return adapter.createHarness(parsed, {
+    ...runtimeOptions,
+    providerId: runtimeOptions?.providerId ?? id,
+  });
 }
 
 export function getAdapter(
@@ -96,6 +93,5 @@ export function getAdapter(
 export function resetDefaultFactoriesForTests(): void {
   defaultRegistry = null;
   defaultFactory = null;
-  defaultFactoryCollectMetrics = null;
   defaultClientFactory = null;
 }

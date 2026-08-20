@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createHarness, getAdapter, getDefaultRegistry } from "../src/bootstrap";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
+import { createAcpCliHarnessRuntime } from "../src/providers/acp.shared";
+import { baseCliConfigSchema } from "../src/runtime/config";
+import { createCliHarnessAdapter } from "../src/runtime/create.cli.harness.adapter";
+import { HarnessRegistry } from "../src/runtime/registry";
+import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
+import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 
 describe("bootstrap", () => {
   it("getDefaultRegistry returns registry with adapters", () => {
@@ -40,4 +47,51 @@ describe("bootstrap", () => {
     const registry = getDefaultRegistry();
     expect(() => createHarness(registry, "unknown-id", {})).toThrow(/Unknown provider id/);
   });
+
+  it("defaults providerId so a custom registry can use session persistence", () => {
+    const registry = new HarnessRegistry();
+    registry.register(
+      createCliHarnessAdapter({
+        id: "custom-provider",
+        name: "Custom",
+        configSchema: baseCliConfigSchema,
+        // Deliberately does NOT self-default providerId, unlike the bundled adapters.
+        createRuntime: (config, runtimeOptions) =>
+          createAcpCliHarnessRuntime(config, runtimeOptions, {
+            create: () => createFakeAcpConnection() as never,
+          }),
+      })
+    );
+
+    expect(() =>
+      createHarness(
+        registry,
+        "custom-provider",
+        { command: "cmd", args: [] },
+        { sessionPersistence: createMemorySessionPersistence() }
+      )
+    ).not.toThrow();
+  });
+
+  it("lets an explicit providerId win over the registry id", () => {
+    const seen: Array<string | undefined> = [];
+    const registry = new HarnessRegistry();
+    registry.register(
+      createCliHarnessAdapter({
+        id: "custom-provider",
+        name: "Custom",
+        configSchema: baseCliConfigSchema,
+        createRuntime: (_config, runtimeOptions) => {
+          seen.push(runtimeOptions?.providerId);
+          return createMockAgentPort();
+        },
+      })
+    );
+
+    createHarness(registry, "custom-provider", { command: "cmd", args: [] });
+    createHarness(registry, "custom-provider", { command: "cmd", args: [] }, { providerId: "mine" });
+
+    expect(seen).toEqual(["custom-provider", "mine"]);
+  });
+
 });
