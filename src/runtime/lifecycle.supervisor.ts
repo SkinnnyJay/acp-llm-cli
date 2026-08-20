@@ -78,6 +78,9 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     inner.on("error", (error: Error) => this.emit("error", error));
   }
 
+  /** Notifications already written, so a second trigger for one is a no-op. */
+  private readonly persistedNotifications = new WeakSet<SessionNotification>();
+
   /** Single write path: every persisted record is assembled here. */
   private async persist(sessionId: string, cwd: string | undefined): Promise<void> {
     const persistence = this.persistence;
@@ -91,9 +94,20 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     });
   }
 
+  /**
+   * Two triggers reach this for the same notification: `sessionUpdate()` above, and
+   * the inner `sessionUpdate` listener firing when that call reaches an inner port
+   * which re-emits - which the real ACP client does. Neither can be dropped: the
+   * listener is the only path for agent-initiated notifications, since the SDK holds
+   * the innermost client and calls it directly, while the method is the only path for
+   * an inner port that does not emit. So both stay, and the notification itself
+   * carries the record of having been persisted, keeping one write per notification.
+   */
   private async maybePersistFromNotification(update: SessionNotification): Promise<void> {
+    if (this.persistedNotifications.has(update)) return;
     const sessionId = notificationSessionId(update, { vendorOnly: true });
     if (!sessionId) return;
+    this.persistedNotifications.add(update);
     await this.persist(sessionId, this.lastSessionCwd);
   }
 
