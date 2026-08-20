@@ -11,11 +11,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ENV_KEY } from "../src/domain/env.keys";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
 const MODELS_DIR = join(ROOT, "src", "domain", "models");
-const DRY_RUN = process.env.ACP_LLM_CLI_MODELS_DRY_RUN === "1";
+const DRY_RUN = process.env[ENV_KEY.ACP_LLM_CLI_MODELS_DRY_RUN] === "1";
 
 function safeKey(id: string): string {
   return id.replace(/[-.]/g, "_").replace(/\W/g, "_").toUpperCase() || "MODEL";

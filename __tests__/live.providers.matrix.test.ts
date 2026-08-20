@@ -12,11 +12,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COMMANDS } from "../src/domain/default.commands.js";
+import { ENV_KEY } from "../src/domain/env.keys.js";
 import { PROVIDER_IDS } from "../src/domain/provider.ids.js";
 import { getDefaultFactory } from "../src/index.js";
 
-const LIVE = process.env.ACP_LLM_CLI_LIVE === "1";
-const FILTER = process.env.ACP_LLM_CLI_PROVIDER;
+const LIVE = process.env[ENV_KEY.ACP_LLM_CLI_LIVE] === "1";
+const FILTER = process.env[ENV_KEY.ACP_LLM_CLI_PROVIDER];
 
 type Case = {
   id: string;
@@ -56,6 +57,14 @@ const CASES: Case[] = [
     mode: "cursor-print",
   },
 ].filter((c) => !FILTER || FILTER === c.id);
+
+// A filter that matches nothing would otherwise let a deliberate live run report green having
+// contacted no CLI at all.
+if (LIVE && CASES.length === 0) {
+  throw new Error(
+    `${ENV_KEY.ACP_LLM_CLI_PROVIDER}="${FILTER}" matched no provider; expected one of: claude, codex, gemini, cursor`
+  );
+}
 
 describe.skipIf(!LIVE)("live provider matrix", () => {
   it.each(CASES)(

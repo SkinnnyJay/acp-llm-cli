@@ -52,6 +52,15 @@ export type GenericOptionKey = (typeof GENERIC_OPTION_KEY)[keyof typeof GENERIC_
 export type GenericFlagMap = Partial<Record<GenericOptionKey, string>>;
 
 /**
+ * A provider's flag map, constrained to flags that provider actually declares. Assignable to
+ * GenericFlagMap, so nothing downstream changes - it just stops an undeclared flag string from
+ * being invented at the map.
+ */
+export type ProviderFlagMap<TFlags extends Record<string, string>> = Partial<
+  Record<GenericOptionKey, TFlags[keyof TFlags]>
+>;
+
+/**
  * Default values for generic options when not set.
  * Used by arg builder to decide whether to emit a flag (e.g. stream: true => emit --stream).
  */

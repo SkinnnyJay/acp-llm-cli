@@ -1,4 +1,4 @@
-import type { GenericFlagMap } from "../../cli/generic.options";
+import type { ProviderFlagMap } from "../../cli/generic.options";
 import { GENERIC_OPTION_KEY } from "../../cli/generic.options";
 import type { ENV_KEY } from "../../domain/env.keys";
 
@@ -21,7 +21,7 @@ export const CODEX_CLI_ARG = {
 } as const;
 
 /** Map generic option keys to Codex CLI flag names. */
-export const CODEX_GENERIC_FLAG_MAP: GenericFlagMap = {
+export const CODEX_GENERIC_FLAG_MAP: ProviderFlagMap<typeof CODEX_CLI_ARG> = {
   [GENERIC_OPTION_KEY.MODEL]: CODEX_CLI_ARG.MODEL,
   [GENERIC_OPTION_KEY.SANDBOX]: CODEX_CLI_ARG.SANDBOX,
   [GENERIC_OPTION_KEY.VERBOSE]: CODEX_CLI_ARG.VERBOSE,

@@ -1,4 +1,4 @@
-import type { GenericFlagMap } from "../../cli/generic.options";
+import type { ProviderFlagMap } from "../../cli/generic.options";
 import { GENERIC_OPTION_KEY } from "../../cli/generic.options";
 import type { ENV_KEY } from "../../domain/env.keys";
 
@@ -20,7 +20,7 @@ export const GEMINI_CLI_ARG = {
 } as const;
 
 /** Map generic option keys to Gemini CLI flag names. */
-export const GEMINI_GENERIC_FLAG_MAP: GenericFlagMap = {
+export const GEMINI_GENERIC_FLAG_MAP: ProviderFlagMap<typeof GEMINI_CLI_ARG> = {
   [GENERIC_OPTION_KEY.MODEL]: GEMINI_CLI_ARG.MODEL,
   [GENERIC_OPTION_KEY.OUTPUT_FORMAT]: GEMINI_CLI_ARG.OUTPUT_FORMAT,
   [GENERIC_OPTION_KEY.VERBOSE]: GEMINI_CLI_ARG.VERBOSE,
