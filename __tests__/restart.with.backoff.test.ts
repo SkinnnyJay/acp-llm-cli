@@ -134,3 +134,21 @@ describe("restartWithBackoff actually waits between attempts", () => {
     }
   });
 });
+
+describe("restartWithBackoff non-Error rejections", () => {
+  it("wraps a non-Error rejection so callers always receive an Error", async () => {
+    // A CLI wrapper rejecting with a string is legal JS and reaches this code
+    // as-is; the port contract promises an Error, so it must be wrapped.
+    const port = {
+      restart: vi.fn().mockRejectedValue("cursor exited badly"),
+    } as unknown as IAgentPort;
+
+    await expect(
+      restartWithBackoff(port, { maxRetries: 1, backoffBaseMs: 1, backoffCapMs: 1 })
+    ).rejects.toThrow("cursor exited badly");
+
+    await expect(
+      restartWithBackoff(port, { maxRetries: 1, backoffBaseMs: 1, backoffCapMs: 1 })
+    ).rejects.toBeInstanceOf(Error);
+  });
+});
