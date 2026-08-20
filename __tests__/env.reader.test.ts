@@ -8,6 +8,11 @@ vi.mock("@simpill/env.utils", () => ({
   Env: {
     getValue: (key: string) => ambient.get(key),
   },
+  // env.reader bootstraps the manager before its first ambient read, so the mock
+  // has to carry it too; the real one loads .env files, which these tests do not want.
+  EnvManager: {
+    getInstance: vi.fn(),
+  },
 }));
 
 const { getEnvBoolean, getEnvString, isDebugEnabled, mergeEnv } = await import(

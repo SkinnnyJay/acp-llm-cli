@@ -24,3 +24,13 @@ export const ENV_KEY = {
 } as const;
 
 export type EnvKey = (typeof ENV_KEY)[keyof typeof ENV_KEY];
+
+/**
+ * The .env files this package will load, in precedence order - the same defaults
+ * @simpill/env.utils uses. Declared here because that package does not export them
+ * and env.reader must filter the list before handing it over.
+ */
+export const ENV_FILE_PATHS = [".env.local", ".env"] as const;
+
+/** dotenvx's code for a .env path it was asked to load and could not find. */
+export const MISSING_ENV_FILE_CODE = "MISSING_ENV_FILE";
