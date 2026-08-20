@@ -27,22 +27,26 @@ export function createStreamPromptQueue(): {
   };
 
   const nextPromise = (): Promise<IteratorResult<SessionNotification>> => {
+    // Drain queued updates BEFORE honoring done: updates pushed before
+    // close()/pushError() must still reach a slow consumer (ACP requires
+    // clients to keep accepting session updates up to the turn's final stop
+    // reason), so end/error only apply once the queue is empty.
+    const queued = dequeue();
+    if (queued !== undefined) return Promise.resolve({ done: false, value: queued });
     if (done) {
       if (done.reason === REASON.ERROR) return Promise.reject(done.error);
       return Promise.resolve({ done: true, value: undefined });
     }
-    const queued = dequeue();
-    if (queued !== undefined) return Promise.resolve({ done: false, value: queued });
     return new Promise((resolve, reject) => {
       wake = () => {
         wake = null;
-        if (done) {
-          if (done.reason === REASON.ERROR) reject(done.error);
-          else resolve({ done: true, value: undefined });
+        const value = dequeue();
+        if (value !== undefined) {
+          resolve({ done: false, value });
           return;
         }
-        const value = dequeue();
-        resolve(value !== undefined ? { done: false, value } : { done: true, value: undefined });
+        if (done && done.reason === REASON.ERROR) reject(done.error);
+        else resolve({ done: true, value: undefined });
       };
     });
   };
