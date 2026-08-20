@@ -90,6 +90,9 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   runtimeOptions?: AcpSharedRuntimeOptions
 ): IAgentPort {
   const resolved = resolveBaseConfig(defaults, configKeys, config);
-  const parsed = schema.parse(resolved);
+  // resolveBaseConfig returns only command/args/cwd/env. Spread the caller's config underneath it
+  // so provider-specific fields (model, generic CLI options, ...) survive into validation instead
+  // of being silently discarded; the resolved base fields still win.
+  const parsed = schema.parse({ ...config, ...resolved });
   return createAcpCliHarnessRuntime(parsed, runtimeOptions);
 }
