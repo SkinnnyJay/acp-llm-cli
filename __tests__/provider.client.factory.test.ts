@@ -9,7 +9,7 @@ vi.mock("../src/runtime/logger", () => ({
   }),
 }));
 
-import { PROVIDER_VALUES, Provider, getDefaultProviderClientFactory } from "../src/index";
+import { getDefaultProviderClientFactory, PROVIDER_VALUES, Provider } from "../src/index";
 
 describe("ProviderClientFactory", () => {
   it("getDefaultProviderClientFactory returns factory with getClient and listProviders", () => {

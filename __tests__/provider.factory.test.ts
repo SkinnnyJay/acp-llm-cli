@@ -9,7 +9,7 @@ vi.mock("../src/runtime/logger", () => ({
   }),
 }));
 
-import { PROVIDER_IDS, getDefaultFactory } from "../src/index";
+import { getDefaultFactory, PROVIDER_IDS } from "../src/index";
 
 describe("ProviderFactory", () => {
   it("getDefaultFactory returns factory with createRuntime and listProviderIds", () => {

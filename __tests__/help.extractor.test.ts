@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HELP_FLAG, extractHelp } from "../src/cli/help.extractor";
+import { extractHelp, HELP_FLAG } from "../src/cli/help.extractor";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { SIGNAL } from "../src/domain/signals";
 import { TIMEOUT } from "../src/domain/timeouts";

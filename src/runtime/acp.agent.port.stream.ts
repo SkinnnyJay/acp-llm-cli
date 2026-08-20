@@ -6,8 +6,8 @@ import type {
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../domain/agent.port.events";
 import type { ConnectionStatus } from "../domain/connection.status";
-import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import type { EnvelopeMode } from "../domain/envelope.mode";
+import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { LIMIT } from "../domain/limits";
 import { OPENAI_COMPAT } from "../domain/openai.compat";

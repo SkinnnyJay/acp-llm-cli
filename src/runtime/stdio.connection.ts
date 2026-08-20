@@ -1,11 +1,11 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { spawn } from "node:child_process";
 import { Readable, Writable } from "node:stream";
-import { type Stream, ndJsonStream } from "@agentclientprotocol/sdk";
+import { ndJsonStream, type Stream } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { CONNECTION_EVENT } from "../domain/connection.events";
-import { CONNECTION_STATUS } from "../domain/connection.status";
 import type { ConnectionStatus } from "../domain/connection.status";
+import { CONNECTION_STATUS } from "../domain/connection.status";
 import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { LIMIT } from "../domain/limits";

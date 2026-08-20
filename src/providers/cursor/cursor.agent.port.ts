@@ -1,4 +1,3 @@
-import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type {
   AuthenticateRequest,
   AuthenticateResponse,
@@ -15,10 +14,11 @@ import type {
   SetSessionModeRequest,
   SetSessionModeResponse,
 } from "@agentclientprotocol/sdk";
+import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../../domain/agent.port.events";
-import { CONNECTION_STATUS } from "../../domain/connection.status";
 import type { ConnectionStatus } from "../../domain/connection.status";
+import { CONNECTION_STATUS } from "../../domain/connection.status";
 import { DEFAULT_COMMANDS } from "../../domain/default.commands";
 import { ENV_KEY } from "../../domain/env.keys";
 import { ERROR_MESSAGE } from "../../domain/error.messages";

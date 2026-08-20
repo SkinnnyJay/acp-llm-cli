@@ -1,24 +1,3 @@
-import {
-  type Client,
-  type ClientCapabilities,
-  ClientSideConnection,
-  type CreateTerminalRequest,
-  type CreateTerminalResponse,
-  type KillTerminalRequest,
-  type KillTerminalResponse,
-  type ReadTextFileRequest,
-  type ReadTextFileResponse,
-  type ReleaseTerminalRequest,
-  type ReleaseTerminalResponse,
-  type RequestPermissionRequest,
-  type RequestPermissionResponse,
-  type TerminalOutputRequest,
-  type TerminalOutputResponse,
-  type WaitForTerminalExitRequest,
-  type WaitForTerminalExitResponse,
-  type WriteTextFileRequest,
-  type WriteTextFileResponse,
-} from "@agentclientprotocol/sdk";
 import type {
   AuthenticateRequest,
   AuthenticateResponse,
@@ -34,7 +13,28 @@ import type {
   SetSessionModeRequest,
   SetSessionModeResponse,
 } from "@agentclientprotocol/sdk";
-import { PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
+import {
+  type Client,
+  type ClientCapabilities,
+  ClientSideConnection,
+  type CreateTerminalRequest,
+  type CreateTerminalResponse,
+  type KillTerminalRequest,
+  type KillTerminalResponse,
+  PROTOCOL_VERSION,
+  type ReadTextFileRequest,
+  type ReadTextFileResponse,
+  type ReleaseTerminalRequest,
+  type ReleaseTerminalResponse,
+  type RequestPermissionRequest,
+  type RequestPermissionResponse,
+  type TerminalOutputRequest,
+  type TerminalOutputResponse,
+  type WaitForTerminalExitRequest,
+  type WaitForTerminalExitResponse,
+  type WriteTextFileRequest,
+  type WriteTextFileResponse,
+} from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
 import { AGENT_PORT_EVENT } from "../domain/agent.port.events";
 import { CONNECTION_EVENT } from "../domain/connection.events";
@@ -55,10 +55,7 @@ export interface IACPConnectionLike {
   on(event: typeof CONNECTION_EVENT.ERROR, handler: (error: Error) => void): void;
   on(
     event: typeof CONNECTION_EVENT.EXIT,
-    handler: (info: {
-      code: number | null;
-      signal: string | null;
-    }) => void
+    handler: (info: { code: number | null; signal: string | null }) => void
   ): void;
 }
 

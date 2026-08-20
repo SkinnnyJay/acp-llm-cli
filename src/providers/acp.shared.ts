@@ -2,15 +2,15 @@ import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import type { ISessionPersistence } from "../domain/session.persistence";
 import { wrapAgentPortWithStream } from "../runtime/acp.agent.port.stream";
-import { createAcpAgentPort } from "../runtime/acp.client";
 import type { ACPClientOptions } from "../runtime/acp.client";
+import { createAcpAgentPort } from "../runtime/acp.client";
 import type { IAgentPort } from "../runtime/agent.port";
 import type { BaseCliConfig, ConfigSchema } from "../runtime/config";
 import { resolveBaseConfig } from "../runtime/config.resolve";
 import type { IConnectionFactory } from "../runtime/connection.factory.interface";
 import type { IConnection } from "../runtime/connection.interface";
-import { wrapAgentPortWithLifecycle } from "../runtime/lifecycle.supervisor";
 import type { LifecycleSupervisorOptions } from "../runtime/lifecycle.supervisor";
+import { wrapAgentPortWithLifecycle } from "../runtime/lifecycle.supervisor";
 import { StdioConnectionFactory } from "../runtime/stdio.connection.factory";
 
 /** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */

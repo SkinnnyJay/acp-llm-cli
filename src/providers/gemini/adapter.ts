@@ -6,8 +6,8 @@ import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { geminiCliSpec } from "./cli.definition";
 import { GEMINI_CONFIG_KEYS } from "./constants";
-import { geminiConfigSchema } from "./schema";
 import type { GeminiConfig } from "./schema";
+import { geminiConfigSchema } from "./schema";
 
 const createRuntime = (
   config: GeminiConfig,

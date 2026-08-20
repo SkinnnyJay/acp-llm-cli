@@ -1,28 +1,24 @@
 // Public agent port types and interfaces
-export type {
-  IAgentPort,
-  AgentPortEvents,
-  AgentPortCapabilities,
-  StreamPromptOptions,
-} from "./agent.port";
 
+export type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
+export type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
+// Shared ACP CLI runtime builders (extension API)
+export {
+  createAcpCliHarnessRuntime,
+  createStandardAcpRuntime,
+} from "../providers/acp.shared";
+export type { WrapAgentPortOptions } from "./acp.agent.port.stream";
 // Stream decorator — named class + factory
 export { StreamAgentPort, wrapAgentPortWithStream } from "./acp.agent.port.stream";
-export type { WrapAgentPortOptions } from "./acp.agent.port.stream";
-
-// Lifecycle decorator — named class + factory
-export { LifecycleAgentPort, wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
-export type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
-
+export type { ACPClientOptions, IACPConnectionLike } from "./acp.client";
 // ACP client factory
 export { createAcpAgentPort } from "./acp.client";
-export type { ACPClientOptions, IACPConnectionLike } from "./acp.client";
-
-// Envelope mapper (public utility for consumers building custom providers)
-export { sessionUpdateToEnvelopes, createOpenAIFinishEnvelope } from "./envelope.mapper";
-
-// Config types and schema
-export { baseCliConfigSchema } from "./config";
+export type {
+  AgentPortCapabilities,
+  AgentPortEvents,
+  IAgentPort,
+  StreamPromptOptions,
+} from "./agent.port";
 export type {
   BaseCliConfig,
   ConfigSchema,
@@ -30,24 +26,19 @@ export type {
   ConfigSchemaIssue,
   ConfigSchemaResult,
 } from "./config";
+// Config types and schema
+export { baseCliConfigSchema } from "./config";
 export { resolveBaseConfig } from "./config.resolve";
-
-// Provider factory stack
-export { ProviderFactory } from "./provider.factory";
-export { ProviderClient } from "./provider.client";
-export { ProviderClientFactory } from "./provider.client.factory";
-export { ProviderMetricsCollector } from "./metrics";
-
-// Registry
-export { HarnessRegistry } from "./registry";
-
+export type { IConnectionFactory } from "./connection.factory.interface";
+// Connection abstractions (for consumers building custom connections)
+export type { IConnection } from "./connection.interface";
+export type { CreateCliHarnessAdapterParams } from "./create.cli.harness.adapter";
 // Adapter creation
 export { createCliHarnessAdapter } from "./create.cli.harness.adapter";
-export type { CreateCliHarnessAdapterParams } from "./create.cli.harness.adapter";
-
+// Envelope mapper (public utility for consumers building custom providers)
+export { createOpenAIFinishEnvelope, sessionUpdateToEnvelopes } from "./envelope.mapper";
 // Harness adapter interface
-export type { IHarnessAdapter, HarnessRuntime } from "./harness.adapter";
-
+export type { HarnessRuntime, IHarnessAdapter } from "./harness.adapter";
 // Provider type interfaces
 export type {
   IProvider,
@@ -56,25 +47,21 @@ export type {
   IProviderFactory,
   IProviderMetrics,
 } from "./interfaces/provider.types";
-
-// Connection abstractions (for consumers building custom connections)
-export type { IConnection } from "./connection.interface";
-export type { IConnectionFactory } from "./connection.factory.interface";
-export { StdioConnection } from "./stdio.connection";
-export type { SpawnFunction } from "./stdio.connection";
-export { StdioConnectionFactory } from "./stdio.connection.factory";
-
+export type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
+// Lifecycle decorator — named class + factory
+export { LifecycleAgentPort, wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
+export { ProviderMetricsCollector } from "./metrics";
 // Permission and tool host interfaces
 export type { IPermissionHandler } from "./permission.handler.interface";
-export type { IToolHost } from "./tool.host.interface";
-
+export { ProviderClient } from "./provider.client";
+export { ProviderClientFactory } from "./provider.client.factory";
+// Provider factory stack
+export { ProviderFactory } from "./provider.factory";
+// Registry
+export { HarnessRegistry } from "./registry";
 // Session persistence
 export { createMemorySessionPersistence } from "./session.persistence.memory";
-export type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
-
-// Shared ACP CLI runtime builders (extension API)
-export {
-  createAcpCliHarnessRuntime,
-  createStandardAcpRuntime,
-} from "../providers/acp.shared";
-export type { AcpSharedRuntimeOptions } from "../providers/acp.shared";
+export type { SpawnFunction } from "./stdio.connection";
+export { StdioConnection } from "./stdio.connection";
+export { StdioConnectionFactory } from "./stdio.connection.factory";
+export type { IToolHost } from "./tool.host.interface";

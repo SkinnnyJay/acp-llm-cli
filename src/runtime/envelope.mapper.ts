@@ -1,7 +1,7 @@
 import type { SessionNotification } from "@agentclientprotocol/sdk";
 import { ENVELOPE_KIND } from "../domain/envelope.kind";
-import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import type { EnvelopeMode } from "../domain/envelope.mode";
+import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import { LIMIT } from "../domain/limits";
 import { OPENAI_COMPAT } from "../domain/openai.compat";
 import { SESSION_UPDATE_TYPE } from "../domain/session.update.types";
