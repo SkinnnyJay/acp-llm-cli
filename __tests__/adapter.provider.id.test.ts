@@ -39,15 +39,8 @@ function createRecordingPersistence(): ISessionPersistence & { saved: PersistedS
  * exists: the lifecycle supervisor persists from inbound notifications, so this
  * observes the key that was really used instead of trusting the wiring.
  */
-/**
- * One inbound notification currently produces two writes: the supervisor persists
- * on the sessionUpdate call and again when the inner client re-emits it. Both
- * carry the same key and payload, so it is redundant rather than wrong - and the
- * key is what this file is about, so assert on that.
- */
-const uniqueProviderIds = (p: { saved: PersistedSession[] }): string[] => [
-  ...new Set(p.saved.map((s) => s.providerId)),
-];
+const providerIdsWritten = (p: { saved: PersistedSession[] }): string[] =>
+  p.saved.map((s) => s.providerId);
 
 const adapters = [
   { name: "claude", adapter: claudeAdapter, defaultId: PROVIDER_IDS.CLAUDE_CLI_ID },
@@ -71,7 +64,7 @@ describe("ACP adapter providerId resolution", () => {
 
       await port.sessionUpdate(vendorUpdate("sess-1"));
 
-      expect(uniqueProviderIds(persistence)).toEqual([defaultId]);
+      expect(providerIdsWritten(persistence)).toEqual([defaultId]);
     });
 
     it(`${name} persists under an explicit providerId instead of its default`, async () => {
@@ -80,8 +73,8 @@ describe("ACP adapter providerId resolution", () => {
 
       await port.sessionUpdate(vendorUpdate("sess-1"));
 
-      expect(uniqueProviderIds(persistence)).toEqual(["custom-namespace"]);
-      expect(uniqueProviderIds(persistence)).not.toContain(defaultId);
+      expect(providerIdsWritten(persistence)).toEqual(["custom-namespace"]);
+      expect(providerIdsWritten(persistence)).not.toContain(defaultId);
     });
   }
 });

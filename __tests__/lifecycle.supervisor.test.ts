@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
+import type { PersistedSession } from "../src/domain/session.persistence";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import {
   LifecycleAgentPort,
@@ -129,6 +130,43 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(errorEvents).toHaveLength(1);
     expect(sessionUpdateEvents).toHaveLength(1);
     expect(permissionEvents).toHaveLength(1);
+  });
+
+  it("writes once when the inner port also re-emits the notification", async () => {
+    // The real ACP client emits on sessionUpdate, so both the method and the
+    // constructor listener see the same notification. Neither trigger can be
+    // dropped - the listener is the only path for agent-initiated updates, the
+    // method the only one for an inner that never emits - so the write itself
+    // must be the thing that happens once.
+    const inner = createMockPort();
+    const saved: PersistedSession[] = [];
+    const wrapped = wrapAgentPortWithLifecycle(inner, {
+      persistence: {
+        store: {
+          async loadSession() {
+            return null;
+          },
+          async saveSession(data) {
+            saved.push(data);
+          },
+          async clearSession() {},
+        },
+        providerId: "gemini-cli",
+      },
+    });
+
+    const update = {
+      sessionId: "s1",
+      update: {},
+      session_id: "sess-1",
+    } as unknown as Parameters<IAgentPort["sessionUpdate"]>[0];
+
+    // Drive both triggers with the same notification, as the real stack does.
+    await wrapped.sessionUpdate(update);
+    (inner as unknown as { emit: (e: string, p: unknown) => void }).emit("sessionUpdate", update);
+    await Promise.resolve();
+
+    expect(saved.map((r) => r.sessionId)).toEqual(["sess-1"]);
   });
 
   it("saves session on sessionUpdate when persistence and session_id are present", async () => {
