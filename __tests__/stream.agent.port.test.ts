@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import { StreamAgentPort, wrapAgentPortWithStream } from "../src/runtime/acp.agent.port.stream";
@@ -272,4 +273,66 @@ describe("StreamAgentPort", () => {
     releasePrompt();
     await first;
   });
+
+  it("stays busy after the consumer abandons the stream until the prompt settles", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const update = {
+      sessionId: "s1",
+      update: {
+        sessionUpdate: "agent_message_chunk" as const,
+        content: { type: "text", text: "partial" },
+      },
+    };
+    (inner.prompt as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      setTimeout(() => {
+        (inner as unknown as EventEmitter).emit("sessionUpdate", update);
+      }, 0);
+      await gate;
+      return { stopReason: "end_turn" };
+    });
+
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+
+    // Consumer takes one envelope and walks away; the underlying prompt is still in flight.
+    for await (const _envelope of port.streamPrompt(params)) {
+      break;
+    }
+
+    const second = (async () => {
+      for await (const _envelope of port.streamPrompt(params)) {
+        // no-op
+      }
+    })();
+    await expect(second).rejects.toThrow(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    expect(inner.prompt).toHaveBeenCalledTimes(1);
+
+    release();
+    await new Promise((r) => setTimeout(r, 5));
+
+    // Once the prompt has settled the port is usable again.
+    for await (const _envelope of port.streamPrompt(params)) {
+      // drain
+    }
+    expect(inner.prompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("detaches its session listener once the prompt settles", async () => {
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner);
+    (inner.prompt as ReturnType<typeof vi.fn>).mockResolvedValue({ stopReason: "end_turn" });
+
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    for await (const _envelope of port.streamPrompt(params)) {
+      // drain
+    }
+
+    expect(inner.listenerCount("sessionUpdate")).toBe(1);
+  });
+
 });

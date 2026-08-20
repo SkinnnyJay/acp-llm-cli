@@ -108,11 +108,23 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       queue.push(update);
     };
     this.inner.on(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
-    const promptPromise = this.inner.prompt(params);
+    let promptPromise: ReturnType<IAgentPort["prompt"]>;
+    try {
+      promptPromise = this.inner.prompt(params);
+    } catch (err) {
+      // A synchronous throw from prompt() must not leave the port permanently busy.
+      this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
+      queue.close();
+      this.streamBusy = false;
+      throw err;
+    }
+    // Busy-ness is released by the prompt that owns it, not by the generator frame: a consumer
+    // that abandons the iterator must not free the port while the request is still in flight.
     promptPromise
       .finally(() => {
         this.inner.off(AGENT_PORT_EVENT.SESSION_UPDATE, handler);
         queue.close();
+        this.streamBusy = false;
       })
       .catch(() => {});
     try {
@@ -138,7 +150,8 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       queue.pushError(err instanceof Error ? err : new Error(String(err)));
       throw err;
     } finally {
-      this.streamBusy = false;
+      // Abandonment only needs to stop buffering; the prompt's own finally clears streamBusy.
+      queue.close();
     }
   }
 }
