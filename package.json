@@ -59,7 +59,7 @@
     "verify:coverage": "npm run lint && npm run typecheck && npm run build && npm run test:coverage"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.3.0",
+    "@agentclientprotocol/sdk": "^1.4.0",
     "@simpill/async.utils": "^1.0.0",
     "@simpill/env.utils": "^1.0.0",
     "@simpill/errors.utils": "^1.0.0",

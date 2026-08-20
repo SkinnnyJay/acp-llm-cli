@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mode and model are sibling categories, not the same concept.
 - **Breaking:** minimum Node is 22. Node 20 reached EOL on 2026-04-30, so CI had been verifying
   an unsupported runtime.
-- `@agentclientprotocol/sdk` 0.12 -> 1.3; `KillTerminalCommandRequest`/`Response` are now
+- `@agentclientprotocol/sdk` 0.12 -> 1.4; `KillTerminalCommandRequest`/`Response` are now
   `KillTerminalRequest`/`Response`.
 - `ICliSpec.buildArgs` takes the new exported `CliArgsInput<TConfig>`: generic options are
   spelled out, and `args`/`env` are optional. A spec reached through the registry erases to
@@ -139,7 +139,7 @@ that permission on upgrade. Check for existing `trust: true` before deploying.
 
 - **Breaking:** Default permission handler cancels when no `permissionHandler` is configured (no longer auto-selects the first option).
 - **Breaking:** Cursor CLI no longer hardcodes `--trust`; pass `trust: true` in config to enable it.
-  (Note: `trust: true` was discarded before reaching the CLI until the Unreleased fix above.)
+  (Note: `trust: true` was discarded before reaching the CLI until the 0.3.0 fix above.)
 - Session persistence saves from inbound `sessionUpdate` events and stores session `cwd` for resume.
 - Memory persistence keys are length-prefixed to avoid `providerId`/`workspace` collisions.
 - Help extraction and Cursor disconnect force-kill orphaned child processes.
