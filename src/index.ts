@@ -18,7 +18,10 @@ export { ProviderClient } from "./runtime/provider.client";
 export { ProviderMetricsCollector } from "./runtime/metrics";
 export { Provider, ProviderSchema, PROVIDER_VALUES } from "./domain/provider";
 export { VALIDATION_ERROR } from "./domain/validation.errors";
-export type { HarnessRegistry } from "./runtime/registry";
+// Value export: docs/api.md and README advertise custom-registry wiring from the root entry
+// point, but this was type-only, so `new HarnessRegistry()` was impossible from "." and callers
+// were pushed into mutating the shared default registry instead.
+export { HarnessRegistry } from "./runtime/registry";
 export type { IHarnessAdapter } from "./runtime/harness.adapter";
 export type {
   IAgentPort,
@@ -79,6 +82,11 @@ export type { ISessionPersistence, PersistedSession } from "./domain/session.per
 export {
   genericLlmCliOptionsSchema,
   GENERIC_OPTION_KEY,
+  /**
+   * @deprecated Unused and misleading: the arg builder does not consult it, and no schema applies
+   * these values, so `stream: true` here is a default that is never applied. Scheduled for
+   * removal in the next major, along with the `*_MODEL_ID_LIST` exports below.
+   */
   GENERIC_OPTION_DEFAULTS,
   buildGenericArgs,
   extractHelp,
@@ -90,5 +98,6 @@ export type {
   GenericFlagMap,
   ICliSpec,
   GetHelpOptions,
+  HelpExtractorOptions,
   BuiltCliInvocation,
 } from "./cli/index";
