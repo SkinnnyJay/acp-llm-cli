@@ -89,14 +89,6 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     return this.status;
   }
 
-  private resolveConnectCommand(): string {
-    return getEnvString(
-      ENV_KEY.ACP_LLM_CLI_CURSOR_COMMAND,
-      DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
-      this.config.env
-    );
-  }
-
   private resolveCliCommand(): string {
     return (
       this.config.command ??
@@ -143,12 +135,17 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
 
   async connect(): Promise<void> {
     this.status = CONNECTION_STATUS.CONNECTING;
-    const command = this.resolveConnectCommand();
+    // Health-check the exact binary and base args every prompt will use. These used to differ:
+    // connect resolved env-then-default and ignored config.command entirely, and omitted the
+    // configured args, so a custom `command` was probed as the default binary - connect could
+    // pass while every real invocation failed, or the reverse.
+    const command = this.resolveCliCommand();
     const args = [
       CURSOR_CLI_ARG.PRINT,
       CURSOR_CLI_ARG.OUTPUT_FORMAT,
       CURSOR_CLI_ARG.STREAM_JSON,
       ...this.trustArgs(),
+      ...this.resolveBaseArgs(),
       CURSOR_HEALTH_CHECK_PROMPT,
     ];
     try {

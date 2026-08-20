@@ -25,7 +25,14 @@ export class ProviderClientFactory implements IProviderClientFactory {
     return new ProviderClient(provider, port);
   }
 
+  /**
+   * Providers that are both in the enum and actually registered. Returning the static enum meant
+   * a factory built over a partial registry advertised ids that every getClient call would then
+   * reject. Declared enum order is preserved.
+   */
   listProviders(): Provider[] {
-    return [...PROVIDER_VALUES];
+    return PROVIDER_VALUES.filter(
+      (provider) => this.runtimeFactory.getProvider(provider) !== undefined
+    );
   }
 }

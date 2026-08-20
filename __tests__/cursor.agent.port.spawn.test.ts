@@ -270,4 +270,28 @@ describe("CursorAgentPort spawn contract", () => {
 
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
   });
+
+  it("health-checks the same binary and args a prompt will use", async () => {
+    const calls: { command: string; args: string[] }[] = [];
+    const spawnFn = vi.fn().mockImplementation((command: string, args: string[]) => {
+      calls.push({ command, args });
+      if (args.includes("hi")) {
+        const ndjson = JSON.stringify({ type: "result", subtype: "success", result: "ok" });
+        return createFakeChild({ stdout: `${ndjson}\n`, exitCode: 0 }).child;
+      }
+      return createFakeChild({ exitCode: 0 }).child;
+    });
+
+    const port = new CursorAgentPort(
+      { command: "/custom/path/cursor-agent", args: ["--flag"], env: {} },
+      { spawnFn: spawnFn as never }
+    );
+
+    await port.connect();
+    await port.prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] });
+
+    expect(calls[0]?.command).toBe("/custom/path/cursor-agent");
+    expect(calls[0]?.args).toContain("--flag");
+    expect(calls.at(-1)?.command).toBe("/custom/path/cursor-agent");
+  });
 });
