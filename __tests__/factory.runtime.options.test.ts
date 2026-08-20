@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMockAgentPort } from "./helpers/mock.agent.port";
 import { getDefaultFactory, resetDefaultFactoriesForTests } from "../src/bootstrap";
-import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import type { AcpSharedRuntimeOptions } from "../src/providers/acp.shared";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -11,6 +9,7 @@ import { wrapAgentPortWithLifecycle } from "../src/runtime/lifecycle.supervisor"
 import { ProviderFactory } from "../src/runtime/provider.factory";
 import { HarnessRegistry } from "../src/runtime/registry";
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
+import { createMockAgentPort } from "./helpers/mock.agent.port";
 
 const createMockPort = () => createMockAgentPort({ sessionId: "factory-sess-1" });
 
