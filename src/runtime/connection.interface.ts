@@ -12,6 +12,14 @@ import type { ConnectionStatus } from "../domain/connection.status";
 export interface ConnectionEvents {
   state: (status: ConnectionStatus) => void;
   error: (error: Error) => void;
+  /**
+   * The agent process exited. Distinguishes "died on its own" from "we asked it to stop", which
+   * `state` alone cannot.
+   *
+   * Implementations MUST clear the stream returned by `getStream()` before emitting this for the
+   * process that stream belonged to. Consumers use that to tell whether an exit refers to the
+   * process backing their current stream or to one already replaced.
+   */
   exit: (info: { code: number | null; signal: string | null }) => void;
 }
 

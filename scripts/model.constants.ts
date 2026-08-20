@@ -68,8 +68,8 @@ ${body}
 } as const;
 
 /**
- * @deprecated Unread anywhere, and lossier than its source: readonly string[] discards the
- * literal union MODEL_IDS already carries. Use Object.values(MODEL_IDS). Removed next major.
+ * @deprecated Unread anywhere, and lossier than its source: \`readonly string[]\` discards the
+ * literal union MODEL_IDS already carries. Use \`Object.values(MODEL_IDS)\`. Removed next major.
  */
 export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
 

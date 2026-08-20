@@ -33,9 +33,16 @@ export function getEnvString(key: EnvKey, defaultValue: string, override?: Proce
 }
 
 export function getEnvBoolean(key: EnvKey, defaultValue: boolean, override?: ProcessEnv): boolean {
-  const raw = readRaw(key, override);
-  if (raw === undefined || raw.trim() === "") return defaultValue;
-  return BOOLEAN_TRUTHY_PATTERN.test(raw.trim());
+  const fromOverride = override?.[key];
+  if (fromOverride !== undefined) {
+    // An explicitly supplied override is authoritative, including "". Falling through to the
+    // ambient environment here would let `env: { ACP_LLM_CLI_DEBUG: "" }` silently pick up a
+    // shell `ACP_LLM_CLI_DEBUG=1` and stop redacting child stderr in thrown errors.
+    return BOOLEAN_TRUTHY_PATTERN.test(String(fromOverride).trim());
+  }
+  const ambient = Env.getValue(key);
+  if (ambient === undefined || ambient.trim() === "") return defaultValue;
+  return BOOLEAN_TRUTHY_PATTERN.test(ambient.trim());
 }
 
 export function mergeEnv(overrides?: ProcessEnv, baseEnv: ProcessEnv = process.env): ProcessEnv {
