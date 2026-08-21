@@ -36,18 +36,33 @@ let envBootstrapped = false;
 function ensureEnvBootstrapped(): void {
   if (envBootstrapped) return;
   envBootstrapped = true;
+
+  // dotenvx emits through console.error, which normally reaches process.stderr.write -
+  // but test runners and log shims patch console.error upstream of the stream, so
+  // filtering only one of the two leaves the message visible in exactly the places a
+  // maintainer looks. Both are wrapped, and both restored.
   const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  const isMissingEnvFile = (value: unknown): boolean =>
+    typeof value === "string" && value.includes(MISSING_ENV_FILE_CODE);
+
   process.stderr.write = ((chunk: string | Uint8Array, ...rest: unknown[]) =>
-    typeof chunk === "string" && chunk.includes(MISSING_ENV_FILE_CODE)
+    isMissingEnvFile(chunk)
       ? true
       : (write as (c: string | Uint8Array, ...r: unknown[]) => boolean)(
           chunk,
           ...rest
         )) as typeof process.stderr.write;
+  console.error = (...args: unknown[]): void => {
+    if (args.some(isMissingEnvFile)) return;
+    error(...args);
+  };
+
   try {
     EnvManager.getInstance({ envPaths: [...ENV_FILE_PATHS] });
   } finally {
     process.stderr.write = write;
+    console.error = error;
   }
 }
 

@@ -293,7 +293,17 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     const result = await this.runTracked(command, args);
     const parsed = parseCursorNdjsonResult(result.stdout);
     if (parsed === null) {
-      throw new Error(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
+      // cursor-agent exits 0 while printing things like "Authentication required"
+      // to stdout, so the parse failure is often not the interesting part - the
+      // line it printed is. Redacted and truncated on the same rules as stderr.
+      const said = formatStderrForError(`${result.stdout}\n${result.stderr}`.trim(), {
+        debug: isDebugEnabled(this.config.env),
+      });
+      throw new Error(
+        said
+          ? ERROR_MESSAGE.CURSOR_RESULT_MISSING_WITH_OUTPUT(said)
+          : ERROR_MESSAGE.CURSOR_RESULT_MISSING
+      );
     }
     // Bind the chat the CLI reports back to this session, so later turns resume it.
     if (parsed.sessionId) {

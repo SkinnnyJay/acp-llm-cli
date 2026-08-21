@@ -87,11 +87,11 @@ describe("CursorAgentPort connect health check", () => {
   const spawnThatExits = (exitCode: number, stderr: string) =>
     vi.fn().mockImplementation(() => {
       const child = createInertChild();
+      child.stderr.on("end", () => child.emit("close", exitCode, null));
       queueMicrotask(() => {
-        child.stderr.push(stderr);
+        if (stderr) child.stderr.push(stderr);
         child.stderr.push(null);
         child.stdout.push(null);
-        child.emit("close", exitCode, null);
       });
       return child;
     });
@@ -122,5 +122,42 @@ describe("CursorAgentPort connect health check", () => {
 
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.ERROR);
     expect(errors[0]?.message).toContain("spawn failed outright");
+  });
+});
+
+describe("CursorAgentPort prompt with no parseable result", () => {
+  // close has to land after the data events have flushed, or the collector still
+  // holds an empty buffer when the promise settles. Waiting on the stream's own
+  // "end" rather than a timer keeps that ordering guaranteed instead of likely.
+  const spawnPrinting = (stdout: string) =>
+    vi.fn().mockImplementation(() => {
+      const child = createInertChild();
+      child.stdout.on("end", () => child.emit("close", 0, null));
+      queueMicrotask(() => {
+        if (stdout) child.stdout.push(stdout);
+        child.stdout.push(null);
+        child.stderr.push(null);
+      });
+      return child;
+    });
+
+  it("includes what the CLI actually said", async () => {
+    // cursor-agent exits 0 while printing this, so without it in the message a
+    // caller is told only that parsing failed - not that they are logged out.
+    const port = new CursorAgentPort(createCursorConfig(), {
+      spawnFn: spawnPrinting("Error: Authentication required. Please run 'agent login' first.\n"),
+    });
+
+    await expect(
+      port.prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] })
+    ).rejects.toThrow(/Authentication required/);
+  });
+
+  it("falls back to the bare message when the CLI printed nothing", async () => {
+    const port = new CursorAgentPort(createCursorConfig(), { spawnFn: spawnPrinting("") });
+
+    await expect(
+      port.prompt({ sessionId: "s1", prompt: [{ type: "text", text: "hi" }] })
+    ).rejects.toThrow(ERROR_MESSAGE.CURSOR_RESULT_MISSING);
   });
 });
