@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Targets **0.4.0**. This is a minor bump, not a patch: several changes below alter behaviour a
+consumer can observe, and one of them widens what an agent is permitted to do. `package.json`
+has been bumped to match so the release tag and the manifest cannot disagree.
+
 ### Changed
 
 - **Supplying `toolHost` now advertises filesystem and terminal capabilities.** `clientCapabilities`
