@@ -62,12 +62,9 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.4.0",
-    "@simpill/async.utils": "^1.0.0",
-    "@simpill/env.utils": "^1.0.0",
-    "@simpill/errors.utils": "^1.0.0",
-    "@simpill/logger.utils": "^1.0.0",
-    "@simpill/patterns.utils": "^1.0.0",
-    "@simpill/protocols.utils": "^1.0.0"
+    "@simpill/async.utils": "^1.1.0",
+    "@simpill/env.utils": "^1.1.0",
+    "@simpill/logger.utils": "^1.1.0"
   },
   "sideEffects": false,
   "peerDependencies": {
@@ -88,10 +85,5 @@
   },
   "files": [
     "dist"
-  ],
-  "overrides": {
-    "@simpill/errors.utils": "^1.0.0",
-    "@simpill/patterns.utils": "^1.0.0",
-    "@simpill/protocols.utils": "^1.0.0"
-  }
+  ]
 }
