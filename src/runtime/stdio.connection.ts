@@ -24,12 +24,30 @@ export type SpawnFunction = (
   options: { cwd?: string; env?: ProcessEnv }
 ) => ChildProcessWithoutNullStreams;
 
+interface ChildSession {
+  readonly child: ChildProcessWithoutNullStreams;
+  readonly stream: Stream;
+  /** Set before we kill it, so a late close is still recognised as one we asked for. */
+  intentional: boolean;
+}
+
 export class StdioConnection extends EventEmitter<ConnectionEvents> implements IConnection {
+  /**
+   * The child currently being talked to, together with the stream built on it and whether this
+   * connection asked it to stop.
+   *
+   * These were three connection-scoped fields hand-synchronised at four sites. `child` set with
+   * `stream` undefined was representable and prevented only by convention - and `stream` is the
+   * identity token acp.client uses to decide whether an exit belongs to its link. `intentional`
+   * lives on the session rather than in a single connection-wide slot, so any number of
+   * deliberately-killed children can be pending at once; a single slot silently forgot the first
+   * one when a second teardown began.
+   *
+   * `status` is deliberately NOT folded in: an errored child stays current and usable
+   * (getStream() still returns its stream), so status is not derivable from the session.
+   */
+  private current: ChildSession | undefined;
   private status: ConnectionStatus = CONNECTION_STATUS.DISCONNECTED;
-  private child: ChildProcessWithoutNullStreams | undefined;
-  private stream: Stream | undefined;
-  /** The child a disconnect() is tearing down. Scoped per child so a late exit is still recognised as intentional. */
-  private closingChild: ChildProcessWithoutNullStreams | undefined;
   private readonly stderrLines: string[] = [];
   private readonly spawnFn: SpawnFunction;
   private readonly options: SpawnOptionsType;
@@ -45,7 +63,7 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
   }
 
   getStream(): Stream | undefined {
-    return this.stream;
+    return this.current?.stream;
   }
 
   async connect(): Promise<void> {
@@ -57,12 +75,11 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     }
     // A previous child can still be alive here (e.g. status ERROR after a child error event).
     // Tear it down first so it is not orphaned by the respawn below.
-    const previous = this.child;
+    const previous = this.current;
     if (previous) {
-      this.closingChild = previous;
-      this.child = undefined;
-      this.stream = undefined;
-      previous.kill?.(SIGNAL.TERM);
+      previous.intentional = true;
+      this.current = undefined;
+      previous.child.kill?.(SIGNAL.TERM);
     }
 
     this.setStatus(CONNECTION_STATUS.CONNECTING);
@@ -73,10 +90,14 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
         cwd: this.options.cwd,
         env: mergeEnv(this.options.env),
       });
-      this.child = child;
       this.bindStderrCapture(child);
-      this.stream = this.createNdjsonStream(child);
-      this.bindChildProcessEvents(child);
+      const session: ChildSession = {
+        child,
+        stream: this.createNdjsonStream(child),
+        intentional: false,
+      };
+      this.current = session;
+      this.bindChildProcessEvents(session);
 
       this.setStatus(CONNECTION_STATUS.CONNECTED);
     } catch (error) {
@@ -86,14 +107,15 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
   }
 
   async disconnect(): Promise<void> {
-    // Capture the child once: every callback below must act on this process, never on
+    // Capture the session once: every callback below must act on this process, never on
     // whichever process happens to be current when the callback eventually runs.
-    const child = this.child;
-    if (!child) {
+    const session = this.current;
+    if (!session) {
       this.setStatus(CONNECTION_STATUS.DISCONNECTED);
       return;
     }
-    this.closingChild = child;
+    const { child } = session;
+    session.intentional = true;
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       await new Promise<void>((resolve) => {
@@ -108,9 +130,8 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     } finally {
       clearTimeout(forceKillTimer);
     }
-    if (this.child === child) {
-      this.child = undefined;
-      this.stream = undefined;
+    if (this.current === session) {
+      this.current = undefined;
     }
     this.setStatus(CONNECTION_STATUS.DISCONNECTED);
   }
@@ -126,14 +147,15 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     return ndJsonStream(input, output);
   }
 
-  private bindChildProcessEvents(child: ChildProcessWithoutNullStreams): void {
+  private bindChildProcessEvents(session: ChildSession): void {
+    const { child } = session;
     // Both handlers are bound per child but mutate connection-wide state, so each one first
     // checks that it still owns that state. State is updated before the event announcing it,
     // so a listener always observes the status the event describes.
     child.on(NODE_EVENT.ERROR, (error: Error) => {
       // A child this connection no longer owns cannot put it into an error state, and reporting
       // its failure would hand listeners an error that contradicts connectionStatus.
-      if (this.child !== child) {
+      if (this.current !== session) {
         return;
       }
       this.setStatus(CONNECTION_STATUS.ERROR);
@@ -141,14 +163,12 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     });
 
     child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
-      const isCurrent = this.child === child;
-      const wasDisconnecting = this.closingChild === child;
-      if (wasDisconnecting) {
-        this.closingChild = undefined;
-      }
+      const isCurrent = this.current === session;
+      // Read from the session that actually exited, not from a connection-wide slot that may
+      // have moved on to a different child since we killed this one.
+      const wasDisconnecting = session.intentional;
       if (isCurrent) {
-        this.child = undefined;
-        this.stream = undefined;
+        this.current = undefined;
       }
       // Emitted for every child, current or stale: this process really did exit, and it is the
       // only signal distinguishing "died on its own" from "we asked it to stop".

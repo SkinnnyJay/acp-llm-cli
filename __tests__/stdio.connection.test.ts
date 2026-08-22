@@ -609,3 +609,35 @@ describe("StdioConnection disconnect force-kill timer", () => {
     }
   });
 });
+
+describe("StdioConnection intentional-kill bookkeeping", () => {
+  it("remembers every child it deliberately killed, not just the most recent one", () => {
+    // `closingChild` was a single slot for what is really a set. Sequence: child A errors and
+    // stays current -> connect() sets closingChild = A and spawns B -> disconnect() overwrites
+    // closingChild = B. A is now a child the connection deliberately killed but has forgotten
+    // it killed, so a late close from A is neither current nor recognised as intentional.
+    //
+    // Today that is benign only because `if (!isCurrent) return` fires before `wasDisconnecting`
+    // is consulted - correctness resting on an unrelated early return three lines later. This
+    // pins the property directly: a deliberately-killed child must never be reported as an error.
+    const childA = createFakeChild();
+    const childB = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValueOnce(childA.child).mockReturnValueOnce(childB.child);
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    const errors: Error[] = [];
+    conn.on("error", (err) => errors.push(err));
+
+    conn.connect();
+    childA.triggerError(new Error("A failed"));
+    expect(errors).toHaveLength(1);
+
+    conn.connect();
+    void conn.disconnect();
+
+    errors.length = 0;
+    childA.triggerExit(1, null);
+
+    expect(errors, "a deliberately killed child must not be reported as a failure").toEqual([]);
+  });
+});
