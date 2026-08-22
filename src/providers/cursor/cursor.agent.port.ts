@@ -30,8 +30,10 @@ import type { AgentPortCapabilities, AgentPortEvents, IAgentPort } from "../../r
 import { getEnvString, isDebugEnabled } from "../../runtime/env.reader";
 import {
   CURSOR_CLI_ARG,
+  CURSOR_CLI_SUBCOMMAND,
   CURSOR_CONFIG_OPTION,
   CURSOR_HEALTH_CHECK_PROMPT,
+  CURSOR_OUTPUT_FORMAT,
   CURSOR_UUID_PATTERN,
 } from "./constants";
 import { resolveCursorMode } from "./cursor.mode.utils";
@@ -149,7 +151,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     const args = [
       CURSOR_CLI_ARG.PRINT,
       CURSOR_CLI_ARG.OUTPUT_FORMAT,
-      CURSOR_CLI_ARG.STREAM_JSON,
+      CURSOR_OUTPUT_FORMAT.STREAM_JSON,
       ...this.trustArgs(),
       ...this.resolveBaseArgs(),
       CURSOR_HEALTH_CHECK_PROMPT,
@@ -224,7 +226,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
   async newSession(_params: NewSessionRequest): Promise<NewSessionResponse> {
     const command = this.resolveCliCommand();
     const baseArgs = this.resolveBaseArgs();
-    const result = await this.runTracked(command, [...baseArgs, CURSOR_CLI_ARG.CREATE_CHAT]);
+    const result = await this.runTracked(command, [...baseArgs, CURSOR_CLI_SUBCOMMAND.CREATE_CHAT]);
     const cursorSessionId = result.stdout.match(CURSOR_UUID_PATTERN)?.[0];
     if (!cursorSessionId) {
       return { sessionId: "" };
@@ -281,7 +283,7 @@ export class CursorAgentPort extends EventEmitter<AgentPortEvents> implements IA
     const args = [
       CURSOR_CLI_ARG.PRINT,
       CURSOR_CLI_ARG.OUTPUT_FORMAT,
-      CURSOR_CLI_ARG.STREAM_JSON,
+      CURSOR_OUTPUT_FORMAT.STREAM_JSON,
       ...this.trustArgs(),
       ...(resumeId ? [CURSOR_CLI_ARG.RESUME, resumeId] : []),
       ...(mode ? [CURSOR_CLI_ARG.MODE, mode] : []),

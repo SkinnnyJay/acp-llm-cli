@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
-import { CURSOR_CLI_ARG } from "../src/providers/cursor/constants";
+import { CURSOR_CLI_ARG, CURSOR_CLI_SUBCOMMAND } from "../src/providers/cursor/constants";
 import { CursorAgentPort } from "../src/providers/cursor/cursor.agent.port";
 import { createFakeChild } from "./helpers/fake.child.process";
 
@@ -42,7 +42,7 @@ describe("CursorAgentPort spawn contract", () => {
 
   it("newSession extracts UUID session id", async () => {
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${SESSION_UUID}\n`, exitCode: 0 }).child;
       }
       return createFakeChild({ exitCode: 0 }).child;
@@ -59,7 +59,7 @@ describe("CursorAgentPort spawn contract", () => {
 
   it("prompt builds argv and parses NDJSON result", async () => {
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: SESSION_UUID, exitCode: 0 }).child;
       }
       if (args.includes("hello")) {
@@ -148,7 +148,7 @@ describe("CursorAgentPort spawn contract", () => {
     const promptArgs: string[][] = [];
 
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
       }
       if (args.includes("hello")) {
@@ -192,7 +192,7 @@ describe("CursorAgentPort spawn contract", () => {
     const promptArgs: string[][] = [];
 
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
       }
       if (args.includes("hi")) {

@@ -46,8 +46,7 @@ describe("runCursorSpawnedCommand", () => {
         "cursor-agent",
         ["-p"],
         { command: "cursor-agent", args: [], env: {} },
-        50,
-        spawnFn as Parameters<typeof runCursorSpawnedCommand>[4]
+        { timeoutMs: 50, spawnFn: spawnFn as never }
       )
     ).rejects.toThrow(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(50));
 
@@ -62,8 +61,7 @@ describe("runCursorSpawnedCommand", () => {
       "cursor-agent",
       ["-p", "hello"],
       { command: "cursor-agent", args: [], env: {} },
-      1000,
-      spawnFn as Parameters<typeof runCursorSpawnedCommand>[4]
+      { timeoutMs: 1000, spawnFn: spawnFn as never }
     );
 
     expect(result.exitCode).toBe(0);
@@ -91,8 +89,7 @@ describe("runCursorSpawnedCommand", () => {
         "cursor-agent",
         [],
         { command: "cursor-agent", args: [], env: {} },
-        1000,
-        spawnFn as Parameters<typeof runCursorSpawnedCommand>[4]
+        { timeoutMs: 1000, spawnFn: spawnFn as never }
       )
     ).rejects.toThrow("ENOENT");
   });
@@ -113,8 +110,7 @@ describe("runCursorSpawnedCommand", () => {
       "cursor-agent",
       [],
       { command: "cursor-agent", args: [], env: {} },
-      1000,
-      spawnFn as Parameters<typeof runCursorSpawnedCommand>[4]
+      { timeoutMs: 1000, spawnFn: spawnFn as never }
     );
 
     stdout.emit("data", "out-1");
@@ -137,8 +133,7 @@ describe("runCursorSpawnedCommand", () => {
         "cursor-agent",
         [],
         { command: "cursor-agent", args: [], env: {} },
-        50,
-        spawnFn as Parameters<typeof runCursorSpawnedCommand>[4]
+        { timeoutMs: 50, spawnFn: spawnFn as never }
       );
 
       const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.CURSOR_COMMAND_TIMEOUT(50));

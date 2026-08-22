@@ -30,19 +30,20 @@ export interface CursorSpawnOptions {
 /**
  * Spawn Cursor CLI with merged env, collect stdout/stderr, enforce timeout with SIGTERM then SIGKILL.
  * Supports AbortSignal to kill the child on disconnect.
- * Legacy signature: (cmd, args, config, timeoutMs, spawnFn) still works.
+ *
+ * A legacy positional form - (cmd, args, config, timeoutMs, spawnFn) - used to be accepted
+ * alongside the options record. Because the fourth parameter was a two-shape union and the fifth
+ * was meaningful under only one of them, `(cmd, args, cfg, { timeoutMs: 50 }, fakeSpawn)`
+ * type-checked while silently discarding fakeSpawn - so a unit test could spawn a real
+ * cursor-agent process. The legacy form also could not express `signal` at all, which is the one
+ * capability runTracked depends on to abort in-flight work.
  */
 export function runCursorSpawnedCommand(
   command: string,
   args: string[],
   config: CursorConfig,
-  timeoutMsOrOptions: number | CursorSpawnOptions = TIMEOUT.CURSOR_PROMPT_MS,
-  spawnFnLegacy?: CursorSpawnFn
+  options: CursorSpawnOptions = {}
 ): Promise<CursorCommandResult> {
-  const options: CursorSpawnOptions =
-    typeof timeoutMsOrOptions === "number"
-      ? { timeoutMs: timeoutMsOrOptions, spawnFn: spawnFnLegacy }
-      : timeoutMsOrOptions;
   const timeoutMs = options.timeoutMs ?? TIMEOUT.CURSOR_PROMPT_MS;
   const spawnFn = options.spawnFn ?? nodeSpawn;
   const signal = options.signal;

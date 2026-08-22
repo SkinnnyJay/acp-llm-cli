@@ -22,6 +22,15 @@ export const CLAUDE_CLI_ARG = {
   VERBOSE: "--verbose",
   INCLUDE_PARTIAL_MESSAGES: "--include-partial-messages",
   REPLAY_USER_MESSAGES: "--replay-user-messages",
+} as const;
+
+/**
+ * Bare subcommands, kept out of CLAUDE_CLI_ARG. They are not flags, and CLAUDE_CLI_ARG is the
+ * codomain of ProviderFlagMap - so while they lived there, mapping a generic option onto one
+ * type-checked and emitted a positional token into the spawned binary's argv, which is exactly
+ * what that type exists to prevent.
+ */
+export const CLAUDE_CLI_SUBCOMMAND = {
   AUTH: "auth",
   STATUS: "status",
   MODELS: "models",
