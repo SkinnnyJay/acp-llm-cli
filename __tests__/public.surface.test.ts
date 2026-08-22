@@ -27,8 +27,32 @@ describe("public surface", () => {
     }
   });
 
-  it("keeps the shared vocabulary a subset of the runtime surface", () => {
-    const shared = Object.keys(root).filter((name) => name in runtime);
-    expect(shared.every((name) => Object.keys(runtime).includes(name))).toBe(true);
+  it("keeps the documented shared core a constructible value on both entry points", () => {
+    // The previous version of this case built `shared` by filtering on `name in runtime` and
+    // then asserted those same names were in runtime - true by construction, so it could never
+    // fail. The two barrels are overlapping sets, not nested (root exports 44 values, runtime
+    // 20, sharing these 10), so "root is a subset of runtime" is not the invariant either.
+    // What actually matters is the defect the docblock above names: a symbol vanishing from one
+    // barrel, or becoming type-only there. Pin the shared core explicitly so either fails.
+    const SHARED_CORE = [
+      "HarnessRegistry",
+      "ProviderClient",
+      "ProviderClientFactory",
+      "ProviderFactory",
+      "ProviderMetricsCollector",
+      "baseCliConfigSchema",
+      "createAcpAgentPort",
+      "createAcpCliHarnessRuntime",
+      "createMemorySessionPersistence",
+      "createStandardAcpRuntime",
+    ] as const;
+
+    for (const name of SHARED_CORE) {
+      expect((root as Record<string, unknown>)[name], `${name} missing from "."`).toBeDefined();
+      expect(
+        (runtime as Record<string, unknown>)[name],
+        `${name} missing from "./runtime"`
+      ).toBeDefined();
+    }
   });
 });

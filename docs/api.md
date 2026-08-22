@@ -67,7 +67,7 @@ Provider `model` config accepts the provider enum **or any string** (open escape
 
 ## Extension API (`@simpill/acp-llm-cli/runtime`)
 
-Everything above is re-exported here. What follows is available *only* from `/runtime` — reach for it when building a custom port, adapter, or connection rather than consuming one.
+The runtime types and classes above are re-exported here; the application conveniences (`getDefault*`, `createHarness`, `getAdapter`, and the CLI and domain constants) are root-only — the two entry points overlap rather than nest. What follows is available *only* from `/runtime` — reach for it when building a custom port, adapter, or connection rather than consuming one.
 
 ### Decorators
 

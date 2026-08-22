@@ -191,7 +191,11 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
       // inbound vendor session_id notification persists cwd: undefined and wipes it, so the
       // following restart resumes in the wrong directory.
       this.lastSessionCwd = cwd;
-      await persistence.store.saveSession({ ...sessionToResume, cwd, updatedAt: Date.now() });
+      // Route through persist() rather than assembling a second record here. Spreading the
+      // LOADED record carried its providerId/workspace into the write, so a store that does not
+      // round-trip those fields would file this under a different key than every other write.
+      // The key belongs to the configured persistence group, never to the loaded value.
+      await this.persist(sessionToResume.sessionId, cwd);
     }
   }
 

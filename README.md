@@ -110,16 +110,20 @@ The provider CLIs read their own credentials — `ANTHROPIC_API_KEY`, `OPENAI_AP
 
 ## Streaming
 
-Claude, Codex, and Gemini stream. Feature-detect, then iterate:
+Claude, Codex, and Gemini stream. Feature-detect, then iterate. Narrow each envelope with the
+exported `isOpenAIEnvelope` / `isNativeEnvelope` guards -- `StreamEnvelope` is a union, so
+`object` is not present on every member and reading it directly does not type-check:
 
 ```ts
+import { isOpenAIEnvelope } from "@simpill/acp-llm-cli";
+
 if (port.capabilities?.streamPrompt && port.streamPrompt) {
   for await (const envelope of port.streamPrompt(
     { sessionId, prompt: [{ type: "text", text: "Hello" }] },
     { envelopeMode: "openai" }
   )) {
-    if (envelope.object === "chat.completion.chunk") {
-      process.stdout.write(envelope.choices[0]?.delta?.content ?? "");
+    if (isOpenAIEnvelope(envelope)) {
+      process.stdout.write(envelope.choices?.[0]?.delta?.content ?? "");
     }
   }
 }
@@ -174,7 +178,7 @@ const argv = adapter?.cliSpec?.buildArgs({
 // ["--model", "claude-sonnet-4-20250514", "--output-format", "stream-json", "--print"]
 ```
 
-The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust`, `sandbox`, `workspace`, `resume`, `sessionId`, `verbose`, `debug`, `print` — are shared across providers and mapped to each one's real flags. `buildGenericArgs` is exported for custom builders.
+The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust`, `sandbox`, `workspace`, `resume`, `sessionId`, `verbose`, `debug`, `print` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted: `trust` reaches only Cursor, `sessionId` only Claude, and `stream`/`debug` are not currently mapped by any bundled provider, so they affect argv only for a custom flag map you supply. `buildGenericArgs` is exported for custom builders.
 
 `cliSpec.getHelp()` shells out to the CLI's `--help` and returns stdout, which is useful for discovery and for checking that an installed CLI supports what you are about to send:
 

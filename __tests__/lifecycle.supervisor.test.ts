@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
-import type { PersistedSession } from "../src/domain/session.persistence";
+import type { ISessionPersistence, PersistedSession } from "../src/domain/session.persistence";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import {
   LifecycleAgentPort,
@@ -420,5 +420,42 @@ describe("wrapAgentPortWithLifecycle", () => {
     await wrapped.restart?.();
 
     expect(inner.newSession).toHaveBeenCalled();
+  });
+});
+
+describe("LifecycleAgentPort persistence key ownership", () => {
+  it("writes under the configured key even if the store echoes a different one back", async () => {
+    // restart() assembled its own record with `{ ...sessionToResume, ... }`, spreading the
+    // LOADED record's providerId/workspace rather than the configured ones. For a store that
+    // does not round-trip those fields the resume write lands under a different key than every
+    // other write, so the real record never advances and each restart resumes a stale session.
+    const saved: PersistedSession[] = [];
+    const store: ISessionPersistence = {
+      loadSession: vi.fn().mockResolvedValue({
+        providerId: "echoed-elsewhere",
+        workspace: "/somewhere/else",
+        sessionId: "s-restored",
+        cwd: "/original",
+      }),
+      saveSession: vi.fn(async (data: PersistedSession) => {
+        saved.push(data);
+      }),
+      clearSession: vi.fn(),
+    };
+
+    const inner = createMockAgentPort({ withRestart: true });
+    const port = wrapAgentPortWithLifecycle(inner, {
+      persistence: { store, providerId: "claude-cli", workspace: "/ws" },
+    });
+
+    await port.restart?.();
+
+    expect(saved).toHaveLength(1);
+    expect(saved.at(0)).toMatchObject({
+      providerId: "claude-cli",
+      workspace: "/ws",
+      sessionId: "s-restored",
+      cwd: "/original",
+    });
   });
 });
