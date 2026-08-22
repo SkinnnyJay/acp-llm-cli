@@ -185,7 +185,7 @@ The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust
 `cliSpec.getHelp()` shells out to the CLI's `--help` and returns stdout, which is useful for discovery and for checking that an installed CLI supports what you are about to send:
 
 ```ts
-const helpText = await adapter.cliSpec.getHelp({
+const helpText = await adapter?.cliSpec?.getHelp({
   command: "claude-agent-acp",
   args: adapter.cliSpec.defaultArgs,
   cwd: process.cwd(),
