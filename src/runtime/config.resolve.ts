@@ -5,17 +5,24 @@ import { getEnvString } from "./env.reader";
 
 /**
  * Resolve config: defaults → env (ENV_KEY only) → overrides. No raw env strings.
- * Returns a plain object; caller validates with provider schema.
+ *
+ * Returns the caller's own config with the resolved base fields applied over it, so the
+ * precedence rule lives here rather than at each call site. It previously returned only
+ * {command, args, cwd, env}, which meant every caller had to write
+ * `schema.parse({ ...config, ...resolved })` to stop provider-specific fields being discarded -
+ * duplicated at two sites, and expressed purely by spread argument order, so the inverted
+ * `{ ...resolved, ...config }` type-checked identically while silently throwing away all
+ * env and default resolution.
  */
-export function resolveBaseConfig(
+export function resolveBaseConfig<TConfig extends Partial<BaseCliConfig>>(
   defaults: { command: string; args: string[] },
   envOverrides: {
     commandKey: keyof typeof ENV_KEY;
     argsKey: keyof typeof ENV_KEY;
   },
-  overrides?: Partial<BaseCliConfig>,
+  overrides?: TConfig,
   envOverride?: ProcessEnv
-): BaseCliConfig {
+): TConfig & BaseCliConfig {
   const command =
     overrides?.command ??
     getEnvString(ENV_KEY[envOverrides.commandKey], defaults.command, envOverride);
@@ -27,7 +34,12 @@ export function resolveBaseConfig(
           if (!raw.trim()) return defaults.args;
           return raw.trim().split(/\s+/);
         })();
-  const cwd = overrides?.cwd ?? undefined;
-  const envVars = overrides?.env ?? {};
-  return { command, args, cwd, env: envVars };
+  // Spread the caller's config first so provider fields survive; the resolved base then wins.
+  return {
+    ...((overrides ?? {}) as TConfig),
+    command,
+    args,
+    cwd: overrides?.cwd,
+    env: overrides?.env ?? {},
+  };
 }

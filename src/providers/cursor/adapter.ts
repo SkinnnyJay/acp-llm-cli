@@ -64,9 +64,7 @@ function createRuntime(config: CursorConfig, runtimeOptions?: AcpSharedRuntimeOp
     },
     config
   );
-  // Spread config underneath the resolved base so cursor-specific fields (trust, mode, model,
-  // workspacePath, ...) survive; CursorAgentPort reads them at spawn time.
-  const parsed = cursorConfigSchema.parse({ ...config, ...resolved });
+  const parsed = cursorConfigSchema.parse(resolved);
   return new CursorAgentPort(parsed);
 }
 
