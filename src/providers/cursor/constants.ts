@@ -13,7 +13,6 @@ export const CURSOR_CONFIG_KEYS = {
 export const CURSOR_CLI_ARG = {
   PRINT: "-p",
   OUTPUT_FORMAT: "--output-format",
-  STREAM_JSON: "stream-json",
   STREAM_PARTIAL_OUTPUT: "--stream-partial-output",
   RESUME: "--resume",
   MODEL: "--model",
@@ -22,9 +21,19 @@ export const CURSOR_CLI_ARG = {
   WORKSPACE: "--workspace",
   TRUST: "--trust",
   VERSION: "--version",
-  STATUS: "status",
-  MODELS: "models",
-  LIST_SESSIONS: "ls",
+} as const;
+
+/** Operand of --output-format. A value, not a flag, so it stays out of the flag table. */
+export const CURSOR_OUTPUT_FORMAT = {
+  STREAM_JSON: "stream-json",
+} as const;
+
+/**
+ * Bare subcommands. Kept out of CURSOR_CLI_ARG for the same reason as Claude's: that table is
+ * the codomain of ProviderFlagMap, and a non-flag token there lets a generic option be mapped
+ * onto a positional argument.
+ */
+export const CURSOR_CLI_SUBCOMMAND = {
   CREATE_CHAT: "create-chat",
 } as const;
 

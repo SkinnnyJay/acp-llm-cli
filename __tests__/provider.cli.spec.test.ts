@@ -43,6 +43,17 @@ describe("provider CLI specs", () => {
       const emitted = argv.filter((token) => token.startsWith("--") || /^-[a-z]$/.test(token));
       expect(emitted.filter((flag) => !declared.has(flag))).toEqual([]);
     });
+
+    it(`${id}: declares only flags, never bare subcommands`, () => {
+      // knownFlags is the codomain of ProviderFlagMap, whose stated purpose is to stop a flag
+      // the provider never declared from being invented at the map. A non-flag token in that
+      // table holes the guard: mapping MODEL to it type-checks and emits a bare positional
+      // subcommand into a spawned binary's argv. The mapped-subset-of-declared assertion above
+      // cannot see it (it IS declared) and the emitted-token filter below only inspects tokens
+      // starting with "-".
+      const nonFlags = Object.values(spec.knownFlags).filter((value) => !value.startsWith("-"));
+      expect(nonFlags).toEqual([]);
+    });
   }
 
   it("no longer claims a --trust flag for claude", () => {

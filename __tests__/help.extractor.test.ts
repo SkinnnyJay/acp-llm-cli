@@ -16,7 +16,7 @@ describe("extractHelp", () => {
     const out = await extractHelp({
       command: "fake-cli",
       args: ["sub"],
-      spawnFn: spawnFn as never,
+      spawnFn: spawnFn,
     });
     expect(out).toBe("Usage: tool\n");
     expect(spawnFn).toHaveBeenCalledWith(
@@ -30,8 +30,8 @@ describe("extractHelp", () => {
     const { child } = createFakeChild({ stderr: "boom", exitCode: 2 });
     const spawnFn = vi.fn().mockReturnValue(child);
 
-    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn as never })).rejects.toThrow(
-      ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")
+    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn })).rejects.toThrow(
+      ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "", "boom")
     );
   });
 
@@ -43,7 +43,7 @@ describe("extractHelp", () => {
     const promise = extractHelp({
       command: "fake-cli",
       timeoutMs: 100,
-      spawnFn: spawnFn as never,
+      spawnFn: spawnFn,
     });
     const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(100));
 
@@ -55,5 +55,25 @@ describe("extractHelp", () => {
 
     await assertion;
     vi.useRealTimers();
+  });
+  it("rejects when the child is killed by a signal instead of returning partial help", async () => {
+    // A signal-killed --help used to resolve with whatever had been captured so far, which is
+    // indistinguishable from "the CLI exited 0 and printed nothing" - and worse when partial
+    // output was already buffered, since getHelp() is documented as a capability check.
+    const { child, triggerExit } = createFakeChild({ stdout: "Usage: to", hang: true });
+    const spawnFn = vi.fn().mockReturnValue(child);
+
+    const promise = extractHelp({ command: "fake-cli", spawnFn: spawnFn });
+    const assertion = expect(promise).rejects.toThrow(/SIGKILL/);
+    triggerExit(null, "SIGKILL");
+    await assertion;
+  });
+
+  it("still resolves an empty string when the CLI genuinely exits 0 with no output", async () => {
+    // Pins the half that must NOT change: exit 0 and silent is a legitimate success.
+    const { child } = createFakeChild({ exitCode: 0 });
+    const spawnFn = vi.fn().mockReturnValue(child);
+
+    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn })).resolves.toBe("");
   });
 });

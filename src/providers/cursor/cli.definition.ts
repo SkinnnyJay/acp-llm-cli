@@ -13,17 +13,17 @@ const baseCliSpec = createStandardCliSpec<CursorConfig>(
 
 function buildArgs(config: CursorConfig): string[] {
   const baseArgs = config.args ?? [...DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS];
+  // `stream` and `debug` are omitted deliberately: CURSOR_GENERIC_FLAG_MAP maps neither, so
+  // buildGenericArgs discarded them. Forwarding them read as if they reached the CLI.
   const generic = buildGenericArgs(
     {
       model: config.model,
       outputFormat: config.outputFormat,
-      stream: config.stream,
       trust: config.trust,
       sandbox: config.sandbox,
       workspace: config.workspace ?? config.workspacePath,
       resume: config.resume,
       verbose: config.verbose,
-      debug: config.debug,
       print: config.print,
     },
     CURSOR_GENERIC_FLAG_MAP,

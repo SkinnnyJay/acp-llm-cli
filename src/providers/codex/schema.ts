@@ -1,12 +1,14 @@
 import type { z } from "zod";
-import { createProviderConfigSchema } from "../../cli/provider.config.schema";
-import { ModelIdSchema as OpenAIModelIdSchema } from "../../domain/models/openai.models";
+import { acpCliConfigSchema } from "../../cli/provider.config.schema";
 
 /**
- * Codex CLI config: base plus generic LLM options (model, sandbox, etc.).
- * model: validated against OpenAI model enum (run npm run update-models to refresh)
- * or any string (open escape for new model ids / overrides).
+ * Codex CLI config: base command/args/cwd/env plus generic LLM options.
+ *
+ * `model` accepts any string. It is a label, not a constraint: ACP providers select their model
+ * over the protocol or via `args`, and the configured value is threaded through as the default
+ * model id on OpenAI-style stream envelopes. For validation against the vendor's catalogue,
+ * import OpenAIModelIdSchema and parse with it explicitly.
  */
-export const codexConfigSchema = createProviderConfigSchema(OpenAIModelIdSchema);
+export const codexConfigSchema = acpCliConfigSchema;
 
 export type CodexConfig = z.infer<typeof codexConfigSchema>;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
-import { CURSOR_CLI_ARG } from "../src/providers/cursor/constants";
+import { CURSOR_CLI_ARG, CURSOR_CLI_SUBCOMMAND } from "../src/providers/cursor/constants";
 import { CursorAgentPort } from "../src/providers/cursor/cursor.agent.port";
 import { createFakeChild } from "./helpers/fake.child.process";
 
@@ -17,7 +17,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();
@@ -34,7 +34,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {}, trust: true },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
@@ -42,7 +42,7 @@ describe("CursorAgentPort spawn contract", () => {
 
   it("newSession extracts UUID session id", async () => {
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${SESSION_UUID}\n`, exitCode: 0 }).child;
       }
       return createFakeChild({ exitCode: 0 }).child;
@@ -50,7 +50,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     const session = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -59,7 +59,7 @@ describe("CursorAgentPort spawn contract", () => {
 
   it("prompt builds argv and parses NDJSON result", async () => {
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: SESSION_UUID, exitCode: 0 }).child;
       }
       if (args.includes("hello")) {
@@ -79,7 +79,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -97,7 +97,7 @@ describe("CursorAgentPort spawn contract", () => {
       .mockImplementation(() => createFakeChild({ stdout: "not-json\n", exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     await expect(
@@ -123,7 +123,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
 
@@ -148,7 +148,7 @@ describe("CursorAgentPort spawn contract", () => {
     const promptArgs: string[][] = [];
 
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
       }
       if (args.includes("hello")) {
@@ -166,7 +166,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -192,7 +192,7 @@ describe("CursorAgentPort spawn contract", () => {
     const promptArgs: string[][] = [];
 
     const spawnFn = vi.fn().mockImplementation((_c: string, args: string[]) => {
-      if (args.includes(CURSOR_CLI_ARG.CREATE_CHAT)) {
+      if (args.includes(CURSOR_CLI_SUBCOMMAND.CREATE_CHAT)) {
         return createFakeChild({ stdout: `Created ${chats.shift()}\n`, exitCode: 0 }).child;
       }
       if (args.includes("hi")) {
@@ -205,7 +205,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -223,7 +223,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     const states: string[] = [];
     port.on("state", (s) => states.push(s));
@@ -239,7 +239,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockReturnValue(hanging.child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const inflight = port
@@ -261,7 +261,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();
@@ -284,7 +284,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "/custom/path/cursor-agent", args: ["--flag"], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();

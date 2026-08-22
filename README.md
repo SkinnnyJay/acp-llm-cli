@@ -45,7 +45,7 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
-  // Enum id or any string, so a model released today is never blocked. For ACP
+  // Any string. The enum is a convenience for autocomplete, not a constraint. For ACP
   // providers this labels OpenAI-style stream envelopes rather than selecting
   // the agent's model — for that use port.setSessionConfigOption(...) or pass
   // the flag your CLI expects in `args`.
@@ -83,7 +83,7 @@ Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cu
 
 Defaults live in `DEFAULT_COMMANDS` and can be overridden per provider through config or environment. The Claude and Codex bins match the wrappers ACPX prefers, so the two can front the same installation.
 
-Cursor is the outlier: it spawns a process per prompt, so it supports neither streaming nor lifecycle. Its `capabilities` report `streamPrompt`, `restart`, `openClose`, and `sessionPersistence` as `false` — check them rather than assuming.
+Cursor is the outlier: it spawns a process per prompt, so it supports neither streaming nor lifecycle. Its `capabilities` report `streamPrompt`, `restart`, `openClose`, and `sessionPersistence` as `false` — check them rather than assuming. Runtime options that have no meaning for it (`sessionPersistence`, `workspace`, `resumeOnRestart`, `restartOptions`, `envelopeMode`, `modelId`, `clientCapabilities`, `permissionHandler`, `toolHost`) are ignored, and the adapter logs a warning naming them — `capabilities` covers only the first four of those concerns.
 
 ## Configuration
 
@@ -110,22 +110,28 @@ The provider CLIs read their own credentials — `ANTHROPIC_API_KEY`, `OPENAI_AP
 
 ## Streaming
 
-Claude, Codex, and Gemini stream. Feature-detect, then iterate:
+Claude, Codex, and Gemini stream. Feature-detect, then iterate. Narrow each envelope with the
+exported `isOpenAIEnvelope` / `isNativeEnvelope` guards -- `StreamEnvelope` is a union, so
+`object` is not present on every member and reading it directly does not type-check:
 
 ```ts
+import { isOpenAIEnvelope } from "@simpill/acp-llm-cli";
+
 if (port.capabilities?.streamPrompt && port.streamPrompt) {
   for await (const envelope of port.streamPrompt(
     { sessionId, prompt: [{ type: "text", text: "Hello" }] },
     { envelopeMode: "openai" }
   )) {
-    if (envelope.object === "chat.completion.chunk") {
-      process.stdout.write(envelope.choices[0]?.delta?.content ?? "");
+    if (isOpenAIEnvelope(envelope)) {
+      process.stdout.write(envelope.choices?.[0]?.delta?.content ?? "");
     }
   }
 }
 ```
 
 `envelopeMode` is `openai` for OpenAI-compatible chunks, `native` for raw ACP session updates, or `both`.
+
+The final chunk carries a `finish_reason` translated from the agent's stop reason — `length` for a truncated turn, `content_filter` for a refusal, `stop` otherwise. Import `OPENAI_FINISH_REASON` to switch on it; a truncated turn is not a clean completion.
 
 ## Lifecycle and session persistence
 
@@ -174,7 +180,7 @@ const argv = adapter?.cliSpec?.buildArgs({
 // ["--model", "claude-sonnet-4-20250514", "--output-format", "stream-json", "--print"]
 ```
 
-The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust`, `sandbox`, `workspace`, `resume`, `sessionId`, `verbose`, `debug`, `print` — are shared across providers and mapped to each one's real flags. `buildGenericArgs` is exported for custom builders.
+The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust`, `sandbox`, `workspace`, `resume`, `sessionId`, `verbose`, `debug`, `print` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted: `trust` reaches only Cursor, `sessionId` only Claude, and `stream`/`debug` are not currently mapped by any bundled provider, so they affect argv only for a custom flag map you supply. `buildGenericArgs` is exported for custom builders.
 
 `cliSpec.getHelp()` shells out to the CLI's `--help` and returns stdout, which is useful for discovery and for checking that an installed CLI supports what you are about to send:
 
@@ -188,7 +194,7 @@ const helpText = await adapter.cliSpec.getHelp({
 
 ## Model IDs
 
-Model IDs are exported as const objects — `ANTHROPIC_MODEL_IDS`, `OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, `XAI_MODEL_IDS` — so editors autocomplete them and typos fail to compile. Schemas also accept any string, so a model released this morning is never blocked by this package's release cadence.
+Model IDs are exported as const objects — `ANTHROPIC_MODEL_IDS`, `OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, `XAI_MODEL_IDS` — so editors autocomplete them and typos fail to compile. Provider config schemas accept any string for `model`, so a model released this morning is never blocked by this package's release cadence. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a vendor catalogue enforced.
 
 Refresh them from live provider catalogues:
 
@@ -217,7 +223,7 @@ Create `src/providers/<name>/` with four files:
 | File | Responsibility |
 |---|---|
 | `schema.ts` | Zod config schema, extending `baseCliConfigSchema` and `genericLlmCliOptionsSchema.partial()` |
-| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP` |
+| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP`. `*_CLI_ARG` is the codomain of `ProviderFlagMap`, so it must hold **flags only** — put bare subcommands in a `*_CLI_SUBCOMMAND` const and flag operands in their own, or a generic option can be mapped onto a positional argument |
 | `cli.definition.ts` | `ICliSpec` — `defaultArgs`, `genericFlagMap`, `knownFlags`, `buildArgs`, `getHelp` |
 | `adapter.ts` | Ties them together and exposes `createRuntime(config)` |
 

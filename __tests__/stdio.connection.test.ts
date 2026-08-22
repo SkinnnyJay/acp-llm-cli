@@ -609,3 +609,85 @@ describe("StdioConnection disconnect force-kill timer", () => {
     }
   });
 });
+
+describe("StdioConnection intentional-kill bookkeeping", () => {
+  it("remembers every child it deliberately killed, not just the most recent one", () => {
+    // `closingChild` was a single slot for what is really a set. Sequence: child A errors and
+    // stays current -> connect() sets closingChild = A and spawns B -> disconnect() overwrites
+    // closingChild = B. A is now a child the connection deliberately killed but has forgotten
+    // it killed, so a late close from A is neither current nor recognised as intentional.
+    //
+    // Today that is benign only because `if (!isCurrent) return` fires before `wasDisconnecting`
+    // is consulted - correctness resting on an unrelated early return three lines later. This
+    // pins the property directly: a deliberately-killed child must never be reported as an error.
+    const childA = createFakeChild();
+    const childB = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValueOnce(childA.child).mockReturnValueOnce(childB.child);
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    const errors: Error[] = [];
+    conn.on("error", (err) => errors.push(err));
+
+    conn.connect();
+    childA.triggerError(new Error("A failed"));
+    expect(errors).toHaveLength(1);
+
+    conn.connect();
+    void conn.disconnect();
+
+    errors.length = 0;
+    childA.triggerExit(1, null);
+
+    expect(errors, "a deliberately killed child must not be reported as a failure").toEqual([]);
+  });
+});
+
+describe("StdioConnection stream construction failure", () => {
+  it("kills the spawned child when its stream cannot be built", async () => {
+    // createNdjsonStream calls Writable.toWeb/Readable.toWeb, which throw on a child without
+    // usable pipes. The OS process is already running at that point. If it is not tracked and
+    // not killed here it is orphaned for the lifetime of the host process: disconnect() finds
+    // nothing to reap, a later connect() sees no previous child, and no close/error listener is
+    // ever bound - so a subsequent 'error' on it is unhandled and takes the process down.
+    const kill = vi.fn();
+    const brokenChild = Object.assign(new EventEmitter(), {
+      stdout: undefined,
+      stderr: { setEncoding() {}, on() {} },
+      stdin: undefined,
+      kill,
+      pid: 999,
+    });
+    const spawnFn = vi.fn().mockReturnValue(brokenChild);
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    conn.on("error", () => {});
+
+    await conn.connect();
+
+    expect(conn.getStream()).toBeUndefined();
+    expect(kill, "a child whose stream failed to build must still be killed").toHaveBeenCalled();
+  });
+
+  it("kills the spawned child when even stderr capture cannot be bound", async () => {
+    // The previous fixture gave the child a working stderr, so bindStderrCapture succeeded and
+    // this path was never exercised. setEncoding on an absent stderr throws one line ABOVE the
+    // kill-on-failure guard, which left exactly the orphan that guard exists to prevent.
+    const kill = vi.fn();
+    const brokenChild = Object.assign(new EventEmitter(), {
+      stdout: undefined,
+      stderr: undefined,
+      stdin: undefined,
+      kill,
+      pid: 998,
+    });
+    const spawnFn = vi.fn().mockReturnValue(brokenChild);
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    conn.on("error", () => {});
+
+    await conn.connect();
+
+    expect(conn.getStream()).toBeUndefined();
+    expect(kill, "a child whose stderr could not be bound must still be killed").toHaveBeenCalled();
+  });
+});

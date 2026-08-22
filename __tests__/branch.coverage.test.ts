@@ -237,8 +237,11 @@ describe("createStandardCliSpec.buildArgs", () => {
 describe("ERROR_MESSAGE helpers", () => {
   it("formats HELP and AGENT_PROCESS_EXITED messages", () => {
     expect(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(1000)).toMatch(/1000/);
-    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")).toMatch(/2/);
-    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "boom")).toMatch(/boom/);
+    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "", "boom")).toMatch(/2/);
+    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "", "boom")).toMatch(/boom/);
+    expect(ERROR_MESSAGE.HELP_COMMAND_FAILED("unknown", " (signal SIGKILL)", "")).toMatch(
+      /SIGKILL/
+    );
     expect(ERROR_MESSAGE.AGENT_PROCESS_EXITED(1, " (signal SIGTERM)", "\nstderr")).toMatch(
       /SIGTERM/
     );

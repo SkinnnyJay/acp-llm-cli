@@ -54,10 +54,14 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
     let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 
     const timeout = setTimeout(() => {
-      child.kill(SIGNAL.TERM);
+      // Install the force-kill timer BEFORE signalling. An injected spawnFn can emit `close`
+      // synchronously from kill(), and the close handler's clearTimeout would then run while
+      // this variable was still undefined - leaving a SIGKILL timer nothing ever clears, holding
+      // the event loop open and later signalling a pid that may have been recycled.
       forceKillTimer = setTimeout(() => {
         child.kill(SIGNAL.KILL);
       }, TIMEOUT.DISCONNECT_FORCE_MS);
+      child.kill(SIGNAL.TERM);
       reject(new Error(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(timeoutMs)));
     }, timeoutMs);
 
@@ -76,14 +80,18 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       reject(err);
     });
 
-    child.on(NODE_EVENT.CLOSE, (code) => {
+    // Both close arguments are bound: a child killed by a signal reports code === null, and
+    // treating that as success returned whatever had been captured so far as if it were the
+    // complete help text. Success is exit 0 and nothing else.
+    child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
-      if (code !== 0 && code !== null) {
+      if (code !== 0) {
         reject(
           new Error(
             ERROR_MESSAGE.HELP_COMMAND_FAILED(
-              code,
+              code ?? "unknown",
+              signal ? ` (signal ${signal})` : "",
               formatStderrForError(stderr, { debug: isDebugEnabled(env) })
             )
           )

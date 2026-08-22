@@ -3,7 +3,7 @@ import { ENVELOPE_KIND } from "../domain/envelope.kind";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import { LIMIT } from "../domain/limits";
-import { OPENAI_COMPAT } from "../domain/openai.compat";
+import { OPENAI_COMPAT, OPENAI_FINISH_REASON } from "../domain/openai.compat";
 import { SESSION_UPDATE_TYPE } from "../domain/session.update.types";
 import type {
   NativeEnvelope,
@@ -100,7 +100,7 @@ export function createOpenAIFinishEnvelope(options: {
 }): OpenAIStyleChunkEnvelope {
   const {
     modelId = OPENAI_COMPAT.DEFAULT_MODEL_ID,
-    finishReason = OPENAI_COMPAT.FINISH_REASON_STOP,
+    finishReason = OPENAI_FINISH_REASON.STOP,
     chunkId = crypto.randomUUID(),
     created = Math.floor(Date.now() / LIMIT.MS_PER_SECOND),
   } = options;

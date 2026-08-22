@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
-import type { PersistedSession } from "../src/domain/session.persistence";
+import type { ISessionPersistence, PersistedSession } from "../src/domain/session.persistence";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import {
   LifecycleAgentPort,
@@ -12,7 +12,8 @@ import {
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 import { createMockAgentPort } from "./helpers/mock.agent.port";
 
-const createMockPort = () => createMockAgentPort({ sessionId: "sess-123", withRestart: true });
+const createMockPort = () =>
+  createMockAgentPort({ sessionId: "sess-123", restart: vi.fn().mockResolvedValue(undefined) });
 
 describe("wrapAgentPortWithLifecycle", () => {
   it("adds restart, openClose, and sessionPersistence capabilities when persistence provided", () => {
@@ -347,9 +348,8 @@ describe("wrapAgentPortWithLifecycle", () => {
   });
 
   it("setSessionMode getter returns bound method from inner when present", () => {
-    const inner = createMockPort();
-    const modeFn = vi.fn();
-    (inner as unknown as Record<string, unknown>).setSessionMode = modeFn;
+    const inner = createMockAgentPort({ setSessionMode: vi.fn() });
+
     const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionMode;
     expect(typeof getter).toBe("function");
@@ -363,9 +363,8 @@ describe("wrapAgentPortWithLifecycle", () => {
   });
 
   it("setSessionConfigOption getter returns bound method from inner when present", () => {
-    const inner = createMockPort();
-    const modelFn = vi.fn();
-    (inner as unknown as Record<string, unknown>).setSessionConfigOption = modelFn;
+    const inner = createMockAgentPort({ setSessionConfigOption: vi.fn() });
+
     const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionConfigOption;
     expect(typeof getter).toBe("function");
@@ -420,5 +419,42 @@ describe("wrapAgentPortWithLifecycle", () => {
     await wrapped.restart?.();
 
     expect(inner.newSession).toHaveBeenCalled();
+  });
+});
+
+describe("LifecycleAgentPort persistence key ownership", () => {
+  it("writes under the configured key even if the store echoes a different one back", async () => {
+    // restart() assembled its own record with `{ ...sessionToResume, ... }`, spreading the
+    // LOADED record's providerId/workspace rather than the configured ones. For a store that
+    // does not round-trip those fields the resume write lands under a different key than every
+    // other write, so the real record never advances and each restart resumes a stale session.
+    const saved: PersistedSession[] = [];
+    const store: ISessionPersistence = {
+      loadSession: vi.fn().mockResolvedValue({
+        providerId: "echoed-elsewhere",
+        workspace: "/somewhere/else",
+        sessionId: "s-restored",
+        cwd: "/original",
+      }),
+      saveSession: vi.fn(async (data: PersistedSession) => {
+        saved.push(data);
+      }),
+      clearSession: vi.fn(),
+    };
+
+    const inner = createMockAgentPort({ restart: vi.fn().mockResolvedValue(undefined) });
+    const port = wrapAgentPortWithLifecycle(inner, {
+      persistence: { store, providerId: "claude-cli", workspace: "/ws" },
+    });
+
+    await port.restart?.();
+
+    expect(saved).toHaveLength(1);
+    expect(saved.at(0)).toMatchObject({
+      providerId: "claude-cli",
+      workspace: "/ws",
+      sessionId: "s-restored",
+      cwd: "/original",
+    });
   });
 });

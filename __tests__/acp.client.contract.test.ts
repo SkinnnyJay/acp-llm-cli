@@ -285,3 +285,61 @@ describe("createAcpAgentPort session methods", () => {
     ).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
   });
 });
+
+describe("ACPClient capability advertisement", () => {
+  const stubToolHost = {
+    readTextFile: vi.fn(),
+    writeTextFile: vi.fn(),
+    createTerminal: vi.fn(),
+    terminalOutput: vi.fn(),
+    waitForTerminalExit: vi.fn(),
+    releaseTerminal: vi.fn(),
+    killTerminal: vi.fn(),
+  } as never;
+
+  it("advertises fs and terminal when a toolHost is supplied", async () => {
+    // Without this the client sent clientCapabilities: {}, so a conforming agent never issued
+    // fs/* or terminal/* requests and the supplied tool host was silently unreachable.
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection, { toolHost: stubToolHost });
+    await port.connect();
+    await port.initialize();
+
+    expect(mockInitialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientCapabilities: {
+          fs: { readTextFile: true, writeTextFile: true },
+          terminal: true,
+        },
+      })
+    );
+  });
+
+  it("advertises nothing when no toolHost is supplied", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+    await port.initialize();
+
+    expect(mockInitialize).toHaveBeenCalledWith(
+      expect.objectContaining({ clientCapabilities: {} })
+    );
+  });
+
+  it("lets an explicit clientCapabilities win over the derived default", async () => {
+    // The escape hatch must stay total: session/plan and partial fs are only expressible here,
+    // so an explicit value is never merged with the derived one.
+    const connection = createMockConnection();
+    const explicit = { fs: { readTextFile: true } };
+    const port = createAcpAgentPort(connection, {
+      toolHost: stubToolHost,
+      clientCapabilities: explicit,
+    });
+    await port.connect();
+    await port.initialize();
+
+    expect(mockInitialize).toHaveBeenCalledWith(
+      expect.objectContaining({ clientCapabilities: explicit })
+    );
+  });
+});

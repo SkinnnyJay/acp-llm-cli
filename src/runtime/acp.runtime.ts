@@ -90,11 +90,9 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   schema: ConfigSchema<TConfig>,
   runtimeOptions?: AcpSharedRuntimeOptions
 ): IAgentPort {
-  const resolved = resolveBaseConfig(defaults, configKeys, config);
-  // resolveBaseConfig returns only command/args/cwd/env. Spread the caller's config underneath it
-  // so provider-specific fields (model, generic CLI options, ...) survive into validation instead
-  // of being silently discarded; the resolved base fields still win.
-  const parsed = schema.parse({ ...config, ...resolved });
+  // resolveBaseConfig now returns the caller's config with the resolved base applied over it,
+  // so the precedence rule lives in that function rather than in a spread here.
+  const parsed = schema.parse(resolveBaseConfig(defaults, configKeys, config));
   // ACP providers select their model over the protocol (setSessionConfigOption) or via `args`, which is
   // passed to the process verbatim - this package never invents CLI flags for a third-party
   // binary. A configured `model` is still meaningful as the default label on OpenAI-style stream

@@ -90,7 +90,15 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
   ) {
     super();
     this.toolHost = options.toolHost;
-    this.clientCapabilities = options.clientCapabilities ?? {};
+    // A tool host is the only way to serve fs/* and terminal/* requests, and IToolHost requires
+    // all seven methods, so its presence is exactly equivalent to "this client supports both".
+    // Defaulting to {} meant the documented way to enable tools advertised no support at all,
+    // the agent never issued the requests, and the host sat unreachable with no diagnostic.
+    // An explicit clientCapabilities still wins outright: session/plan and partial fs support
+    // are only expressible there, so the two are never merged.
+    this.clientCapabilities =
+      options.clientCapabilities ??
+      (options.toolHost ? { fs: { readTextFile: true, writeTextFile: true }, terminal: true } : {});
     this.connection.on(CONNECTION_EVENT.STATE, (status) => {
       // Drop the link on terminal transport states only. A transient CONNECTING must not
       // detach, and third-party transports may emit states this client does not model.
@@ -102,8 +110,13 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     this.connection.on(CONNECTION_EVENT.ERROR, (error) => this.emit(AGENT_PORT_EVENT.ERROR, error));
     // The transport declares and emits EXIT; nothing used to subscribe, so the client kept a
     // link to a process that had already gone away. EXIT is announced for every child, including
-    // one abandoned by an earlier reconnect, so check ownership: if the transport still hands
-    // back the stream this link was built on, the exit belongs to some other child.
+    // one abandoned by an earlier reconnect, so ownership has to be checked.
+    //
+    // The transport clears getStream() before announcing the exit of the process that stream
+    // belonged to. So if getStream() STILL returns the stream this link was built on, the
+    // process that just exited was some other child and the link is untouched; otherwise the
+    // exit was ours and the link is dead. The test reads inverted at a glance - keep the
+    // ordering contract in connection.interface.ts in mind when changing either side.
     this.connection.on(CONNECTION_EVENT.EXIT, () => {
       if (this.attached && this.connection.getStream() === this.attached.stream) {
         return;

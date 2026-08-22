@@ -22,9 +22,6 @@ export const CLAUDE_CLI_ARG = {
   VERBOSE: "--verbose",
   INCLUDE_PARTIAL_MESSAGES: "--include-partial-messages",
   REPLAY_USER_MESSAGES: "--replay-user-messages",
-  AUTH: "auth",
-  STATUS: "status",
-  MODELS: "models",
 } as const;
 
 /**

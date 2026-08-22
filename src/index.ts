@@ -52,6 +52,8 @@ export {
   MODEL_IDS as XAI_MODEL_IDS,
   ModelIdSchema as XAIModelIdSchema,
 } from "./domain/models/xai.models";
+export type { OpenAIFinishReason } from "./domain/openai.compat";
+export { OPENAI_FINISH_REASON } from "./domain/openai.compat";
 export type { PortCapabilityName } from "./domain/port.capabilities";
 export { PORT_CAPABILITY } from "./domain/port.capabilities";
 export { PROVIDER_VALUES, Provider, ProviderSchema } from "./domain/provider";
