@@ -16,7 +16,7 @@ describe("extractHelp", () => {
     const out = await extractHelp({
       command: "fake-cli",
       args: ["sub"],
-      spawnFn: spawnFn as never,
+      spawnFn: spawnFn,
     });
     expect(out).toBe("Usage: tool\n");
     expect(spawnFn).toHaveBeenCalledWith(
@@ -30,7 +30,7 @@ describe("extractHelp", () => {
     const { child } = createFakeChild({ stderr: "boom", exitCode: 2 });
     const spawnFn = vi.fn().mockReturnValue(child);
 
-    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn as never })).rejects.toThrow(
+    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn })).rejects.toThrow(
       ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "", "boom")
     );
   });
@@ -43,7 +43,7 @@ describe("extractHelp", () => {
     const promise = extractHelp({
       command: "fake-cli",
       timeoutMs: 100,
-      spawnFn: spawnFn as never,
+      spawnFn: spawnFn,
     });
     const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(100));
 
@@ -63,7 +63,7 @@ describe("extractHelp", () => {
     const { child, triggerExit } = createFakeChild({ stdout: "Usage: to", hang: true });
     const spawnFn = vi.fn().mockReturnValue(child);
 
-    const promise = extractHelp({ command: "fake-cli", spawnFn: spawnFn as never });
+    const promise = extractHelp({ command: "fake-cli", spawnFn: spawnFn });
     const assertion = expect(promise).rejects.toThrow(/SIGKILL/);
     triggerExit(null, "SIGKILL");
     await assertion;
@@ -74,6 +74,6 @@ describe("extractHelp", () => {
     const { child } = createFakeChild({ exitCode: 0 });
     const spawnFn = vi.fn().mockReturnValue(child);
 
-    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn as never })).resolves.toBe("");
+    await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn })).resolves.toBe("");
   });
 });

@@ -179,11 +179,11 @@ describe("StreamAgentPort", () => {
   });
 
   it("setSessionMode and setSessionConfigOption getters bind inner methods when present", () => {
-    const inner = createMockPort();
-    const modeFn = vi.fn();
-    const modelFn = vi.fn();
-    (inner as unknown as Record<string, unknown>).setSessionMode = modeFn;
-    (inner as unknown as Record<string, unknown>).setSessionConfigOption = modelFn;
+    const inner = createMockAgentPort({
+      setSessionMode: vi.fn(),
+      setSessionConfigOption: vi.fn(),
+    });
+
     const port = new StreamAgentPort(inner);
     expect(typeof port.setSessionMode).toBe("function");
     expect(typeof port.setSessionConfigOption).toBe("function");

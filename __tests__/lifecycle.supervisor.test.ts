@@ -12,7 +12,8 @@ import {
 import { createMemorySessionPersistence } from "../src/runtime/session.persistence.memory";
 import { createMockAgentPort } from "./helpers/mock.agent.port";
 
-const createMockPort = () => createMockAgentPort({ sessionId: "sess-123", withRestart: true });
+const createMockPort = () =>
+  createMockAgentPort({ sessionId: "sess-123", restart: vi.fn().mockResolvedValue(undefined) });
 
 describe("wrapAgentPortWithLifecycle", () => {
   it("adds restart, openClose, and sessionPersistence capabilities when persistence provided", () => {
@@ -347,9 +348,8 @@ describe("wrapAgentPortWithLifecycle", () => {
   });
 
   it("setSessionMode getter returns bound method from inner when present", () => {
-    const inner = createMockPort();
-    const modeFn = vi.fn();
-    (inner as unknown as Record<string, unknown>).setSessionMode = modeFn;
+    const inner = createMockAgentPort({ setSessionMode: vi.fn() });
+
     const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionMode;
     expect(typeof getter).toBe("function");
@@ -363,9 +363,8 @@ describe("wrapAgentPortWithLifecycle", () => {
   });
 
   it("setSessionConfigOption getter returns bound method from inner when present", () => {
-    const inner = createMockPort();
-    const modelFn = vi.fn();
-    (inner as unknown as Record<string, unknown>).setSessionConfigOption = modelFn;
+    const inner = createMockAgentPort({ setSessionConfigOption: vi.fn() });
+
     const wrapped = wrapAgentPortWithLifecycle(inner, {});
     const getter = wrapped.setSessionConfigOption;
     expect(typeof getter).toBe("function");
@@ -443,7 +442,7 @@ describe("LifecycleAgentPort persistence key ownership", () => {
       clearSession: vi.fn(),
     };
 
-    const inner = createMockAgentPort({ withRestart: true });
+    const inner = createMockAgentPort({ restart: vi.fn().mockResolvedValue(undefined) });
     const port = wrapAgentPortWithLifecycle(inner, {
       persistence: { store, providerId: "claude-cli", workspace: "/ws" },
     });

@@ -4,10 +4,19 @@ import type { ConnectionStatus } from "../../src/domain/connection.status";
 import { CONNECTION_STATUS } from "../../src/domain/connection.status";
 import type { IAgentPort } from "../../src/runtime/agent.port";
 
-export interface MockAgentPortOptions {
-  sessionId?: string;
-  withRestart?: boolean;
-}
+/**
+ * Optional IAgentPort members are supplied as the members themselves, not as boolean flags.
+ *
+ * A real port fixes which optional methods it has when the object is built - ACPClient and the
+ * cursor port both declare theirs on the class. A `withRestart` flag modelled only `restart`,
+ * so the other optional members were bolted on after construction at the call sites, producing
+ * a port that ACQUIRES a method later: a transition no production port can make, which meant
+ * those tests were asserting late-bound lookup through an unreachable state. Passing the members
+ * here matches the production model and typechecks the mocks against the real signatures.
+ */
+export type MockAgentPortOptions = { sessionId?: string } & Partial<
+  Pick<IAgentPort, "restart" | "setSessionMode" | "setSessionConfigOption" | "capabilities">
+>;
 
 /** Shared mock IAgentPort for decorator / factory composition tests. */
 export function createMockAgentPort(options: MockAgentPortOptions = {}): IAgentPort {
@@ -44,12 +53,8 @@ export function createMockAgentPort(options: MockAgentPortOptions = {}): IAgentP
     once: emitter.once.bind(emitter),
   };
 
-  if (options.withRestart) {
-    // Stub only — callers that need disconnect/connect semantics should assert those separately.
-    Object.assign(port, {
-      restart: vi.fn().mockResolvedValue(undefined),
-    });
-  }
+  const { sessionId: _sessionId, ...optionalMembers } = options;
+  Object.assign(port, optionalMembers);
 
   return port as unknown as IAgentPort;
 }

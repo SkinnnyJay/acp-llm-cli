@@ -17,7 +17,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();
@@ -34,7 +34,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {}, trust: true },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     expect(port.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
@@ -50,7 +50,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     const session = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -79,7 +79,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -97,7 +97,7 @@ describe("CursorAgentPort spawn contract", () => {
       .mockImplementation(() => createFakeChild({ stdout: "not-json\n", exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
     await expect(
@@ -123,7 +123,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     await port.connect();
 
@@ -166,7 +166,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -205,7 +205,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const a = await port.newSession({ cwd: "/tmp", mcpServers: [] });
@@ -223,7 +223,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
     const states: string[] = [];
     port.on("state", (s) => states.push(s));
@@ -239,7 +239,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockReturnValue(hanging.child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     const inflight = port
@@ -261,7 +261,7 @@ describe("CursorAgentPort spawn contract", () => {
     const spawnFn = vi.fn().mockImplementation(() => createFakeChild({ exitCode: 0 }).child);
     const port = new CursorAgentPort(
       { command: "cursor-agent", args: [], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();
@@ -284,7 +284,7 @@ describe("CursorAgentPort spawn contract", () => {
 
     const port = new CursorAgentPort(
       { command: "/custom/path/cursor-agent", args: ["--flag"], env: {} },
-      { spawnFn: spawnFn as never }
+      { spawnFn: spawnFn }
     );
 
     await port.connect();
