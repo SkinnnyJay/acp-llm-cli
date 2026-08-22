@@ -32,6 +32,13 @@ vi.mock("node:child_process", async () => {
   };
 });
 
+// Imported once at module scope rather than inside each test. As in-test dynamic imports these
+// paid the module-graph cost (zod, the ACP SDK, logger.utils) against vitest's 5s per-test
+// budget, which made this file fail roughly a third of the time on an otherwise busy machine.
+// vi.mock above is hoisted over these imports, so the child_process mock still applies.
+const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
+const { cursorAdapter } = await import("../src/providers/cursor/adapter");
+
 /**
  * resolveBaseConfig returns a fresh {command, args, cwd, env} object. Adapters used to hand that
  * reduced object straight to schema.parse, so every provider-specific field a caller set was
@@ -39,7 +46,6 @@ vi.mock("node:child_process", async () => {
  */
 describe("provider config passthrough", () => {
   it("keeps provider-specific fields when the shared ACP runtime resolves config", async () => {
-    const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
     const seen: unknown[] = [];
     const capturingSchema = {
       parse: (value: unknown) => {
@@ -70,7 +76,6 @@ describe("provider config passthrough", () => {
   });
 
   it("lets resolved base fields win over the caller's originals", async () => {
-    const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
     const seen: unknown[] = [];
     const capturingSchema = {
       parse: (value: unknown) => {
@@ -100,7 +105,6 @@ describe("provider config passthrough", () => {
 
   it("passes --trust to the cursor CLI when the adapter config sets trust", async () => {
     spawnCalls.length = 0;
-    const { cursorAdapter } = await import("../src/providers/cursor/adapter");
 
     const port = cursorAdapter.createHarness({
       command: "cursor-agent",
@@ -117,7 +121,6 @@ describe("provider config passthrough", () => {
 
   it("omits --trust when the adapter config does not set trust", async () => {
     spawnCalls.length = 0;
-    const { cursorAdapter } = await import("../src/providers/cursor/adapter");
 
     const port = cursorAdapter.createHarness({
       command: "cursor-agent",
@@ -133,7 +136,6 @@ describe("provider config passthrough", () => {
 
   it("carries mode and model from adapter config into the prompt argv", async () => {
     spawnCalls.length = 0;
-    const { cursorAdapter } = await import("../src/providers/cursor/adapter");
 
     const port = cursorAdapter.createHarness({
       command: "cursor-agent",
@@ -158,7 +160,6 @@ describe("provider config passthrough", () => {
   });
 
   it("labels OpenAI-style envelopes with the configured model", async () => {
-    const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
     const captured: Array<Record<string, unknown>> = [];
     const capturingSchema = {
       parse: (value: unknown) => {
