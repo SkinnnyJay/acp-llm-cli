@@ -94,19 +94,20 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
         cwd: this.options.cwd,
         env: mergeEnv(this.options.env),
       });
-      this.bindStderrCapture(child);
+      // Everything between spawning and recording the session is guarded together. The process
+      // is already running by this point, but nothing has been stored in `current`, so
+      // disconnect() would find nothing to reap and the next connect() would see no previous
+      // child - leaving it orphaned for the lifetime of the host process, with no listeners
+      // bound, so a later 'error' on it would be unhandled. Both steps can throw on a child
+      // without usable pipes: setEncoding on an absent stderr, and Writable/Readable.toWeb
+      // inside createNdjsonStream.
       let session: ChildSession;
       try {
+        this.bindStderrCapture(child);
         session = { child, stream: this.createNdjsonStream(child), intentional: false };
-      } catch (streamError) {
-        // The process is already running but can never be reached: the stream it would be
-        // driven through does not exist, and nothing has been recorded in `current` for
-        // disconnect() to reap. Kill it here rather than orphan it for the lifetime of the
-        // host process. (Previously `child` was assigned before the stream was built, so a
-        // failure here left a tracked child-without-stream - the representable state this
-        // session record removes - and that was the only handle by which it got killed.)
+      } catch (setupError) {
         child.kill?.(SIGNAL.TERM);
-        throw streamError;
+        throw setupError;
       }
       this.current = session;
       this.bindChildProcessEvents(session);

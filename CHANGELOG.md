@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Targets **0.4.0**. This is a minor bump, not a patch: several changes below alter behaviour a
-consumer can observe, and one of them widens what an agent is permitted to do. `package.json`
-has been bumped to match so the release tag and the manifest cannot disagree.
+## [0.4.0] - 2026-08-22
+
+A minor bump, not a patch: several changes below alter behaviour a consumer can observe, and one
+of them widens what an agent is permitted to do. `package.json` matches, and the release workflow
+now refuses a tag that disagrees with it.
 
 ### Changed
 
@@ -31,6 +33,11 @@ has been bumped to match so the release tag and the manifest cannot disagree.
   refusal signals an OpenAI-compatible consumer acts on. Consumers switching on `finish_reason`
   will now see `"length"` and `"content_filter"`. `OPENAI_FINISH_REASON` and `OpenAIFinishReason`
   are exported from both entry points so there is a vocabulary to switch on.
+
+  The reported reason arrives unvalidated over JSON-RPC, so the translation is own-property
+  guarded and an unrecognised reason falls back to `"stop"` explicitly. (0.3.0 emitted a
+  hardcoded constant and never performed a lookup, so this hardens new code rather than fixing
+  anything a 0.3.0 consumer could hit.)
 
 - **`extractHelp` / `cliSpec.getHelp()` reject on a signal kill.** A child killed by a signal
   reports `code === null`, which previously resolved with whatever partial output had been
@@ -58,15 +65,6 @@ has been bumped to match so the release tag and the manifest cannot disagree.
   unaffected and remain available as strict opt-in validators.
 
 ### Fixed
-
-- An unrecognised `stopReason` from an agent could ship a malformed terminal chunk. The value
-  arrives unvalidated over JSON-RPC and was used to index a plain object literal, so it reached
-  `Object.prototype`: `"constructor"` and `"toString"` returned functions, which `JSON.stringify`
-  drops — emitting a chunk with **no `finish_reason` key at all**, which an OpenAI client reads as
-  "still generating" and waits on — and `"__proto__"` emitted `finish_reason: {}`. The lookup is
-  now own-property guarded and unknown reasons fall back to `"stop"` explicitly.
-
-- A child whose stream could not be constructed was left running with no way to reach or kill it.
 
 - The help extractor's force-kill timer could be installed after the child had already closed,
   leaving an uncleared `SIGKILL` timer holding the event loop open.

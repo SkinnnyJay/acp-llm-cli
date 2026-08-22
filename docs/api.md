@@ -38,7 +38,10 @@ Curated exports from the package root. Prefer this surface for applications.
 | `ENVELOPE_MODE` / `EnvelopeMode` | const/type | `openai` \| `native` \| `both` |
 | `OpenAIStyleChunkEnvelope` | type | The OpenAI-compatible chunk shape |
 | `StreamEnvelope` / `isNativeEnvelope` / `isOpenAIEnvelope` | type/guard | Dual-envelope stream types |
+| `OPENAI_FINISH_REASON` / `OpenAIFinishReason` | const/type | The closed set of `finish_reason` values emitted on OpenAI-style envelopes: `stop`, `length`, `content_filter`, `tool_calls` |
 | `PORT_CAPABILITY` / `PortCapabilityName` | const/type | Capability flag names |
+
+The terminal chunk carries a real `finish_reason` translated from the agent's ACP stop reason: `max_tokens` and `max_turn_requests` become `length`, `refusal` becomes `content_filter`, and `end_turn`/`cancelled` become `stop`. Switch on `OPENAI_FINISH_REASON` rather than raw strings — a truncated or refused turn is not a clean completion.
 
 `streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
 

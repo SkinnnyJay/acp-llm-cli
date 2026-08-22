@@ -8,10 +8,16 @@ describe("resolveBaseConfig owns the precedence rule", () => {
     // duplicated at two sites, each with its own explanatory comment. Precedence was expressed
     // by spread ARGUMENT ORDER, so `{ ...resolved, ...config }` type-checked identically and
     // silently threw away all env/default resolution.
+    const providerConfig = {
+      command: "explicit-cmd",
+      args: ["--explicit"],
+      model: "m",
+      verbose: true,
+    };
     const out = resolveBaseConfig(
       { command: "default-cmd", args: ["--default"] },
       { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
-      { command: "explicit-cmd", args: ["--explicit"], model: "m", verbose: true } as never,
+      providerConfig,
       {}
     );
 

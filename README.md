@@ -131,6 +131,8 @@ if (port.capabilities?.streamPrompt && port.streamPrompt) {
 
 `envelopeMode` is `openai` for OpenAI-compatible chunks, `native` for raw ACP session updates, or `both`.
 
+The final chunk carries a `finish_reason` translated from the agent's stop reason — `length` for a truncated turn, `content_filter` for a refusal, `stop` otherwise. Import `OPENAI_FINISH_REASON` to switch on it; a truncated turn is not a clean completion.
+
 ## Lifecycle and session persistence
 
 Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` retries on an awaited, capped exponential backoff.
