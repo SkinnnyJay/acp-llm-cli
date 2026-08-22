@@ -10,10 +10,9 @@ import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { LIMIT } from "../domain/limits";
-import { OPENAI_FINISH_REASON } from "../domain/openai.compat";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import { notificationSessionId } from "../domain/session.notification";
-import { STOP_REASON_TO_FINISH_REASON } from "../domain/stop.reason";
+import { toFinishReason } from "../domain/stop.reason";
 import type { StreamEnvelope } from "../domain/stream.envelopes";
 import type {
   AgentPortCapabilities,
@@ -155,12 +154,9 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
       // clean completion, so the one signal those consumers act on was lost.
       const response = await promptPromise;
       if (mode === ENVELOPE_MODE.OPENAI || mode === ENVELOPE_MODE.BOTH) {
-        const stopReason = response?.stopReason;
         yield createOpenAIFinishEnvelope({
           modelId,
-          finishReason: stopReason
-            ? STOP_REASON_TO_FINISH_REASON[stopReason]
-            : OPENAI_FINISH_REASON.STOP,
+          finishReason: toFinishReason(response?.stopReason),
           chunkId: chunkId(),
           created: streamCreated,
         });

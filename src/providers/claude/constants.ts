@@ -25,18 +25,6 @@ export const CLAUDE_CLI_ARG = {
 } as const;
 
 /**
- * Bare subcommands, kept out of CLAUDE_CLI_ARG. They are not flags, and CLAUDE_CLI_ARG is the
- * codomain of ProviderFlagMap - so while they lived there, mapping a generic option onto one
- * type-checked and emitted a positional token into the spawned binary's argv, which is exactly
- * what that type exists to prevent.
- */
-export const CLAUDE_CLI_SUBCOMMAND = {
-  AUTH: "auth",
-  STATUS: "status",
-  MODELS: "models",
-} as const;
-
-/**
  * Map generic option keys to Claude CLI flag names. Typed as a projection of CLAUDE_CLI_ARG so a
  * flag that the provider never declared - as `--trust` was, the only raw literal here and not a
  * claude-agent-acp flag at all - becomes a compile error rather than wrong discovery metadata.

@@ -23,14 +23,37 @@ describe("resolveBaseConfig owns the precedence rule", () => {
     });
   });
 
-  it("still lets the resolved base win over the caller's own base fields", () => {
-    const out = resolveBaseConfig(
-      { command: "default-cmd", args: ["--default"] },
+  it("prefers the caller's command over the env var, and the env var over the default", () => {
+    // The previous version of this case passed a config with no command and no args, so it
+    // asserted the plain default path rather than precedence - it would have passed against the
+    // inverted `{ ...resolved, ...config }` too. Drive all three layers instead.
+    const env = { ACP_LLM_CLI_CLAUDE_COMMAND: "from-env" };
+
+    const callerWins = resolveBaseConfig(
+      { command: "from-default", args: [] },
       { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
-      { model: "m" } as never,
+      { command: "from-caller" },
+      env
+    );
+    expect(callerWins.command).toBe("from-caller");
+
+    // Carries env so it satisfies Partial<BaseCliConfig>; a real provider config always does.
+    const modelOnly = { model: "m", env: {} };
+    const envWins = resolveBaseConfig(
+      { command: "from-default", args: [] },
+      { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
+      modelOnly,
+      env
+    );
+    expect(envWins.command).toBe("from-env");
+
+    const defaultWins = resolveBaseConfig(
+      { command: "from-default", args: [] },
+      { commandKey: "ACP_LLM_CLI_CLAUDE_COMMAND", argsKey: "ACP_LLM_CLI_CLAUDE_ARGS" },
+      modelOnly,
       {}
     );
-    expect(out).toMatchObject({ command: "default-cmd", args: ["--default"], model: "m" });
+    expect(defaultWins.command).toBe("from-default");
   });
 
   it("preserves an explicit cwd", () => {

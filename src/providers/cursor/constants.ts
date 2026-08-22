@@ -34,9 +34,6 @@ export const CURSOR_OUTPUT_FORMAT = {
  * onto a positional argument.
  */
 export const CURSOR_CLI_SUBCOMMAND = {
-  STATUS: "status",
-  MODELS: "models",
-  LIST_SESSIONS: "ls",
   CREATE_CHAT: "create-chat",
 } as const;
 

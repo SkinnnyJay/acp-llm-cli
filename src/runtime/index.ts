@@ -1,5 +1,7 @@
 // Public agent port types and interfaces
 
+export type { OpenAIFinishReason } from "../domain/openai.compat";
+export { OPENAI_FINISH_REASON } from "../domain/openai.compat";
 export type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
 export type { WrapAgentPortOptions } from "./acp.agent.port.stream";
 // Stream decorator — named class + factory

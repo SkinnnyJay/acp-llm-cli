@@ -45,7 +45,7 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
-  // Enum id or any string, so a model released today is never blocked. For ACP
+  // Any string. The enum is a convenience for autocomplete, not a constraint. For ACP
   // providers this labels OpenAI-style stream envelopes rather than selecting
   // the agent's model — for that use port.setSessionConfigOption(...) or pass
   // the flag your CLI expects in `args`.
@@ -83,7 +83,7 @@ Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cu
 
 Defaults live in `DEFAULT_COMMANDS` and can be overridden per provider through config or environment. The Claude and Codex bins match the wrappers ACPX prefers, so the two can front the same installation.
 
-Cursor is the outlier: it spawns a process per prompt, so it supports neither streaming nor lifecycle. Its `capabilities` report `streamPrompt`, `restart`, `openClose`, and `sessionPersistence` as `false` — check them rather than assuming.
+Cursor is the outlier: it spawns a process per prompt, so it supports neither streaming nor lifecycle. Its `capabilities` report `streamPrompt`, `restart`, `openClose`, and `sessionPersistence` as `false` — check them rather than assuming. Runtime options that have no meaning for it (`sessionPersistence`, `workspace`, `resumeOnRestart`, `restartOptions`, `envelopeMode`, `modelId`, `clientCapabilities`, `permissionHandler`, `toolHost`) are ignored, and the adapter logs a warning naming them — `capabilities` covers only the first four of those concerns.
 
 ## Configuration
 
@@ -192,7 +192,7 @@ const helpText = await adapter.cliSpec.getHelp({
 
 ## Model IDs
 
-Model IDs are exported as const objects — `ANTHROPIC_MODEL_IDS`, `OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, `XAI_MODEL_IDS` — so editors autocomplete them and typos fail to compile. Schemas also accept any string, so a model released this morning is never blocked by this package's release cadence.
+Model IDs are exported as const objects — `ANTHROPIC_MODEL_IDS`, `OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, `XAI_MODEL_IDS` — so editors autocomplete them and typos fail to compile. Provider config schemas accept any string for `model`, so a model released this morning is never blocked by this package's release cadence. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a vendor catalogue enforced.
 
 Refresh them from live provider catalogues:
 
@@ -221,7 +221,7 @@ Create `src/providers/<name>/` with four files:
 | File | Responsibility |
 |---|---|
 | `schema.ts` | Zod config schema, extending `baseCliConfigSchema` and `genericLlmCliOptionsSchema.partial()` |
-| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP` |
+| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP`. `*_CLI_ARG` is the codomain of `ProviderFlagMap`, so it must hold **flags only** — put bare subcommands in a `*_CLI_SUBCOMMAND` const and flag operands in their own, or a generic option can be mapped onto a positional argument |
 | `cli.definition.ts` | `ICliSpec` — `defaultArgs`, `genericFlagMap`, `knownFlags`, `buildArgs`, `getHelp` |
 | `adapter.ts` | Ties them together and exposes `createRuntime(config)` |
 

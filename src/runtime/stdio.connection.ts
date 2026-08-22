@@ -38,10 +38,14 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
    *
    * These were three connection-scoped fields hand-synchronised at four sites. `child` set with
    * `stream` undefined was representable and prevented only by convention - and `stream` is the
-   * identity token acp.client uses to decide whether an exit belongs to its link. `intentional`
-   * lives on the session rather than in a single connection-wide slot, so any number of
-   * deliberately-killed children can be pending at once; a single slot silently forgot the first
-   * one when a second teardown began.
+   * identity token acp.client uses to decide whether an exit belongs to its link.
+   *
+   * `intentional` lives on the session rather than in a single connection-wide slot, so any
+   * number of deliberately-killed children can be pending at once. Note this is a robustness
+   * change, not a bug fix: with the old single slot the first kill was forgotten when a second
+   * teardown began, but that was unobservable, because the flag is only ever read after an
+   * `isCurrent` check that a forgotten child always fails. The point is that the guarantee no
+   * longer depends on the order of those two statements.
    *
    * `status` is deliberately NOT folded in: an errored child stays current and usable
    * (getStream() still returns its stream), so status is not derivable from the session.
@@ -91,11 +95,19 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
         env: mergeEnv(this.options.env),
       });
       this.bindStderrCapture(child);
-      const session: ChildSession = {
-        child,
-        stream: this.createNdjsonStream(child),
-        intentional: false,
-      };
+      let session: ChildSession;
+      try {
+        session = { child, stream: this.createNdjsonStream(child), intentional: false };
+      } catch (streamError) {
+        // The process is already running but can never be reached: the stream it would be
+        // driven through does not exist, and nothing has been recorded in `current` for
+        // disconnect() to reap. Kill it here rather than orphan it for the lifetime of the
+        // host process. (Previously `child` was assigned before the stream was built, so a
+        // failure here left a tracked child-without-stream - the representable state this
+        // session record removes - and that was the only handle by which it got killed.)
+        child.kill?.(SIGNAL.TERM);
+        throw streamError;
+      }
       this.current = session;
       this.bindChildProcessEvents(session);
 

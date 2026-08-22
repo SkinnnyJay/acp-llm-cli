@@ -641,3 +641,30 @@ describe("StdioConnection intentional-kill bookkeeping", () => {
     expect(errors, "a deliberately killed child must not be reported as a failure").toEqual([]);
   });
 });
+
+describe("StdioConnection stream construction failure", () => {
+  it("kills the spawned child when its stream cannot be built", async () => {
+    // createNdjsonStream calls Writable.toWeb/Readable.toWeb, which throw on a child without
+    // usable pipes. The OS process is already running at that point. If it is not tracked and
+    // not killed here it is orphaned for the lifetime of the host process: disconnect() finds
+    // nothing to reap, a later connect() sees no previous child, and no close/error listener is
+    // ever bound - so a subsequent 'error' on it is unhandled and takes the process down.
+    const kill = vi.fn();
+    const brokenChild = Object.assign(new EventEmitter(), {
+      stdout: undefined,
+      stderr: { setEncoding() {}, on() {} },
+      stdin: undefined,
+      kill,
+      pid: 999,
+    });
+    const spawnFn = vi.fn().mockReturnValue(brokenChild);
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    conn.on("error", () => {});
+
+    await conn.connect();
+
+    expect(conn.getStream()).toBeUndefined();
+    expect(kill, "a child whose stream failed to build must still be killed").toHaveBeenCalled();
+  });
+});

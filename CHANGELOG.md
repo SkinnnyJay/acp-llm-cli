@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Supplying `toolHost` now advertises filesystem and terminal capabilities.** `clientCapabilities`
+  defaulted to `{}` and nothing ever set it, so passing `toolHost` — the documented way to enable
+  tools — told the agent this client supports neither, and the host was never called. It now
+  advertises `fs.readTextFile`, `fs.writeTextFile` and `terminal` unless you pass
+  `clientCapabilities` yourself, in which case your value is used outright and never merged.
+
+  Read this before upgrading if you pass a `toolHost`: `fs/write_text_file` and `terminal/create`
+  are direct client methods in ACP and do **not** pass through `permissionHandler`, so the
+  deny-by-default permission rule does not gate them. An agent that previously could not touch
+  the disk now can. `IToolHost` requires all seven methods to *exist*, not to *work*, so stubbed
+  terminal methods will now be called. Pass `clientCapabilities` explicitly to advertise less.
+
+- **OpenAI-mode streams emit real `finish_reason` values.** The stream discarded the resolved
+  `PromptResponse` and always emitted `"stop"`, so `max_tokens`, `max_turn_requests`, `refusal`
+  and `cancelled` were all reported as clean completions — losing exactly the truncation and
+  refusal signals an OpenAI-compatible consumer acts on. Consumers switching on `finish_reason`
+  will now see `"length"` and `"content_filter"`. `OPENAI_FINISH_REASON` and `OpenAIFinishReason`
+  are exported from both entry points so there is a vocabulary to switch on.
+
+- **`extractHelp` / `cliSpec.getHelp()` reject on a signal kill.** A child killed by a signal
+  reports `code === null`, which previously resolved with whatever partial output had been
+  captured — indistinguishable from a CLI that exited 0 and printed nothing. Since `getHelp()` is
+  documented as the way to check whether an installed CLI supports a flag, a truncated capture
+  produced a false negative. Success is now exit 0 and nothing else, and the error carries a
+  `(signal SIGX)` suffix.
+
+- **`resolveBaseConfig` returns your config with the resolved base applied over it**, instead of
+  only `{ command, args, cwd, env }`. Callers no longer need `schema.parse({ ...config, ...resolved })`
+  to stop provider-specific fields being discarded — the precedence rule now lives in the function
+  rather than in each call site's spread order, where the inverted spelling type-checked
+  identically while silently discarding all env and default resolution. Exported from `./runtime`.
+
+- **Cursor warns about runtime options it cannot honour.** It accepted the shared options type and
+  discarded every field; `sessionPersistence`, `envelopeMode`, `modelId`, `toolHost`,
+  `permissionHandler` and `restartOptions` now produce a warning naming what was ignored.
+  `capabilities` already reported four of these as unsupported; the other five had no signal at all.
+
+- Provider `model` config is plain `z.string()`. `claudeConfigSchema`, `codexConfigSchema` and
+  `geminiConfigSchema` threaded a vendor enum through `z.union([enum, z.string()])`, which accepts
+  a strict superset of any enum — so the enum rejected nothing at runtime and the inferred type
+  widened to `string`. Their JSDoc claimed the model was "validated against" the vendor enum,
+  which was never true. Runtime behaviour is unchanged; the `*ModelIdSchema` exports are
+  unaffected and remain available as strict opt-in validators.
+
+### Fixed
+
+- An unrecognised `stopReason` from an agent could ship a malformed terminal chunk. The value
+  arrives unvalidated over JSON-RPC and was used to index a plain object literal, so it reached
+  `Object.prototype`: `"constructor"` and `"toString"` returned functions, which `JSON.stringify`
+  drops — emitting a chunk with **no `finish_reason` key at all**, which an OpenAI client reads as
+  "still generating" and waits on — and `"__proto__"` emitted `finish_reason: {}`. The lookup is
+  now own-property guarded and unknown reasons fall back to `"stop"` explicitly.
+
+- A child whose stream could not be constructed was left running with no way to reach or kill it.
+
+- The help extractor's force-kill timer could be installed after the child had already closed,
+  leaving an uncleared `SIGKILL` timer holding the event loop open.
+
+- Non-flag tokens (`auth`, `status`, `models`, `ls`, `create-chat`) lived in the Claude and Cursor
+  `*_CLI_ARG` tables, which are the codomain of `ProviderFlagMap`. Mapping a generic option onto
+  one type-checked and emitted a bare positional argument into a spawned binary's argv. They now
+  live in separate `*_CLI_SUBCOMMAND` / `CURSOR_OUTPUT_FORMAT` consts, and `knownFlags` — public
+  discovery data — contains only flags again.
+
+- README's streaming example did not type-check: it read `envelope.object` (not present on every
+  member of the `StreamEnvelope` union) and indexed `choices[0]` under `noUncheckedIndexedAccess`.
+  It now uses the exported `isOpenAIEnvelope` guard, matching `examples/stream-prompt.ts`.
+
+- `lifecycle.supervisor`'s restart path assembled its own persistence record, spreading the
+  *loaded* record's `providerId`/`workspace` rather than the configured ones, so a store that does
+  not round-trip those fields wrote under a different key than every other write.
+
+### Removed
+
+- `runCursorSpawnedCommand`'s legacy positional signature `(cmd, args, config, timeoutMs, spawnFn)`.
+  Because the fourth parameter was a two-shape union, `(cmd, args, cfg, { timeoutMs }, spawnFn)`
+  type-checked while silently discarding `spawnFn`, and the legacy form could not express
+  `signal` at all. Use the options record. Not on a public entry point.
+
+- `createProviderConfigSchema` (internal), replaced by `acpCliConfigSchema`.
+
 ## [0.3.0] - 2026-08-20
 
 ### Fixed
