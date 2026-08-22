@@ -90,7 +90,15 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
   ) {
     super();
     this.toolHost = options.toolHost;
-    this.clientCapabilities = options.clientCapabilities ?? {};
+    // A tool host is the only way to serve fs/* and terminal/* requests, and IToolHost requires
+    // all seven methods, so its presence is exactly equivalent to "this client supports both".
+    // Defaulting to {} meant the documented way to enable tools advertised no support at all,
+    // the agent never issued the requests, and the host sat unreachable with no diagnostic.
+    // An explicit clientCapabilities still wins outright: session/plan and partial fs support
+    // are only expressible there, so the two are never merged.
+    this.clientCapabilities =
+      options.clientCapabilities ??
+      (options.toolHost ? { fs: { readTextFile: true, writeTextFile: true }, terminal: true } : {});
     this.connection.on(CONNECTION_EVENT.STATE, (status) => {
       // Drop the link on terminal transport states only. A transient CONNECTING must not
       // detach, and third-party transports may emit states this client does not model.

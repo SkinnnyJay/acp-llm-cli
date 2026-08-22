@@ -24,8 +24,8 @@ export const ERROR_MESSAGE = {
   SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED:
     "providerId is required when sessionPersistence is provided",
   HELP_EXTRACTION_TIMEOUT: (timeoutMs: number) => `Help extraction timed out after ${timeoutMs}ms`,
-  HELP_COMMAND_FAILED: (code: number, stderr: string) =>
-    `Help command exited ${code}. stderr: ${stderr}`,
+  HELP_COMMAND_FAILED: (code: number | string, suffix: string, stderr: string) =>
+    `Help command exited ${code}${suffix}. stderr: ${stderr}`,
   STREAM_PROMPT_IN_PROGRESS: "Another streamPrompt is already in progress on this port",
   AGENT_PROCESS_EXITED: (code: number | string, suffix: string, details: string) =>
     `Agent process exited with code ${code}${suffix}${details}`,

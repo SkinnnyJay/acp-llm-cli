@@ -76,14 +76,18 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       reject(err);
     });
 
-    child.on(NODE_EVENT.CLOSE, (code) => {
+    // Both close arguments are bound: a child killed by a signal reports code === null, and
+    // treating that as success returned whatever had been captured so far as if it were the
+    // complete help text. Success is exit 0 and nothing else.
+    child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
-      if (code !== 0 && code !== null) {
+      if (code !== 0) {
         reject(
           new Error(
             ERROR_MESSAGE.HELP_COMMAND_FAILED(
-              code,
+              code ?? "unknown",
+              signal ? ` (signal ${signal})` : "",
               formatStderrForError(stderr, { debug: isDebugEnabled(env) })
             )
           )

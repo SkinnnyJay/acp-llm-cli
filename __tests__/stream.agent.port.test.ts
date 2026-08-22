@@ -135,6 +135,30 @@ describe("StreamAgentPort", () => {
     expect(lastEnvelope?.choices?.[0]?.finish_reason).toBe("stop");
   });
 
+  it.each([
+    ["max_tokens", "length"],
+    ["max_turn_requests", "length"],
+    ["refusal", "content_filter"],
+    ["cancelled", "stop"],
+    ["end_turn", "stop"],
+  ])("maps the ACP stop reason %s onto finish_reason %s", async (stopReason, expected) => {
+    // The stream used to discard the resolved PromptResponse and hardcode "stop", so a truncated
+    // or refused turn was reported to OpenAI-compat consumers as a clean completion.
+    const inner = createMockPort();
+    const port = new StreamAgentPort(inner, { envelopeMode: ENVELOPE_MODE.OPENAI });
+
+    (inner.prompt as ReturnType<typeof vi.fn>).mockResolvedValue({ stopReason });
+
+    const envelopes: unknown[] = [];
+    const params = { sessionId: "s1", prompt: [] } as Parameters<IAgentPort["prompt"]>[0];
+    for await (const env of port.streamPrompt(params)) {
+      envelopes.push(env);
+    }
+
+    const last = envelopes.at(-1) as { choices?: Array<{ finish_reason: string | null }> };
+    expect(last?.choices?.[0]?.finish_reason).toBe(expected);
+  });
+
   it("streamPrompt propagates inner prompt rejection", async () => {
     const inner = createMockPort();
     const port = new StreamAgentPort(inner);
