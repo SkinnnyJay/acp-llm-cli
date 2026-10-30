@@ -62,7 +62,7 @@
     "check:docs": "node scripts/check-docs-snippets.mjs"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.4.0",
+    "@agentclientprotocol/sdk": "^2.0.2",
     "@simpill/async.utils": "^1.1.0",
     "@simpill/env.utils": "^1.1.0",
     "@simpill/logger.utils": "^1.1.0"
