@@ -54,11 +54,15 @@ trip for this release.
 
 ### Changed
 
+- **Behaviour change for Cursor callers:** `model`, `trust`, `sandbox` and `workspace` now reach the spawned
+  process. They are appended after the resolved args (`cursor-agent acp --model <id>`) unless `args` already
+  has that flag, in which case the explicit args win. `outputFormat` and `debug` are never applied. Claude,
+  Codex and Antigravity map none of the four, so their spawn args are unchanged.
 - The wrapper packages were renamed upstream. `claude-agent-acp` now comes from npm
   `@agentclientprotocol/claude-agent-acp` and `codex-acp` from `@agentclientprotocol/codex-acp`;
   the `@zed-industries/*` packages are deprecated. Default commands are unchanged.
 - Flag tables were corrected against saved `--help` output. Cursor maps `model`, `trust`, `sandbox` and
-  `workspace` (this mapping is what `cliSpec.buildArgs` produces; the runtime never calls it); Antigravity's is
+  `workspace` (this mapping is what `cliSpec.buildArgs` produces and what the runtime appends at spawn); Antigravity's is
   filled from `agy acp --help` and maps none of them.
 - A `sessionUpdate` listener that throws now surfaces on the port's `error` event.
 - `session/update` notifications are checked structurally before being emitted, not against the

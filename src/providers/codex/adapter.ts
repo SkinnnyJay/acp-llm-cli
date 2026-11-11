@@ -5,7 +5,7 @@ import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapte
 import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { codexCliSpec } from "./cli.definition";
-import { CODEX_CONFIG_KEYS } from "./constants";
+import { CODEX_CONFIG_KEYS, CODEX_GENERIC_FLAG_MAP } from "./constants";
 import type { CodexConfig } from "./schema";
 import { codexConfigSchema } from "./schema";
 
@@ -24,7 +24,8 @@ const createRuntime = (config: CodexConfig, runtimeOptions?: AcpSharedRuntimeOpt
     {
       ...runtimeOptions,
       providerId: runtimeOptions?.providerId ?? PROVIDER_IDS.CODEX_CLI_ID,
-    }
+    },
+    CODEX_GENERIC_FLAG_MAP
   );
 
 export const codexAdapter = createCliHarnessAdapter<CodexConfig>({

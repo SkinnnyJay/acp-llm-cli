@@ -1,3 +1,5 @@
+import { appendGenericArgs } from "../cli/arg.builder";
+import type { GenericFlagMap, GenericLlmCliOptions } from "../cli/generic.options";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
 import { ACP_ERROR_CODE, InvalidStateError } from "../domain/errors";
@@ -97,17 +99,22 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   defaults: Parameters<typeof resolveBaseConfig>[0],
   configKeys: Parameters<typeof resolveBaseConfig>[1],
   schema: ConfigSchema<TConfig>,
-  runtimeOptions?: AcpSharedRuntimeOptions
+  runtimeOptions?: AcpSharedRuntimeOptions,
+  flagMap: GenericFlagMap = {}
 ): IAgentPort {
   // resolveBaseConfig now returns the caller's config with the resolved base applied over it,
   // so the precedence rule lives in that function rather than in a spread here.
   const parsed = schema.parse(resolveBaseConfig(defaults, configKeys, config));
-  // ACP providers select their model over the protocol (setSessionConfigOption) or via `args`, which is
-  // passed to the process verbatim - this package never invents CLI flags for a third-party
-  // binary. A configured `model` is still meaningful as the default label on OpenAI-style stream
-  // envelopes, so it is threaded through rather than left inert.
+  // The process is spawned with the resolved args plus a flag for each of model, trust, sandbox
+  // and workspace that is set, mapped by the provider's flag map, and not already in the args
+  // (explicit args win). outputFormat and debug are never applied: they could corrupt the ACP stdout.
+  // `model` is also the default label on OpenAI-style stream envelopes.
   const configuredModel = (parsed as { model?: unknown }).model;
-  return createAcpCliHarnessRuntime(parsed, {
+  const spawnConfig = {
+    ...parsed,
+    args: appendGenericArgs(parsed as Partial<GenericLlmCliOptions>, flagMap, parsed.args),
+  };
+  return createAcpCliHarnessRuntime(spawnConfig, {
     ...runtimeOptions,
     ...(runtimeOptions?.modelId === undefined && typeof configuredModel === "string"
       ? { modelId: configuredModel }

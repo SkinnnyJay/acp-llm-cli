@@ -5,7 +5,7 @@ import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapte
 import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { cursorCliSpec } from "./cli.definition";
-import { CURSOR_CONFIG_KEYS } from "./constants";
+import { CURSOR_CONFIG_KEYS, CURSOR_GENERIC_FLAG_MAP } from "./constants";
 import type { CursorConfig } from "./schema";
 import { cursorConfigSchema } from "./schema";
 
@@ -27,7 +27,8 @@ const createRuntime = (
     {
       ...runtimeOptions,
       providerId: runtimeOptions?.providerId ?? PROVIDER_IDS.CURSOR_CLI_ID,
-    }
+    },
+    CURSOR_GENERIC_FLAG_MAP
   );
 
 export const cursorAdapter = createCliHarnessAdapter<CursorConfig>({

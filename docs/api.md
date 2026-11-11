@@ -142,5 +142,5 @@ the derived one outright and is never merged with it.
 
 
 - Permission requests without a `permissionHandler` are **cancelled** (never auto-allow).
-- No flag is added to a spawned binary for you: the ACP runtime starts `command` with `args` exactly as resolved, so `--trust` reaches `cursor-agent` only if you put it in `args`.
+- The ACP runtime starts `command` with the resolved `args`, then appends a flag for each of `model`, `trust`, `sandbox` and `workspace` that is set and mapped by the provider (only Cursor maps any), unless `args` already has it. `outputFormat` and `debug` are never applied.
 - Stderr in thrown errors is redacted/truncated unless `ACP_LLM_CLI_DEBUG` is set.

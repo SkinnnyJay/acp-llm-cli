@@ -40,6 +40,34 @@ export function buildGenericArgs(
   return out;
 }
 
+/** The generic options that take effect on the spawned process. Others are never applied there. */
+const SPAWN_OPTION_KEYS = [
+  GENERIC_OPTION_KEY.MODEL,
+  GENERIC_OPTION_KEY.TRUST,
+  GENERIC_OPTION_KEY.SANDBOX,
+  GENERIC_OPTION_KEY.WORKSPACE,
+] as const;
+
+const hasFlag = (args: readonly string[], flag: string): boolean =>
+  args.some((arg) => arg === flag || arg.startsWith(`${flag}=`));
+
+/**
+ * Args to spawn with: `args`, then a flag for each of model, trust, sandbox and workspace that is
+ * set, mapped by `flagMap`, and not already in `args` (as `--flag` or `--flag=value`).
+ */
+export function appendGenericArgs(
+  options: Partial<GenericLlmCliOptions>,
+  flagMap: GenericFlagMap,
+  args: string[]
+): string[] {
+  const spawnMap: GenericFlagMap = {};
+  for (const key of SPAWN_OPTION_KEYS) {
+    const flag = flagMap[key];
+    if (flag && !hasFlag(args, flag)) spawnMap[key] = flag;
+  }
+  return buildGenericArgs(options, spawnMap, args);
+}
+
 /**
  * Result of building full CLI args: command name and argv for spawn/exec.
  */

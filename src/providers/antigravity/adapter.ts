@@ -5,7 +5,7 @@ import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapte
 import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { antigravityCliSpec } from "./cli.definition";
-import { ANTIGRAVITY_CONFIG_KEYS } from "./constants";
+import { ANTIGRAVITY_CONFIG_KEYS, ANTIGRAVITY_GENERIC_FLAG_MAP } from "./constants";
 import type { AntigravityConfig } from "./schema";
 import { antigravityConfigSchema } from "./schema";
 
@@ -27,7 +27,8 @@ const createRuntime = (
     {
       ...runtimeOptions,
       providerId: runtimeOptions?.providerId ?? PROVIDER_IDS.ANTIGRAVITY_CLI_ID,
-    }
+    },
+    ANTIGRAVITY_GENERIC_FLAG_MAP
   );
 
 export const antigravityAdapter = createCliHarnessAdapter<AntigravityConfig>({
