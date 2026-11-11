@@ -7,6 +7,7 @@ import { PROVIDER_IDS } from "./provider.ids";
  */
 export const Provider = {
   CLAUDE: PROVIDER_IDS.CLAUDE_CLI_ID,
+  /** @experimental Has not yet been run against a real `agy` binary. */
   ANTIGRAVITY: PROVIDER_IDS.ANTIGRAVITY_CLI_ID,
   CODEX: PROVIDER_IDS.CODEX_CLI_ID,
   CURSOR: PROVIDER_IDS.CURSOR_CLI_ID,

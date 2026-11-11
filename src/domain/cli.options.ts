@@ -9,13 +9,6 @@ export const OUTPUT_FORMAT = {
 
 export type OutputFormat = (typeof OUTPUT_FORMAT)[keyof typeof OUTPUT_FORMAT];
 
-export const INPUT_FORMAT = {
-  TEXT: "text",
-  STREAM_JSON: "stream-json",
-} as const;
-
-export type InputFormat = (typeof INPUT_FORMAT)[keyof typeof INPUT_FORMAT];
-
 export const SANDBOX_MODE = {
   ENABLED: "enabled",
   DISABLED: "disabled",

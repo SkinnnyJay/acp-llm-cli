@@ -253,6 +253,8 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
 
   async connect(): Promise<void> {
     await this.connection.connect();
+    // The SDK has closed the link but its close callback has not run yet: treat it as stale now.
+    if (this.attached?.link.signal.aborted) this.onLinkClosed(this.attached.link);
     let stream = this.connection.getStream();
     const staleStream = this.staleStream;
     if (staleStream && stream === staleStream) {

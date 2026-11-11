@@ -21,20 +21,16 @@ export interface FakeAcpSdk {
   close: Mock<() => void>;
   /** Invoke a registered inbound request handler as the agent would. */
   callRequest(method: string, params: unknown): Promise<unknown>;
-  /** Invoke a registered inbound notification handler as the agent would. */
-  callNotification(method: string, params: unknown): Promise<void>;
   reset(): void;
 }
 
 interface FakeClientApp {
   onRequest(method: string, handler: Handler): FakeClientApp;
-  onNotification(method: string, handler: Handler): FakeClientApp;
   connect(stream: unknown): unknown;
 }
 
 export function createFakeAcpSdk(): FakeAcpSdk {
   const requestHandlers = new Map<string, Handler>();
-  const notificationHandlers = new Map<string, Handler>();
   const responses = new Map<string, unknown>();
   const request = vi.fn(async (method: string, _params: unknown) => responses.get(method));
   const close = vi.fn();
@@ -47,10 +43,6 @@ export function createFakeAcpSdk(): FakeAcpSdk {
   const app: FakeClientApp = {
     onRequest(method, handler) {
       requestHandlers.set(method, handler);
-      return app;
-    },
-    onNotification(method, handler) {
-      notificationHandlers.set(method, handler);
       return app;
     },
     connect,
@@ -68,9 +60,6 @@ export function createFakeAcpSdk(): FakeAcpSdk {
     close,
     async callRequest(method, params) {
       return require(requestHandlers, method)({ params });
-    },
-    async callNotification(method, params) {
-      await require(notificationHandlers, method)({ params });
     },
     reset() {
       request.mockClear();

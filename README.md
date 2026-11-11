@@ -81,7 +81,7 @@ All four providers are driven through the same ACP runtime and configured the sa
 | Provider | `Provider` value | Command spawned | Binary comes from | Verified live in 0.5.0 |
 |---|---|---|---|---|
 | Claude | `Provider.CLAUDE` | `claude-agent-acp` | npm `@agentclientprotocol/claude-agent-acp` | Yes |
-| Codex | `Provider.CODEX` | `codex-acp` | npm `@agentclientprotocol/codex-acp` | Handshake only: it answered `initialize`; no prompt round trip was run |
+| Codex | `Provider.CODEX` | `codex-acp` | npm `@agentclientprotocol/codex-acp` | Yes |
 | Cursor | `Provider.CURSOR` | `cursor-agent acp` | Cursor's `cursor-agent` CLI | Yes |
 | Antigravity | `Provider.ANTIGRAVITY` | `agy acp` | Google's Antigravity CLI (`agy`) | No. It has not been run against a real `agy` binary; its flag table is empty and its capabilities are recorded as "not measured" |
 
@@ -141,9 +141,9 @@ The final chunk carries a `finish_reason` translated from the agent's stop reaso
 
 ## Lifecycle and session persistence
 
-Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` retries on an awaited, capped exponential backoff.
+Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` restarts the process with an awaited, capped exponential backoff and re-initializes.
 
-To survive a restart with the conversation intact, pass a persistence store:
+A persistence store records the session id and cwd. The conversation is **not** restored by this release: `restart()` does not give you a usable session, so call `newSession()` again after it (when a session was persisted, the supervisor sends `session/new`, discards the new id and keeps the old one in the store). Real resume (`session/resume` / `session/load`, which [`docs/capabilities.md`](./docs/capabilities.md) shows the agents advertise) is planned for the next phase. To record the session, pass a persistence store:
 
 ```ts
 import {
@@ -162,7 +162,7 @@ const port = getDefaultFactory().createRuntime(
 );
 
 if (port.capabilities?.restart) {
-  await port.restart?.(); // reloads and resumes the persisted session
+  await port.restart?.(); // restarts the process and re-initializes; the conversation is not restored
 }
 ```
 
@@ -232,7 +232,7 @@ Create `src/providers/<name>/` with four files:
 | File | Responsibility |
 |---|---|
 | `schema.ts` | Zod config schema, extending `baseCliConfigSchema` and `genericLlmCliOptionsSchema.partial()` |
-| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP`. `*_CLI_ARG` is the codomain of `ProviderFlagMap`, so it must hold **flags only** — put bare subcommands in a `*_CLI_SUBCOMMAND` const and flag operands in their own, or a generic option can be mapped onto a positional argument |
+| `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP`. `*_CLI_ARG` is the codomain of `ProviderFlagMap`, so it must hold **flags only**, or a generic option can be mapped onto a positional argument |
 | `cli.definition.ts` | `ICliSpec` — `defaultArgs`, `genericFlagMap`, `knownFlags`, `buildArgs`, `getHelp` |
 | `adapter.ts` | Ties them together and exposes `createRuntime(config)` |
 

@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Four providers now: Claude, Codex, Cursor and Antigravity. The Antigravity provider has **not yet
 been run against a real `agy` binary**: its flag table is empty and its capabilities are recorded
-as "not measured" in `docs/capabilities.md`. Codex was verified for the `initialize` handshake
-only; no prompt round trip was run. Claude and Cursor were verified live.
+as "not measured" in `docs/capabilities.md`. Claude, Codex and Cursor were each verified live with
+a prompt round trip.
 
 ### Breaking
 
@@ -31,15 +31,21 @@ only; no prompt round trip was run. Claude and Cursor were verified live.
 - **Cursor runs over ACP (`cursor-agent acp`) on the shared runtime.** The print / `stream-json`
   port, its helpers and the `cursor-print` example are deleted. `CursorConfig` no longer types
   `mode`, `workspacePath`, `force`, `browser`, `approveMcps` or `approvalTimeoutMs`. The config
-  schema keeps unknown keys, so old config that still sets them parses but they do nothing.
-  `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor now supports
-  streaming, `restart()` and session persistence like the other providers. Internal constants for
+  schema accepts and discards unknown keys, so old config still parses and the removed fields are
+  dropped. `trust`, `model` and `mode` are no longer turned into command-line flags for Cursor: in
+  0.4.0 the print port put `--trust` on the spawn when `trust: true` and `--mode` / `--model` on each prompt. Now
+  `trust` and `model` are still accepted on the config but do not change the spawned process, and
+  `mode` is discarded. `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
+  now supports streaming and `restart()` like the other providers; `restart()` restarts the
+  process but does not restore the conversation (see Known limits). Internal constants for
   the print port are removed (`TIMEOUT.CURSOR_*`, `ERROR_MESSAGE.CURSOR_*`, `CURSOR_MODE`,
   `CURSOR_NDJSON_*`, `CURSOR_OUTPUT_FORMAT` and others); none were on a public entry point.
 - **Generic option keys removed:** `inputFormat`, `stream`, `resume`, `sessionId`, `verbose` and
   `print` are gone from `GENERIC_OPTION_KEY`, `genericLlmCliOptionsSchema` and
   `GenericLlmCliOptions`, and `buildGenericArgs` no longer reads them. The remaining keys are
   `model`, `outputFormat`, `trust`, `sandbox`, `workspace` and `debug`.
+- **Claude and Codex flag tables are now empty**, because those wrappers print no flag help.
+  `claudeAdapter.cliSpec.buildArgs({ model })` (and the Codex equivalent) now returns `[]`.
 - **Deprecated exports removed:** `GENERIC_OPTION_DEFAULTS` and `ANTHROPIC_MODEL_ID_LIST`,
   `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`. Model id lists are
   otherwise unchanged in this release.
@@ -49,10 +55,15 @@ only; no prompt round trip was run. Claude and Cursor were verified live.
 - The wrapper packages were renamed upstream. `claude-agent-acp` now comes from npm
   `@agentclientprotocol/claude-agent-acp` and `codex-acp` from `@agentclientprotocol/codex-acp`;
   the `@zed-industries/*` packages are deprecated. Default commands are unchanged.
-- Flag tables were corrected against saved `--help` output. Claude's and Codex's tables are now
-  empty, because those wrappers print no flag help; Cursor maps `model`, `trust`, `sandbox` and
-  `workspace`; Antigravity's is empty until `npm run refresh:help` has been run with `agy`
+- Flag tables were corrected against saved `--help` output. Cursor maps `model`, `trust`, `sandbox` and
+  `workspace` (this mapping is what `cliSpec.buildArgs` produces; the runtime never calls it); Antigravity's is empty until `npm run refresh:help` has been run with `agy`
   installed.
+- A `sessionUpdate` listener that throws now surfaces on the port's `error` event.
+- `session/update` notifications are checked structurally before being emitted, not against the
+  SDK's schema.
+- With SDK 2.x a non-JSON line on the agent's stdout gets a JSON-RPC parse-error response written
+  back to the agent, and a single message over 32 MiB (the SDK's default limit) errors the input
+  stream, which closes the link.
 - Dev toolchain: Biome 2.6.6 and vitest 5.1.0.
 
 ### Fixed
@@ -61,7 +72,9 @@ only; no prompt round trip was run. Claude and Cursor were verified live.
   stream.** Each update is now emitted at read time, so every update that arrives before the
   response is delivered first.
 - **A link the SDK closed on its own left the client calling into a dead stream.** Calls now
-  reject with `ERROR_MESSAGE.ACP_LINK_CLOSED`, and `connect()` replaces the stale stream.
+  reject with "ACP connection to the agent closed unexpectedly; call connect() to reconnect", and
+  `connect()` replaces the stale stream. `connect()` starts a fresh process, so the caller must
+  `initialize()` and create a session again.
 
 ### Added
 
@@ -80,12 +93,27 @@ only; no prompt round trip was run. Claude and Cursor were verified live.
 - **Cursor config.** Before: `{ command: "cursor-agent", args: [], mode: "plan", workspacePath: dir }`.
   After: `{ command: "cursor-agent", args: ["acp"] }` (or omit `args` and resolve with
   `resolveBaseConfig`), then pass the directory as `cwd` to `newSession` and set the mode with
-  `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`.
+  `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`. `trust`,
+  `model` and `mode` no longer become command-line flags; to keep `--trust`, pass it in `args`
+  yourself, for example `args: ["--trust", "acp"]` (both flag positions start the ACP server).
 - **Gemini to Antigravity.** Before: `Provider.GEMINI` / `"gemini-cli"`, `ACP_LLM_CLI_GEMINI_COMMAND`
   and `ACP_LLM_CLI_GEMINI_ARGS`. After: `Provider.ANTIGRAVITY` / `"antigravity-cli"`,
   `ACP_LLM_CLI_ANTIGRAVITY_COMMAND` (default `agy`) and `ACP_LLM_CLI_ANTIGRAVITY_ARGS` (default
   `acp`). Antigravity has not yet been run against a real `agy` binary. Model id lists are
-  unchanged.
+  unchanged. To keep driving Gemini CLI (paid API key or enterprise licence), run it as a generic
+  ACP command (`--acp` on Gemini CLI 0.33 or later):
+  ```ts
+  import { createAcpCliHarnessRuntime } from "@simpill/acp-llm-cli";
+  const port = createAcpCliHarnessRuntime({ command: "gemini", args: ["--acp"], env: {} });
+  ```
+
+### Known limits
+
+- `restart()` restarts the process with backoff and re-initializes. The persistence store records
+  the session id and cwd, but the conversation is not restored by this release. `restart()` sends
+  `session/new` with a `sessionId` field that `session/new` does not define, and an agent built on
+  the SDK drops it and creates a new session. Real resume (`session/resume` / `session/load`,
+  which `docs/capabilities.md` shows the agents advertise) is planned for the next phase.
 
 ## [0.4.0] - 2026-08-22
 

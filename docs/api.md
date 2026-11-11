@@ -26,7 +26,7 @@ Curated exports from the package root. Prefer this surface for applications.
 | `createAcpCliHarnessRuntime` / `createStandardAcpRuntime` | fn | Build ACP ports (also on `./runtime`) |
 | `AcpSharedRuntimeOptions` | type | Persistence, permissions, envelope, lifecycle |
 | `createMemorySessionPersistence` | fn | In-memory `ISessionPersistence` |
-| `ISessionPersistence` / `PersistedSession` | type | Session save/restore |
+| `ISessionPersistence` / `PersistedSession` | type | Records session id and cwd; the conversation is not restored in this release |
 | `createAcpAgentPort` / `ACPClientOptions` | fn/type | Low-level ACP client over a connection |
 | `baseCliConfigSchema` / `BaseCliConfig` | schema/type | Shared CLI config |
 | `ConfigSchema` / `ConfigSchemaResult` / `ConfigSchemaError` / `ConfigSchemaIssue` | type | The `parse`/`safeParse` surface an adapter config schema must provide, spelled structurally so it holds across both supported zod majors |
@@ -78,7 +78,7 @@ The runtime types and classes above are re-exported here; the application conven
 |--------|------|---------|
 | `StreamAgentPort` / `wrapAgentPortWithStream` | class/fn | Adds `streamPrompt` to a port |
 | `WrapAgentPortOptions` | type | Envelope mode and model label for the stream decorator |
-| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close`, backoff, and session resume |
+| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, and the conversation is not restored in this release |
 | `LifecycleSupervisorOptions` / `LifecycleSessionPersistence` | type | Lifecycle tuning; persistence is grouped under `persistence` |
 
 ### Connections

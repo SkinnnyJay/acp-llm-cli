@@ -12,14 +12,5 @@ export const ANTIGRAVITY_CONFIG_KEYS = {
  */
 export const ANTIGRAVITY_CLI_ARG = {} as const;
 
-/**
- * Bare subcommands. Kept out of ANTIGRAVITY_CLI_ARG for the same reason as Cursor's: that table
- * is the codomain of ProviderFlagMap, and a non-flag token there lets a generic option be mapped
- * onto a positional argument.
- */
-export const ANTIGRAVITY_CLI_SUBCOMMAND = {
-  ACP: "acp",
-} as const;
-
 /** Map generic option keys to Antigravity CLI flag names. Empty until the flag table is filled. */
 export const ANTIGRAVITY_GENERIC_FLAG_MAP: ProviderFlagMap<typeof ANTIGRAVITY_CLI_ARG> = {};

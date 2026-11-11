@@ -98,6 +98,30 @@ describe("ACPClient when the SDK closes the link by itself", () => {
     expect(response.stopReason).toBe("end_turn");
   });
 
+  it("connect() right after the SDK closes the link never writes to the old agent", async () => {
+    const { port: p, connection, agent } = await connectedPort();
+    const next = startAgent();
+    let closeAgent = true;
+    connection.connect.mockImplementation(async () => {
+      if (connection.disconnect.mock.calls.length > 0) {
+        connection.getStream.mockReturnValue(next.stream);
+      } else if (closeAgent) {
+        // The agent's output ends while connect() is already running, so the SDK closes the
+        // link at a point the client's own bookkeeping has not caught up with.
+        closeAgent = false;
+        await agent.endOutput();
+      }
+    });
+    const before = [...agent.received];
+
+    await p.connect();
+    await p.initialize();
+
+    expect(agent.received).toEqual(before);
+    expect(next.received).toEqual(["initialize"]);
+    expect(connection.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("connect() gives up with ACP_STREAM_UNAVAILABLE if the restart still yields the dead stream", async () => {
     const { port: p, connection, agent } = await connectedPort();
     await endAgentOutput(p, agent);

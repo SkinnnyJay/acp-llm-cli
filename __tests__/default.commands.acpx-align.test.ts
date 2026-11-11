@@ -13,7 +13,7 @@ describe("DEFAULT_COMMANDS ACPX alignment", () => {
     expect(DEFAULT_COMMANDS.ANTIGRAVITY_DEFAULT_ARGS).toEqual(["acp"]);
   });
 
-  it("keeps Cursor on print-mode binary (ACP is via ACPX cursor-agent acp)", () => {
+  it("spawns the cursor-agent binary (its ACP server is started with the acp argument)", () => {
     expect(DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND).toBe("cursor-agent");
   });
 });

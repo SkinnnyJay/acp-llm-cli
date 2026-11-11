@@ -25,15 +25,6 @@ export const CURSOR_CLI_ARG = {
   VERSION: "--version",
 } as const;
 
-/**
- * Bare subcommands. Kept out of CURSOR_CLI_ARG for the same reason as Claude's: that table is
- * the codomain of ProviderFlagMap, and a non-flag token there lets a generic option be mapped
- * onto a positional argument.
- */
-export const CURSOR_CLI_SUBCOMMAND = {
-  ACP: "acp",
-} as const;
-
 /** Map generic option keys to Cursor CLI flag names. */
 export const CURSOR_GENERIC_FLAG_MAP: ProviderFlagMap<typeof CURSOR_CLI_ARG> = {
   [GENERIC_OPTION_KEY.MODEL]: CURSOR_CLI_ARG.MODEL,

@@ -11,6 +11,13 @@ export type JsonMessage = Record<string, unknown>;
 export interface FakeAcpAgent {
   /** The client side of the pipes, to hand to the transport under test. */
   stream: Stream;
+  /**
+   * Sends a JSON-RPC request to the client and resolves with the client's response message
+   * exactly as it came off the wire (`result` or `error`).
+   */
+  request(method: string, params: unknown): Promise<JsonMessage>;
+  /** Methods of the requests and notifications the agent has received from the client. */
+  received: string[];
   /** Ends the agent's output (EOF on the client's readable) without touching the transport. */
   endOutput(): Promise<void>;
   /** Releases both pipes and waits for the agent loop to finish. */
@@ -39,6 +46,16 @@ export function createFakeAcpAgent(
     }
   };
 
+  const received: string[] = [];
+  const pending = new Map<number, (message: JsonMessage) => void>();
+  let nextRequestId = 1000;
+  const request = (method: string, params: unknown) =>
+    new Promise<JsonMessage>((resolve) => {
+      const id = nextRequestId++;
+      pending.set(id, resolve);
+      send([{ jsonrpc: "2.0", id, method, params }]);
+    });
+
   const loop = (async () => {
     let buffer = "";
     let prompts = 0;
@@ -51,7 +68,12 @@ export function createFakeAcpAgent(
         const message = JSON.parse(buffer.slice(0, newline)) as JsonMessage;
         buffer = buffer.slice(newline + 1);
         newline = buffer.indexOf("\n");
-        if (message.method === "initialize") {
+        if (typeof message.method === "string") received.push(message.method);
+        const resolveRequest = pending.get(message.id as number);
+        if (message.method === undefined && resolveRequest) {
+          pending.delete(message.id as number);
+          resolveRequest(message);
+        } else if (message.method === "initialize") {
           send([
             {
               jsonrpc: "2.0",
@@ -70,6 +92,8 @@ export function createFakeAcpAgent(
 
   return {
     stream,
+    request,
+    received,
     endOutput,
     async close() {
       await endOutput();

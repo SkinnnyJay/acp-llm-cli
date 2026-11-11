@@ -19,7 +19,7 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
   envelopeMode?: EnvelopeMode;
   /** Model id used in OpenAI-style stream envelopes. */
   modelId?: string;
-  /** Optional session persistence. When provided, enables save/restore on restart. */
+  /** Optional session persistence. When provided, the store records the session id and cwd; restoring the conversation is not implemented in this release. */
   sessionPersistence?: ISessionPersistence;
   /**
    * Provider id for the persistence key.
@@ -30,7 +30,7 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
   workspace?: string;
   /** Restart backoff options for lifecycle supervisor. */
   restartOptions?: LifecycleSupervisorOptions["restartOptions"];
-  /** If true, resume session after restart using persisted sessionId. Default: true when sessionPersistence is set. */
+  /** Default: true when sessionPersistence is set. After restart a new session is created and the persisted session id is kept; restoring the conversation is not implemented in this release. */
   resumeOnRestart?: boolean;
 }
 
