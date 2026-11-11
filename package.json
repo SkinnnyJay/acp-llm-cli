@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/SkinnnyJay/acp-llm-cli#readme",
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "refresh:help": "node scripts/refresh-help-fixtures.mjs",
     "probe": "node scripts/probe-capabilities.mjs",
     "prepack": "npm run build",
@@ -80,9 +80,9 @@
     "@vitest/coverage-v8": "^5.1.0",
     "eventemitter3": "^5.0.1",
     "publint": "^0.3.25",
-    "tsup": "^9.0.0",
+    "tsdown": "^0.23.7",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.1.0",
     "zod": "^3.25.76"
   },

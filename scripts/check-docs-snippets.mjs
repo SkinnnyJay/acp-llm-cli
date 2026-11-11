@@ -125,8 +125,10 @@ try {
         // Snippets illustrate; they are not required to consume every binding they create.
         noUnusedLocals: false,
         noUnusedParameters: false,
-        baseUrl: ROOT,
-        paths: { [PKG]: ["src/index.ts"], [`${PKG}/runtime`]: ["src/runtime/index.ts"] },
+        paths: {
+          [PKG]: [join(ROOT, "src/index.ts")],
+          [`${PKG}/runtime`]: [join(ROOT, "src/runtime/index.ts")],
+        },
       },
       include: [join(tmp, "snippets.ts")],
     })
