@@ -48,14 +48,14 @@ describe("ProviderFactory", () => {
     const provider = factory.getProvider(PROVIDER_IDS.GEMINI_CLI_ID);
     expect(provider).toBeDefined();
     expect(provider?.id).toBe(PROVIDER_IDS.GEMINI_CLI_ID);
-    expect(provider?.cliSpec?.defaultArgs).toEqual(["--experimental-acp"]);
+    expect(provider?.cliSpec?.defaultArgs).toEqual(["--acp"]);
   });
 
   it("getMetrics returns metrics after createRuntime when collectMetrics true", () => {
     const factory = getDefaultFactory();
     factory.createRuntime(PROVIDER_IDS.CODEX_CLI_ID, {
       command: "codex",
-      args: ["--experimental-acp"],
+      args: ["--acp"],
     });
     const metrics = factory.getMetrics?.(PROVIDER_IDS.CODEX_CLI_ID);
     expect(metrics).toBeDefined();

@@ -24,7 +24,7 @@ describe("Provider config parity with app HarnessConfig", () => {
   it("Gemini: accepts app-style config", () => {
     const config = {
       command: "gemini",
-      args: ["--experimental-acp"],
+      args: ["--acp"],
       env: {},
       cwd: "/project",
     };
@@ -34,7 +34,7 @@ describe("Provider config parity with app HarnessConfig", () => {
   it("Codex: accepts app-style config", () => {
     const config = {
       command: "codex",
-      args: ["--experimental-acp"],
+      args: ["--acp"],
       env: {},
     };
     expect(() => codexConfigSchema.parse(config)).not.toThrow();

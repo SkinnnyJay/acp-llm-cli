@@ -12,7 +12,7 @@ export const GEMINI_CONFIG_KEYS = {
 
 /** Gemini CLI flags. */
 export const GEMINI_CLI_ARG = {
-  EXPERIMENTAL_ACP: "--experimental-acp",
+  ACP: "--acp",
   MODEL: "--model",
   OUTPUT_FORMAT: "--output-format",
   VERBOSE: "--verbose",

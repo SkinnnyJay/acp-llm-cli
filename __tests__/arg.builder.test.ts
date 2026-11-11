@@ -27,8 +27,8 @@ describe("buildGenericArgs", () => {
   });
 
   it("prepends baseArgs before any flag", () => {
-    const result = buildGenericArgs({ model: "gpt-4o" }, flagMap, ["--experimental-acp"]);
-    expect(result[0]).toBe("--experimental-acp");
+    const result = buildGenericArgs({ model: "gpt-4o" }, flagMap, ["--acp"]);
+    expect(result[0]).toBe("--acp");
     expect(result).toContain("--model");
     expect(result).toContain("gpt-4o");
   });

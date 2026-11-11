@@ -12,7 +12,6 @@ export const CODEX_CONFIG_KEYS = {
 
 /** Codex CLI flags. */
 export const CODEX_CLI_ARG = {
-  EXPERIMENTAL_ACP: "--experimental-acp",
   SANDBOX: "--sandbox",
   FULL_AUTO: "--full-auto",
   MODEL: "--model",

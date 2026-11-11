@@ -36,7 +36,7 @@ describe("ProviderClientFactory", () => {
     const factory = getDefaultProviderClientFactory();
     const client = factory.getClient(Provider.GEMINI, {
       command: "gemini",
-      args: ["--experimental-acp"],
+      args: ["--acp"],
     });
     expect(client.provider).toBe(Provider.GEMINI);
     expect(client.port).toBeDefined();
