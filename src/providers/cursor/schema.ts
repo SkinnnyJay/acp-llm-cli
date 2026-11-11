@@ -1,27 +1,10 @@
-import { z } from "zod";
-import { genericLlmCliOptionsSchema } from "../../cli/generic.options";
-import { TIMEOUT } from "../../domain/timeouts";
-import { baseCliConfigSchema } from "../../runtime/config";
-import { CURSOR_MODE } from "./constants";
+import type { z } from "zod";
+import { acpCliConfigSchema } from "../../cli/provider.config.schema";
 
 /**
- * Cursor CLI config. Accepts app harness options (force, browser, approveMcps, approvalTimeoutMs)
- * for config compatibility; minimal CursorAgentPort uses mode, model, workspacePath.
+ * Cursor CLI config: base command/args/cwd/env plus generic LLM options. Cursor runs as an ACP
+ * server (`cursor-agent acp`), so mode and model are selected over the protocol, not by flags.
  */
-export const cursorConfigSchema = baseCliConfigSchema.and(genericLlmCliOptionsSchema.partial()).and(
-  z.object({
-    mode: z.enum(Object.values(CURSOR_MODE) as [string, ...string[]]).optional(),
-    workspacePath: z.string().optional(),
-    force: z.boolean().optional(),
-    browser: z.boolean().optional(),
-    approveMcps: z.boolean().optional(),
-    approvalTimeoutMs: z
-      .number()
-      .int()
-      .min(TIMEOUT.CURSOR_APPROVAL_TIMEOUT_MIN_MS)
-      .max(300_000)
-      .optional(),
-  })
-);
+export const cursorConfigSchema = acpCliConfigSchema;
 
 export type CursorConfig = z.infer<typeof cursorConfigSchema>;

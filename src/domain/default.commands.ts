@@ -14,5 +14,5 @@ export const DEFAULT_COMMANDS = {
   CODEX_DEFAULT_COMMAND: "codex-acp",
   CODEX_DEFAULT_ARGS: [] as const,
   CURSOR_DEFAULT_COMMAND: "cursor-agent",
-  CURSOR_DEFAULT_ARGS: [] as const,
+  CURSOR_DEFAULT_ARGS: ["acp"] as const,
 } as const;

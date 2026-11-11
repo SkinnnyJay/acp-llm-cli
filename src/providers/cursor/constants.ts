@@ -23,46 +23,14 @@ export const CURSOR_CLI_ARG = {
   VERSION: "--version",
 } as const;
 
-/** Operand of --output-format. A value, not a flag, so it stays out of the flag table. */
-export const CURSOR_OUTPUT_FORMAT = {
-  STREAM_JSON: "stream-json",
-} as const;
-
 /**
  * Bare subcommands. Kept out of CURSOR_CLI_ARG for the same reason as Claude's: that table is
  * the codomain of ProviderFlagMap, and a non-flag token there lets a generic option be mapped
  * onto a positional argument.
  */
 export const CURSOR_CLI_SUBCOMMAND = {
-  CREATE_CHAT: "create-chat",
+  ACP: "acp",
 } as const;
-
-/**
- * Session config option ids Cursor understands. ACP 1.x replaced the removed
- * `session/set_model` method with the general `session/set_config_option`,
- * where the model selector is just an option carrying `category: "model"`.
- */
-export const CURSOR_CONFIG_OPTION = {
-  MODEL: "model",
-} as const;
-
-export const CURSOR_MODE = {
-  AGENT: "agent",
-  PLAN: "plan",
-  ASK: "ask",
-} as const;
-
-export const CURSOR_NDJSON_TYPE = {
-  RESULT: "result",
-} as const;
-
-export const CURSOR_NDJSON_SUBTYPE = {
-  SUCCESS: "success",
-} as const;
-
-export const CURSOR_UUID_PATTERN = /[0-9a-f-]{36}/;
-
-export const CURSOR_HEALTH_CHECK_PROMPT = "echo ok";
 
 /** Map generic option keys to Cursor CLI flag names. */
 export const CURSOR_GENERIC_FLAG_MAP: ProviderFlagMap<typeof CURSOR_CLI_ARG> = {

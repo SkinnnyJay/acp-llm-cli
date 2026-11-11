@@ -8,7 +8,7 @@
  * When LIVE=1, asserts connect → initialize → newSession → short prompt → disconnect.
  * Missing binaries fail the test (no soft-pass).
  *
- * Cursor in this package uses print/stream-json (not ACP). Others use ACP stdio.
+ * All four providers use ACP stdio (Cursor via `cursor-agent acp`).
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COMMANDS } from "../src/domain/default.commands.js";
@@ -24,7 +24,7 @@ type Case = {
   providerId: string;
   command: string;
   args: string[];
-  mode: "acp" | "cursor-print";
+  mode: "acp";
 };
 
 const CASES: Case[] = [
@@ -54,7 +54,7 @@ const CASES: Case[] = [
     providerId: PROVIDER_IDS.CURSOR_CLI_ID,
     command: DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS],
-    mode: "cursor-print" as const,
+    mode: "acp" as const,
   },
 ].filter((c) => !FILTER || FILTER === c.id);
 

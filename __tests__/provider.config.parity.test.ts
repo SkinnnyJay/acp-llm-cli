@@ -40,25 +40,16 @@ describe("Provider config parity with app HarnessConfig", () => {
     expect(() => codexConfigSchema.parse(config)).not.toThrow();
   });
 
-  it("Cursor: accepts app-style config with cursor options", () => {
+  it("Cursor: accepts app-style config", () => {
     const config = {
       command: "cursor-agent",
-      args: [] as string[],
+      args: ["acp"],
       env: {},
       cwd: "/project",
-      mode: "agent" as const,
-      workspacePath: "/project",
       model: "claude-sonnet-4-20250514",
-      force: false,
-      browser: false,
-      approveMcps: false,
-      approvalTimeoutMs: 30_000,
     };
     expect(() => cursorConfigSchema.parse(config)).not.toThrow();
-    const parsed = cursorConfigSchema.parse(config);
-    expect(parsed.mode).toBe("agent");
-    expect(parsed.force).toBe(false);
-    expect(parsed.approvalTimeoutMs).toBe(30_000);
+    expect(cursorConfigSchema.parse(config).model).toBe("claude-sonnet-4-20250514");
   });
 
   it("Cursor: accepts minimal config", () => {

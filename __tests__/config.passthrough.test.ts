@@ -1,43 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { CURSOR_CLI_ARG } from "../src/providers/cursor/constants";
+import { describe, expect, it } from "vitest";
 import type { BaseCliConfig, ConfigSchema } from "../src/runtime/config";
 import { baseCliConfigSchema } from "../src/runtime/config";
-
-const { spawnCalls } = vi.hoisted(() => ({
-  spawnCalls: [] as Array<{ command: string; args: string[] }>,
-}));
-
-vi.mock("node:child_process", async () => {
-  const { EventEmitter } = await import("node:events");
-  const { Readable, Writable } = await import("node:stream");
-  return {
-    spawn: (command: string, args: string[]) => {
-      spawnCalls.push({ command, args });
-      const emitter = new EventEmitter();
-      const stdout = new Readable({ read() {} });
-      const stderr = new Readable({ read() {} });
-      const stdin = new Writable({
-        write(_c, _e, cb) {
-          cb();
-        },
-      });
-      const child = Object.assign(emitter, { stdout, stderr, stdin, kill: vi.fn(), pid: 7 });
-      setTimeout(() => {
-        stdout.push(null);
-        stderr.push(null);
-        child.emit("close", 0, null);
-      }, 0);
-      return child;
-    },
-  };
-});
 
 // Imported once at module scope rather than inside each test. As in-test dynamic imports these
 // paid the module-graph cost (zod, the ACP SDK, logger.utils) against vitest's 5s per-test
 // budget, which made this file fail roughly a third of the time on an otherwise busy machine.
-// vi.mock above is hoisted over these imports, so the child_process mock still applies.
 const { createStandardAcpRuntime } = await import("../src/providers/acp.shared");
-const { cursorAdapter } = await import("../src/providers/cursor/adapter");
 
 /**
  * resolveBaseConfig returns a fresh {command, args, cwd, env} object. Adapters used to hand that
@@ -101,62 +69,6 @@ describe("provider config passthrough", () => {
       args: ["--from-caller"],
       model: "m",
     });
-  });
-
-  it("passes --trust to the cursor CLI when the adapter config sets trust", async () => {
-    spawnCalls.length = 0;
-
-    const port = cursorAdapter.createHarness({
-      command: "cursor-agent",
-      args: [],
-      env: {},
-      trust: true,
-    } as never);
-
-    await port.connect();
-
-    expect(spawnCalls.length).toBeGreaterThan(0);
-    expect(spawnCalls[0]?.args).toContain(CURSOR_CLI_ARG.TRUST);
-  });
-
-  it("omits --trust when the adapter config does not set trust", async () => {
-    spawnCalls.length = 0;
-
-    const port = cursorAdapter.createHarness({
-      command: "cursor-agent",
-      args: [],
-      env: {},
-    } as never);
-
-    await port.connect();
-
-    expect(spawnCalls.length).toBeGreaterThan(0);
-    expect(spawnCalls[0]?.args).not.toContain(CURSOR_CLI_ARG.TRUST);
-  });
-
-  it("carries mode and model from adapter config into the prompt argv", async () => {
-    spawnCalls.length = 0;
-
-    const port = cursorAdapter.createHarness({
-      command: "cursor-agent",
-      args: [],
-      env: {},
-      mode: "plan",
-      model: "claude-sonnet-4.6",
-    } as never);
-
-    await expect(
-      port.prompt({
-        sessionId: "s1",
-        prompt: [{ type: "text", text: "hi" }],
-      } as never)
-    ).rejects.toThrow();
-
-    const promptCall = spawnCalls.at(-1);
-    expect(promptCall?.args).toContain(CURSOR_CLI_ARG.MODE);
-    expect(promptCall?.args).toContain("plan");
-    expect(promptCall?.args).toContain(CURSOR_CLI_ARG.MODEL);
-    expect(promptCall?.args).toContain("claude-sonnet-4.6");
   });
 
   it("labels OpenAI-style envelopes with the configured model", async () => {
