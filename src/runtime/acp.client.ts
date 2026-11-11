@@ -314,16 +314,14 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
       await this.connection.disconnect().catch(() => undefined);
       // Set by the transport's error event during the awaits above, which TS cannot see.
       const failure = this.transportError as Error | undefined;
-      const cliUnusable =
-        failure instanceof AgentProcessError &&
-        (failure.code === ACP_ERROR_CODE.CLI_NOT_FOUND ||
-          failure.code === ACP_ERROR_CODE.CLI_NOT_EXECUTABLE);
-      throw cliUnusable
+      throw failure instanceof AgentProcessError
         ? failure
         : new ConnectionError(
             ACP_ERROR_CODE.STREAM_UNAVAILABLE,
             ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE,
-            { providerId: this.options.providerId }
+            {
+              providerId: this.options.providerId,
+            }
           );
     }
     // Connecting a client app starts a reader loop, so re-attaching to a stream we

@@ -18,6 +18,8 @@ export const ERROR_MESSAGE = {
     `Agent process exited with code ${code}${suffix}${details}`,
   CLI_NOT_FOUND: (command: string) =>
     `Agent CLI not found: "${command}" is not installed or not on PATH`,
+  WORKING_DIRECTORY_NOT_FOUND: (cwd: string) =>
+    `Could not start the agent: working directory "${cwd}" does not exist`,
   /** One trailing period is dropped from `message` so it never ends up as "..". */
   WITH_HINT: (message: string, hint: string) =>
     `${message.endsWith(".") ? message.slice(0, -1) : message}. ${hint}`,

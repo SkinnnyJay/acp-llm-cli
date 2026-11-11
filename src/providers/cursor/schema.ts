@@ -3,7 +3,8 @@ import { acpCliConfigSchema } from "../../cli/provider.config.schema";
 
 /**
  * Cursor CLI config: base command/args/cwd/env plus generic LLM options. Cursor runs as an ACP
- * server (`cursor-agent acp`), so mode and model are selected over the protocol, not by flags.
+ * server (`cursor-agent acp`): `mode` is selected over the protocol; `model`, `trust`, `sandbox`
+ * and `workspace` are passed as spawn flags.
  */
 export const cursorConfigSchema = acpCliConfigSchema;
 

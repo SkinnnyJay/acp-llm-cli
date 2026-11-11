@@ -23,6 +23,12 @@ import type {
 import type { RestartWithBackoffOptions } from "./restart.with.backoff";
 import { restartWithBackoff } from "./restart.with.backoff";
 
+/** A login or a cancel says nothing about the session, so it must not discard it. */
+const movesOnToNextMethod = (error: unknown): boolean =>
+  error instanceof AgentProtocolError &&
+  error.code !== ACP_ERROR_CODE.AUTH_REQUIRED &&
+  error.code !== ACP_ERROR_CODE.REQUEST_CANCELLED;
+
 /**
  * Session persistence travels as one group: the store, the key it is written under, and the
  * resume policy. Grouping them makes `resumeOnRestart` unstateable without a store and lets
@@ -201,8 +207,9 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
 
   /**
    * Restarts the process, then restores the persisted session: `session/resume` when advertised,
-   * else `session/load` (its history replay is dropped), else a new session. An agent error
-   * (AgentProtocolError) moves on to the next method; any other error propagates.
+   * else `session/load` (its history replay is dropped), else a new session. An agent error other
+   * than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; any other error
+   * propagates.
    */
   async restart(): Promise<RestartOutcome> {
     const persistence = this.persistence;
@@ -243,7 +250,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
         await this.inner.resumeSession({ sessionId, cwd, mcpServers });
         return { session: "resumed", sessionId };
       } catch (error) {
-        if (!(error instanceof AgentProtocolError)) throw error;
+        if (!movesOnToNextMethod(error)) throw error;
       }
     }
     if (caps?.loadSession && this.inner.loadSession) {
@@ -252,7 +259,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
         await this.inner.loadSession({ sessionId, cwd, mcpServers });
         return { session: "loaded", sessionId };
       } catch (error) {
-        if (!(error instanceof AgentProtocolError)) throw error;
+        if (!movesOnToNextMethod(error)) throw error;
       } finally {
         this.replayingSessionId = undefined;
       }

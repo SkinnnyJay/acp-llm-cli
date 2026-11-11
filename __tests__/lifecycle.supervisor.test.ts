@@ -631,6 +631,33 @@ describe("LifecycleAgentPort restart restores the conversation", () => {
     expect(inner.newSession).not.toHaveBeenCalled();
   });
 
+  it("rethrows AUTH_REQUIRED from resume and keeps the stored session", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const authRequired = new AgentProtocolError("AUTH_REQUIRED", "log in", { rpcCode: -32000 });
+    mocks.resumeSession.mockRejectedValue(authRequired);
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+
+    await expect(supervise(inner, store).restart()).rejects.toBe(authRequired);
+
+    expect(mocks.loadSession).not.toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+    expect((await store.loadSession(PROVIDER))?.sessionId).toBe(STORED_ID);
+  });
+
+  it("rethrows REQUEST_CANCELLED from load and keeps the stored session", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const cancelled = new AgentProtocolError("REQUEST_CANCELLED", "cancelled", { rpcCode: -32800 });
+    mocks.loadSession.mockRejectedValue(cancelled);
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: LOAD_CAPS });
+
+    await expect(supervise(inner, store).restart()).rejects.toBe(cancelled);
+
+    expect(inner.newSession).not.toHaveBeenCalled();
+    expect((await store.loadSession(PROVIDER))?.sessionId).toBe(STORED_ID);
+  });
+
   it("creates a new session without a sessionId when nothing is advertised", async () => {
     const { store } = await storedSession();
     const mocks = restoreMocks();

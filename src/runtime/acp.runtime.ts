@@ -16,8 +16,10 @@ import type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
 import { wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 import { StdioConnectionFactory } from "./stdio.connection.factory";
 
-/** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */
-/** `command` is omitted: the runtime always names `config.command` on errors. */
+/**
+ * Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning.
+ * `command` is omitted: the runtime always names `config.command` on errors.
+ */
 export interface AcpSharedRuntimeOptions extends Omit<ACPClientOptions, "command"> {
   /** Envelope mode for streamPrompt: openai, native, or both. Default: both. */
   envelopeMode?: EnvelopeMode;

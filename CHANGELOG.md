@@ -32,10 +32,9 @@ trip for this release.
   port, its helpers and the `cursor-print` example are deleted. `CursorConfig` no longer types
   `mode`, `workspacePath`, `force`, `browser`, `approveMcps` or `approvalTimeoutMs`. The config
   schema accepts and discards unknown keys, so old config still parses and the removed fields are
-  dropped. `trust`, `model` and `mode` are no longer turned into command-line flags for Cursor: in
-  0.4.0 the print port put `--trust` on the spawn when `trust: true` and `--mode` / `--model` on each prompt. Now
-  `trust` and `model` are still accepted on the config but do not change the spawned process, and
-  `mode` is discarded. `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
+  dropped. `mode` is no longer turned into a flag and is discarded (use `setSessionMode`); in
+  0.4.0 the print port put `--mode` on each prompt. `trust` and `model` are applied as spawn flags
+  (`cursor-agent acp --trust --model <id>`; see Changed). `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
   now supports streaming and `restart()` like the other providers, including restoring the
   session (see Added). Internal constants for
   the print port are removed (`TIMEOUT.CURSOR_*`, `ERROR_MESSAGE.CURSOR_*`, `CURSOR_MODE`,
@@ -47,12 +46,26 @@ trip for this release.
 - **Claude and Codex flag tables are now empty**, because those wrappers print no flag help.
   `claudeAdapter.cliSpec.buildArgs({ model })` (and the Codex equivalent) now returns `[]`.
 - **Deprecated exports removed:** `GENERIC_OPTION_DEFAULTS` and `ANTHROPIC_MODEL_ID_LIST`,
-  `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`. Model id lists:
-  `npm run update-models` reads each vendor's models API when its key is set, otherwise the
-  vendor's public documentation page; OpenRouter is no longer used. Router variants (`:batch`,
-  `:free`) and router-spelled Anthropic ids (`claude-opus-4.8` for `claude-opus-4-8`) were
-  removed and new ids added. The refresh is additive by default (`ACP_LLM_CLI_MODELS_PRUNE=1`
-  makes the fetched list authoritative).
+  `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`.
+- **Model id constants changed.** Ids now come from the vendors: `npm run update-models` reads each
+  vendor's models API when its key is set, otherwise the vendor's public documentation page;
+  OpenRouter is no longer used. Dotted router spellings (`claude-opus-4.8` for `claude-opus-4-8`)
+  and router variants (`:batch`, `:free`) were removed (three older ids without dots remain) and
+  new ids added. In `ANTHROPIC_MODEL_IDS` these keys no longer exist:
+  `CLAUDE_3_5_HAIKU`, `CLAUDE_3_5_SONNET`, `CLAUDE_3_7_SONNET`, `CLAUDE_3_7_SONNET_THINKING`,
+  `CLAUDE_HAIKU_4_5`, `CLAUDE_OPUS_4_1`, `CLAUDE_OPUS_4_5` and `CLAUDE_SONNET_4_5` (the dated
+  `CLAUDE_HAIKU_4_5_20251001`, `CLAUDE_OPUS_4_5_20251101` and `CLAUDE_SONNET_4_5_20250929`
+  replace the last three), and `CLAUDE_OPUS_4_6` / `CLAUDE_SONNET_4_6` now hold `claude-opus-4-6`
+  / `claude-sonnet-4-6`. In the OpenAI and Gemini constants, every key for a `:free`,
+  `:extended` or `:exacto` variant is gone. The refresh is additive by default
+  (`ACP_LLM_CLI_MODELS_PRUNE=1` makes the fetched list authoritative).
+- **Agent JSON-RPC errors are wrapped.** A request the agent answers with an error now rejects with
+  `AgentProtocolError` (`code` from the JSON-RPC code, `rpcCode`, `data`, the agent's message)
+  instead of the SDK's `RequestError`, which is on `cause`. `code` is now the string code (for
+  example `"AUTH_REQUIRED"`); the numeric JSON-RPC code is on `rpcCode`; `instanceof RequestError`
+  no longer matches, so read `cause` or switch to `code`. For `AUTH_REQUIRED` the message also names
+  the provider's login command.
+- **`connect()` now rejects when the CLI is missing** (see Changed, "A missing agent CLI").
 
 ### Changed
 
@@ -76,19 +89,15 @@ trip for this release.
   tsup's declaration build needs the TypeScript compiler API, which 7.0.2 does not provide.
 - **Errors raised by the package are now typed** (`AcpCliError` subclasses, see Added). Message
   text is unchanged, and every one is still an `Error`.
-- **Agent JSON-RPC errors are wrapped.** A request the agent answers with an error now rejects with
-  `AgentProtocolError` (`code` from the JSON-RPC code, `rpcCode`, `data`, the agent's message)
-  instead of the SDK's `RequestError`, which is on `cause`. Callers that checked `instanceof
-  RequestError` must read `cause` or switch to `code`. For `AUTH_REQUIRED` the message also names
-  the provider's login command.
 - **A missing agent CLI** is reported as `AgentProcessError` with code `CLI_NOT_FOUND`, the command,
   and for built-in providers the install command in `hint` and `message`, instead of Node's raw
   `spawn <cmd> ENOENT` error (now on `cause`). Other spawn failures are `CLI_NOT_EXECUTABLE`
-  (`EACCES`) or `SPAWN_FAILED` with Node's message. `StdioConnection.connect()` now waits for the
-  child's `spawn` event when Node returns a child without a pid, so a missing or non-executable
+  (`EACCES`) or `SPAWN_FAILED` with Node's message. `StdioConnection.connect()` now waits one
+  tick for the child's `error` event when Node returns a child without a pid, so a missing or non-executable
   CLI makes the port's `connect()` (and `restart()`) reject with `CLI_NOT_FOUND` /
   `CLI_NOT_EXECUTABLE`; before, `connect()` resolved and the next call failed with "ACP connection
-  closed". The error is emitted once on `error`; the follow-up "exited with code -2" error is gone.
+  closed". Any spawn failure rejects `connect()` with its own error, and a missing working directory is
+  `SPAWN_FAILED` naming it, not `CLI_NOT_FOUND`. The error is emitted once on `error`; the follow-up "exited with code -2" error is gone.
   `extractHelp` rejects a missing binary as `CLI_NOT_FOUND` too, keeping Node's message.
 - A request still pending when its link closes now rejects with `ConnectionError` code
   `LINK_CLOSED`, keeping the SDK's message, with the SDK's error on `cause`.
@@ -102,14 +111,14 @@ trip for this release.
   reject with `ConnectionError` code `LINK_CLOSED` ("ACP connection to the agent closed
   unexpectedly; call connect() to reconnect"), and
   `connect()` replaces the stale stream. `connect()` starts a fresh process, so the caller must
-  `initialize()` and create a session again.
+  `initialize()` and create a session again, or restore one with `resumeSession` / `loadSession`.
 
 ### Added
 
 - **`restart()` restores the session.** After restarting the process it sends `session/resume`
   when the agent advertises `sessionCapabilities.resume`, else `session/load` when it advertises
   `loadSession` (the history the agent replays is not re-emitted or persisted), else a new
-  session. An agent error moves on to the next method; a closed link or dead process propagates.
+  session. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two, a closed link and a dead process propagate.
   It returns a `RestartOutcome` (`session`: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and
   `sessionId`); `"new"` means the agent could not restore the session and the conversation
   context is gone. 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
@@ -143,14 +152,14 @@ trip for this release.
 - **Cursor config.** Before: `{ command: "cursor-agent", args: [], mode: "plan", workspacePath: dir }`.
   After: `{ command: "cursor-agent", args: ["acp"] }` (or omit `args` and resolve with
   `resolveBaseConfig`), then pass the directory as `cwd` to `newSession` and set the mode with
-  `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`. `trust`,
-  `model` and `mode` no longer become command-line flags; to keep `--trust`, pass it in `args`
-  yourself, for example `args: ["--trust", "acp"]` (both flag positions start the ACP server).
+  `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`. `mode`
+  no longer becomes a flag (use `setSessionMode`); `trust: true` and `model` are appended at
+  spawn, nothing to change.
 - **Gemini to Antigravity.** Before: `Provider.GEMINI` / `"gemini-cli"`, `ACP_LLM_CLI_GEMINI_COMMAND`
   and `ACP_LLM_CLI_GEMINI_ARGS`. After: `Provider.ANTIGRAVITY` / `"antigravity-cli"`,
   `ACP_LLM_CLI_ANTIGRAVITY_COMMAND` (default `agy`) and `ACP_LLM_CLI_ANTIGRAVITY_ARGS` (default
-  `acp`). Antigravity was verified live against `agy` 1.5.5. Model id lists are
-  unchanged. To keep driving Gemini CLI (paid API key or enterprise licence), run it as a generic
+  `acp`). Antigravity was verified live against `agy` 1.5.5. The model id constants
+  changed (see Breaking). To keep driving Gemini CLI (paid API key or enterprise licence), run it as a generic
   ACP command (`--acp` on Gemini CLI 0.33 or later):
   ```ts
   import { createAcpCliHarnessRuntime } from "@simpill/acp-llm-cli";

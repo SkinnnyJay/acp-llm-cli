@@ -1,5 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { Readable, Writable } from "node:stream";
 import { ndJsonStream, type Stream } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
@@ -267,6 +268,15 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     const { command } = this.options;
     const nodeCode = (error as NodeJS.ErrnoException | undefined)?.code;
     const message = error instanceof Error ? error.message : String(error);
+    const { cwd } = this.options;
+    if (nodeCode === NODE_SPAWN_ERROR.ENOENT && cwd && !existsSync(cwd)) {
+      // Node raises the same `spawn <cmd> ENOENT` when the working directory is missing.
+      return new AgentProcessError(
+        ACP_ERROR_CODE.SPAWN_FAILED,
+        ERROR_MESSAGE.WORKING_DIRECTORY_NOT_FOUND(cwd),
+        { command, cause: error }
+      );
+    }
     if (nodeCode === NODE_SPAWN_ERROR.ENOENT) {
       return new AgentProcessError(
         ACP_ERROR_CODE.CLI_NOT_FOUND,

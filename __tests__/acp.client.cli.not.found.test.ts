@@ -112,6 +112,21 @@ describe("a missing agent CLI", () => {
     expect((error as AgentProcessError).code).toBe("CLI_NOT_FOUND");
   });
 
+  it("rejects connect() with SPAWN_FAILED naming the directory when the cwd does not exist", async () => {
+    const cwd = join(tmpdir(), "acp-llm-cli-missing-dir", "nope");
+    port = createAcpCliHarnessRuntime(
+      { command: process.execPath, args: [], env: {}, cwd },
+      { providerId: "cursor-cli" }
+    );
+
+    const error = (await rejectionOf(port.connect())) as AgentProcessError;
+
+    expect(error).toBeInstanceOf(AgentProcessError);
+    expect(error.code).toBe("SPAWN_FAILED");
+    expect(error.message).toContain(cwd);
+    expect(error.hint).toBeUndefined();
+  });
+
   it("rejects connect() with CLI_NOT_EXECUTABLE for a file that is not executable", async () => {
     const dir = mkdtempSync(join(tmpdir(), "acp-llm-cli-"));
     const file = join(dir, "not-executable");

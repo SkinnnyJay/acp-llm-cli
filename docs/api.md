@@ -57,7 +57,7 @@ See the README section "Errors you can branch on" for the codes per class and th
 
 The terminal chunk carries a real `finish_reason` translated from the agent's ACP stop reason: `max_tokens` and `max_turn_requests` become `length`, `refusal` becomes `content_filter`, and `end_turn`/`cancelled` become `stop`. Switch on `OPENAI_FINISH_REASON` rather than raw strings — a truncated or refused turn is not a clean completion.
 
-`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
+`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`InvalidStateError`, code `STREAM_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
 
 ## Models
 
@@ -68,7 +68,7 @@ The terminal chunk carries a real `finish_reason` translated from the agent's AC
 | `GEMINI_MODEL_IDS` / `GeminiModelIdSchema` | const/schema | Gemini model ids (there is no Gemini provider; see Antigravity) |
 | `XAI_MODEL_IDS` / `XAIModelIdSchema` | const/schema | xAI |
 
-Provider `model` config accepts **any string**. It is a label, not a constraint: ACP providers select their model over the protocol or via `args`, and the configured value is threaded through as the default model id on OpenAI-style stream envelopes. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a model id checked against a vendor catalogue.
+Provider `model` config accepts **any string**. `model` is not validated. For Claude, Codex and Antigravity it only labels OpenAI-style stream envelopes; for Cursor it is also passed as `--model <id>` at spawn. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a model id checked against a vendor catalogue.
 
 ## CLI helpers
 

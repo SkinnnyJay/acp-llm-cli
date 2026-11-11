@@ -5,7 +5,6 @@ export const NODE_EVENT = {
   DATA: "data",
   ERROR: "error",
   CLOSE: "close",
-  SPAWN: "spawn",
 } as const;
 
 /** What Node puts on a child-process spawn failure: its `code`, and the `syscall` prefix. */

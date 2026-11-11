@@ -68,7 +68,7 @@ console.log(result.stopReason);
 await client.port.disconnect();
 ```
 
-Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes. `factory.listProviders()` returns all of them.
+Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes, except `model`, which Cursor receives as `--model` and must be a Cursor model name. `factory.listProviders()` returns all of them.
 
 Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cursor-acp.ts`, `stream-prompt.ts`. Run `npm run build` first.
 
@@ -101,7 +101,7 @@ DEFAULT_COMMANDS  →  environment (ENV_KEY)  →  config you pass
 
 The result is validated against the provider's Zod schema before a process is spawned.
 
-That arrow is a simplification worth unpacking, because the env layer is narrower than it looks. `command` is required by the config schema, so a config you pass always supplies it — which means `ACP_LLM_CLI_*_COMMAND` only takes effect when you call `resolveBaseConfig` yourself (exported from `@simpill/acp-llm-cli/runtime`). `ACP_LLM_CLI_*_ARGS` applies whenever `args` is empty. Provider-specific fields you pass, such as `model`, survive resolution untouched on the validated config. The runtime does not turn them into flags.
+That arrow is a simplification worth unpacking, because the env layer is narrower than it looks. `command` is required by the config schema, so a config you pass always supplies it — which means `ACP_LLM_CLI_*_COMMAND` only takes effect when you call `resolveBaseConfig` yourself (exported from `@simpill/acp-llm-cli/runtime`). `ACP_LLM_CLI_*_ARGS` applies whenever `args` is empty. Provider-specific fields you pass, such as `model`, survive resolution untouched on the validated config. The runtime turns `model`, `trust`, `sandbox` and `workspace` into spawn flags where the provider maps them (only Cursor does); see [Building CLI arguments](#building-cli-arguments).
 
 Copy `.env.sample` to `.env`. Every key this package reads is declared in `ENV_KEY` (`src/domain/env.keys.ts`):
 
@@ -143,7 +143,7 @@ The final chunk carries a `finish_reason` translated from the agent's stop reaso
 
 Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` restarts the process with an awaited, capped exponential backoff and re-initializes.
 
-A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session. It tries `session/resume` when the agent advertises it, then `session/load` (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone. To record the session, pass a persistence store:
+A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session; this needs `sessionPersistence`, and without it the outcome is `{ session: "none" }` and the caller creates a session. It tries `session/resume` when the agent advertises it, then `session/load` when advertised (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two reject `restart()` and the stored session is kept. To record the session, pass a persistence store:
 
 ```ts
 import {
@@ -285,7 +285,7 @@ Create `src/providers/<name>/` with four files:
 | `schema.ts` | Zod config schema, extending `baseCliConfigSchema` and `genericLlmCliOptionsSchema.partial()` |
 | `constants.ts` | Env keys, `*_CLI_ARG` flag names, and `*_GENERIC_FLAG_MAP`. `*_CLI_ARG` is the codomain of `ProviderFlagMap`, so it must hold **flags only**, or a generic option can be mapped onto a positional argument |
 | `cli.definition.ts` | `ICliSpec` — `defaultArgs`, `genericFlagMap`, `knownFlags`, `buildArgs`, `getHelp` |
-| `adapter.ts` | Ties them together and exposes `createRuntime(config)` |
+| `adapter.ts` | Ties them together and exposes `createRuntime(config)`. It passes its `*_GENERIC_FLAG_MAP` as the last argument of `createStandardAcpRuntime`, or its generic options have no effect |
 
 Then add the default command to `src/domain/default.commands.ts`, the env keys to `src/domain/env.keys.ts`, and register the adapter in `src/bootstrap.ts`. If the CLI speaks ACP over stdio, `createAcpCliHarnessRuntime(config)` is the whole runtime. If it does not, you need a custom port that implements `IAgentPort`.
 

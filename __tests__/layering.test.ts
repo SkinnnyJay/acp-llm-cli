@@ -12,7 +12,7 @@ function walk(dir: string): string[] {
 }
 
 /**
- * src/README.md declares the dependency direction: runtime/ may import domain/, and providers/
+ * src/README.md declares the dependency direction: runtime/ may import domain/ and cli/, and providers/
  * import domain/ and runtime/. The reverse used to hold in six places - including a value
  * re-export in the published ./runtime entry point - so the documented rule was false.
  */

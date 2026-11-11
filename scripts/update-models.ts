@@ -55,7 +55,7 @@ function writeModelConstants(provider: string, modelIds: string[], headerComment
 async function fetchAnthropic(): Promise<string[]> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
-    console.warn("ANTHROPIC_API_KEY not set, skipping Anthropic");
+    console.warn("ANTHROPIC_API_KEY not set, using the Anthropic documentation page instead");
     return [];
   }
   const out: string[] = [];
@@ -88,7 +88,7 @@ async function fetchAnthropic(): Promise<string[]> {
 async function fetchOpenAI(): Promise<string[]> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    console.warn("OPENAI_API_KEY not set, skipping OpenAI");
+    console.warn("OPENAI_API_KEY not set, using the OpenAI documentation page instead");
     return [];
   }
   const out: string[] = [];
@@ -115,7 +115,9 @@ async function fetchOpenAI(): Promise<string[]> {
 async function fetchGemini(): Promise<string[]> {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY / GOOGLE_API_KEY not set, skipping Gemini");
+    console.warn(
+      "GEMINI_API_KEY / GOOGLE_API_KEY not set, using the Gemini documentation page instead"
+    );
     return [];
   }
   const out: string[] = [];
@@ -146,7 +148,7 @@ async function fetchGemini(): Promise<string[]> {
 async function fetchXAI(): Promise<string[]> {
   const key = process.env.XAI_API_KEY;
   if (!key) {
-    console.warn("XAI_API_KEY not set, skipping xAI");
+    console.warn("XAI_API_KEY not set, using the xAI documentation page instead");
     return [];
   }
   const res = await fetch("https://api.x.ai/v1/models", {
