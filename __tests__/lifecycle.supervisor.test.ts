@@ -735,6 +735,42 @@ describe("LifecycleAgentPort restart restores the conversation", () => {
     );
   });
 
+  describe.each(["loadSession", "resumeSession"] as const)("%s through the port", (method) => {
+    const caps = method === "loadSession" ? LOAD_CAPS : RESUME_CAPS;
+    const mcpServers = [{ name: "files", command: "mcp-files", args: [], env: [] }];
+
+    it("becomes the stored session, restored with its cwd and servers on restart", async () => {
+      const { store } = await storedSession();
+      const mocks = restoreMocks();
+      const inner = createMockAgentPort({ ...mocks, agentCapabilities: caps });
+      const port = supervise(inner, store);
+
+      await port[method]?.({ sessionId: "old", cwd: "/c", mcpServers });
+
+      const stored = await store.loadSession(PROVIDER);
+      expect(stored?.sessionId).toBe("old");
+      expect(stored?.cwd).toBe("/c");
+
+      const outcome = await port.restart();
+
+      expect(mocks[method]).toHaveBeenLastCalledWith({ sessionId: "old", cwd: "/c", mcpServers });
+      expect(outcome.sessionId).toBe("old");
+    });
+
+    it("writes nothing when the call is rejected", async () => {
+      const { store, saved } = await storedSession();
+      const mocks = restoreMocks();
+      mocks[method].mockRejectedValue(notFound());
+      const inner = createMockAgentPort({ ...mocks, agentCapabilities: caps });
+      const port = supervise(inner, store);
+
+      await expect(port[method]?.({ sessionId: "old", cwd: "/c", mcpServers })).rejects.toThrow();
+
+      expect(saved).toEqual([]);
+      expect((await store.loadSession(PROVIDER))?.sessionId).toBe(STORED_ID);
+    });
+  });
+
   it("forwards resumeSession, loadSession and agentCapabilities from the inner port", () => {
     const mocks = restoreMocks();
     const withRestore = new LifecycleAgentPort(

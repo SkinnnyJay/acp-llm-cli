@@ -20,6 +20,8 @@ Curated exports from the package root. Prefer this surface for applications.
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `IAgentPort` / `AgentPortCapabilities` / `StreamPromptOptions` | type | Agent port contract |
+| `ConnectionStatus` | type | Port and connection state (root entry only) |
+| `ProcessEnv` | type | Environment map accepted by config and spawn options (root entry only) |
 | `RestartOutcome` / `RestartSessionOutcome` | type | What `restart()` returns: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and the session id to use |
 | `IProviderClient` / `IProviderClientFactory` / `IProviderFactory` / `IProviderMetrics` | type | Factory interfaces |
 | `ProviderMetricsCollector` | class | Holds `invocations`, `lastError`, `lastInvocationMs`; reached via `factory.getMetrics(id)` when `collectMetrics` is on |
@@ -101,9 +103,9 @@ The runtime types and classes above are re-exported here; the application conven
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `StdioConnection` / `StdioConnectionFactory` | class | Default stdio transport and its factory |
-| `SpawnFunction` | type | Inject a spawn implementation, mainly for tests |
+| `SpawnFunction` / `SpawnOptions` | type | Inject a spawn implementation, mainly for tests; the options it receives |
+| `ConnectionEvents` | type | The event map an `IConnection` emits |
 | `IConnection` / `IConnectionFactory` | type | Implement these for a non-stdio transport |
-| `ConnectionStatus` | type | Port and connection state |
 | `IACPConnectionLike` | type | The connection surface the ACP client needs |
 
 ### Adapters and config

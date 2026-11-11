@@ -36,4 +36,19 @@ describe("help extraction spawn failure", () => {
       cause: expect.objectContaining({ code: "ENOENT" }),
     });
   });
+
+  it("classifies a non-executable binary as CLI_NOT_EXECUTABLE, keeping the original as cause", async () => {
+    const child = createInertChild();
+    const spawnFn = vi.fn().mockReturnValue(child);
+    const pending = extractHelp({ command: "not-executable", spawnFn });
+
+    child.emit("error", Object.assign(new Error("spawn EACCES"), { code: "EACCES" }));
+
+    await expect(pending).rejects.toBeInstanceOf(AgentProcessError);
+    await expect(pending).rejects.toMatchObject({
+      code: "CLI_NOT_EXECUTABLE",
+      command: "not-executable",
+      cause: expect.objectContaining({ code: "EACCES" }),
+    });
+  });
 });
