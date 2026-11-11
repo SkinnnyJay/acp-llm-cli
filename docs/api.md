@@ -20,13 +20,14 @@ Curated exports from the package root. Prefer this surface for applications.
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `IAgentPort` / `AgentPortCapabilities` / `StreamPromptOptions` | type | Agent port contract |
+| `RestartOutcome` / `RestartSessionOutcome` | type | What `restart()` returns: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and the session id to use |
 | `IProviderClient` / `IProviderClientFactory` / `IProviderFactory` / `IProviderMetrics` | type | Factory interfaces |
 | `ProviderMetricsCollector` | class | Holds `invocations`, `lastError`, `lastInvocationMs`; reached via `factory.getMetrics(id)` when `collectMetrics` is on |
 | `ProviderFactory` / `ProviderClientFactory` / `ProviderClient` | class | Explicit factory construction |
 | `createAcpCliHarnessRuntime` / `createStandardAcpRuntime` | fn | Build ACP ports (also on `./runtime`) |
 | `AcpSharedRuntimeOptions` | type | Persistence, permissions, envelope, lifecycle |
 | `createMemorySessionPersistence` | fn | In-memory `ISessionPersistence` |
-| `ISessionPersistence` / `PersistedSession` | type | Records session id and cwd; the conversation is not restored in this release |
+| `ISessionPersistence` / `PersistedSession` | type | Records session id and cwd, which `restart()` uses to restore the session |
 | `createAcpAgentPort` / `ACPClientOptions` | fn/type | Low-level ACP client over a connection |
 | `baseCliConfigSchema` / `BaseCliConfig` | schema/type | Shared CLI config |
 | `ConfigSchema` / `ConfigSchemaResult` / `ConfigSchemaError` / `ConfigSchemaIssue` | type | The `parse`/`safeParse` surface an adapter config schema must provide, spelled structurally so it holds across both supported zod majors |
@@ -91,7 +92,7 @@ The runtime types and classes above are re-exported here; the application conven
 |--------|------|---------|
 | `StreamAgentPort` / `wrapAgentPortWithStream` | class/fn | Adds `streamPrompt` to a port |
 | `WrapAgentPortOptions` | type | Envelope mode and model label for the stream decorator |
-| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, and the conversation is not restored in this release |
+| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, then restores the persisted session with `session/resume`, else `session/load` (replay dropped), else a new session, and returns a `RestartOutcome` |
 | `LifecycleSupervisorOptions` / `LifecycleSessionPersistence` | type | Lifecycle tuning; persistence is grouped under `persistence` |
 
 ### Connections

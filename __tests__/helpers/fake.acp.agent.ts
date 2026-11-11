@@ -5,9 +5,10 @@ export type JsonMessage = Record<string, unknown>;
 
 /**
  * A scripted ACP agent on the far end of in-memory pipes, for tests that run the real SDK over
- * `ndJsonStream`. It answers `initialize`; for the n-th `session/prompt` (0-based) it sends what
- * `onPrompt` returns, either as one chunk or one write per message. `respond`, when given, sees
- * every request from the client first; returning messages sends them instead of the default.
+ * `ndJsonStream`. It answers `initialize`, `session/resume` and `session/load` (the latter after
+ * replaying two `session/update` notifications); for the n-th `session/prompt` (0-based) it sends
+ * what `onPrompt` returns, either as one chunk or one write per message. `respond`, when given,
+ * sees every request from the client first; returning messages sends them instead of the default.
  */
 export interface FakeAcpAgent {
   /** The client side of the pipes, to hand to the transport under test. */
@@ -24,6 +25,16 @@ export interface FakeAcpAgent {
   /** Releases both pipes and waits for the agent loop to finish. */
   close(): Promise<void>;
 }
+
+/** One history message as `session/load` replays it before its response. */
+const replayedUpdate = (sessionId: string, text: string): JsonMessage => ({
+  jsonrpc: "2.0",
+  method: "session/update",
+  params: {
+    sessionId,
+    update: { sessionUpdate: "user_message_chunk", content: { type: "text", text } },
+  },
+});
 
 export function createFakeAcpAgent(
   mode: WriteMode = "separate-writes",
@@ -88,6 +99,15 @@ export function createFakeAcpAgent(
           ]);
         } else if (message.method === "session/prompt") {
           send(onPrompt(prompts++, message.id));
+        } else if (message.method === "session/resume") {
+          send([{ jsonrpc: "2.0", id: message.id, result: {} }]);
+        } else if (message.method === "session/load") {
+          const { sessionId } = message.params as { sessionId: string };
+          send([
+            replayedUpdate(sessionId, "replayed 1"),
+            replayedUpdate(sessionId, "replayed 2"),
+            { jsonrpc: "2.0", id: message.id, result: {} },
+          ]);
         }
       }
     }

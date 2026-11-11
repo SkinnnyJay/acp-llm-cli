@@ -8,7 +8,7 @@ import type {
 import { EventEmitter } from "eventemitter3";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
-import { ACP_ERROR_CODE, UnsupportedCapabilityError } from "../domain/errors";
+import { ACP_ERROR_CODE, AgentProtocolError, UnsupportedCapabilityError } from "../domain/errors";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import { notificationSessionId } from "../domain/session.notification";
 import type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
@@ -17,6 +17,7 @@ import type {
   AgentPortCapabilities,
   AgentPortEvents,
   IAgentPort,
+  RestartOutcome,
   StreamPromptOptions,
 } from "./agent.port";
 import type { RestartWithBackoffOptions } from "./restart.with.backoff";
@@ -53,6 +54,13 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   private readonly resumeOnRestart: boolean;
   private readonly restartOptions: RestartWithBackoffOptions | undefined;
   private lastSessionCwd: string | undefined;
+  /** From the last successful newSession() through this port, reused when restoring. */
+  private lastMcpServers: NewSessionRequest["mcpServers"] = [];
+  /**
+   * The session a pending `session/load` is replaying. Its updates are history the consumer has
+   * already rendered, so they are neither re-emitted nor persisted.
+   */
+  private replayingSessionId: string | undefined;
 
   constructor(inner: IAgentPort, options: LifecycleSupervisorOptions) {
     super();
@@ -70,6 +78,12 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
 
     inner.on("state", (status: ConnectionStatus) => this.emit("state", status));
     inner.on("sessionUpdate", (update: SessionNotification) => {
+      if (
+        this.replayingSessionId !== undefined &&
+        notificationSessionId(update) === this.replayingSessionId
+      ) {
+        return;
+      }
       void this.maybePersistFromNotification(update);
       this.emit("sessionUpdate", update);
     });
@@ -131,6 +145,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
     const response = await this.inner.newSession(params);
     this.lastSessionCwd = params.cwd;
+    this.lastMcpServers = params.mcpServers;
     if (response.sessionId) {
       await this.persist(response.sessionId, params.cwd);
     }
@@ -172,7 +187,24 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     return this.inner.setSessionConfigOption?.bind(this.inner);
   }
 
-  async restart(): Promise<void> {
+  get resumeSession() {
+    return this.inner.resumeSession?.bind(this.inner);
+  }
+
+  get loadSession() {
+    return this.inner.loadSession?.bind(this.inner);
+  }
+
+  get agentCapabilities() {
+    return this.inner.agentCapabilities;
+  }
+
+  /**
+   * Restarts the process, then restores the persisted session: `session/resume` when advertised,
+   * else `session/load` (its history replay is dropped), else a new session. An agent error
+   * (AgentProtocolError) moves on to the next method; any other error propagates.
+   */
+  async restart(): Promise<RestartOutcome> {
     const persistence = this.persistence;
     let sessionToResume: PersistedSession | null = null;
     if (persistence && this.resumeOnRestart) {
@@ -184,24 +216,49 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
 
     await restartWithBackoff(this.inner, this.restartOptions);
 
-    if (persistence && sessionToResume?.sessionId) {
-      const cwd = sessionToResume.cwd ?? persistence.workspace ?? process.cwd();
-      const resumeParams = {
-        cwd,
-        mcpServers: [] as NewSessionRequest["mcpServers"],
-        sessionId: sessionToResume.sessionId,
-      } as NewSessionRequest;
-      await this.inner.newSession(resumeParams);
-      // Keep the in-memory cwd in step with what was just restored. Without this the next
-      // inbound vendor session_id notification persists cwd: undefined and wipes it, so the
-      // following restart resumes in the wrong directory.
-      this.lastSessionCwd = cwd;
-      // Route through persist() rather than assembling a second record here. Spreading the
-      // LOADED record carried its providerId/workspace into the write, so a store that does not
-      // round-trip those fields would file this under a different key than every other write.
-      // The key belongs to the configured persistence group, never to the loaded value.
-      await this.persist(sessionToResume.sessionId, cwd);
+    if (!persistence || !sessionToResume?.sessionId) return { session: "none" };
+
+    const cwd = sessionToResume.cwd ?? persistence.workspace ?? process.cwd();
+    const outcome = await this.restoreSession(sessionToResume.sessionId, cwd);
+    // Keep the in-memory cwd in step with what was just restored. Without this the next
+    // inbound vendor session_id notification persists cwd: undefined and wipes it, so the
+    // following restart resumes in the wrong directory.
+    this.lastSessionCwd = cwd;
+    // Route through persist() rather than assembling a second record here. Spreading the
+    // LOADED record carried its providerId/workspace into the write, so a store that does not
+    // round-trip those fields would file this under a different key than every other write.
+    // The key belongs to the configured persistence group, never to the loaded value.
+    if (outcome.sessionId) await this.persist(outcome.sessionId, cwd);
+    return outcome;
+  }
+
+  private async restoreSession(
+    sessionId: string,
+    cwd: string
+  ): Promise<RestartOutcome & { sessionId: string }> {
+    const caps = this.inner.agentCapabilities;
+    const mcpServers = this.lastMcpServers;
+    if (caps?.sessionCapabilities?.resume && this.inner.resumeSession) {
+      try {
+        await this.inner.resumeSession({ sessionId, cwd, mcpServers });
+        return { session: "resumed", sessionId };
+      } catch (error) {
+        if (!(error instanceof AgentProtocolError)) throw error;
+      }
     }
+    if (caps?.loadSession && this.inner.loadSession) {
+      this.replayingSessionId = sessionId;
+      try {
+        await this.inner.loadSession({ sessionId, cwd, mcpServers });
+        return { session: "loaded", sessionId };
+      } catch (error) {
+        if (!(error instanceof AgentProtocolError)) throw error;
+      } finally {
+        this.replayingSessionId = undefined;
+      }
+    }
+    const created = await this.inner.newSession({ cwd, mcpServers });
+    return { session: "new", sessionId: created.sessionId };
   }
 
   async open(): Promise<void> {

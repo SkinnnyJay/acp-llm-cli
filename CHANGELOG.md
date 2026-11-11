@@ -15,8 +15,10 @@ trip for this release.
 ### Breaking
 
 - **ACP SDK `^1.4.0` to `^2.5.0`** (stable entrypoint). `ACPClient` is rebuilt on the SDK's
-  `client()` app API; `IAgentPort` is unchanged. The `zod` peer floor is raised from `^3.25.0` to
+  `client()` app API; `IAgentPort` keeps its methods (see `restart()` below). The `zod` peer floor is raised from `^3.25.0` to
   `^3.25.76 || ^4.0.0`.
+- **`IAgentPort.restart?()` returns `Promise<RestartOutcome>`** (was `Promise<void>`). A custom port
+  that implements `restart` must return one, for example `{ session: "none" }`.
 - **The Gemini provider is removed and replaced by Antigravity.** Google has replaced the Gemini CLI
   with the Antigravity CLI for consumer accounts. Removed: `Provider.GEMINI`
   (and `"gemini-cli"` from `Provider`, `ProviderSchema` and `PROVIDER_VALUES`),
@@ -34,8 +36,8 @@ trip for this release.
   0.4.0 the print port put `--trust` on the spawn when `trust: true` and `--mode` / `--model` on each prompt. Now
   `trust` and `model` are still accepted on the config but do not change the spawned process, and
   `mode` is discarded. `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
-  now supports streaming and `restart()` like the other providers; `restart()` restarts the
-  process but does not restore the conversation (see Known limits). Internal constants for
+  now supports streaming and `restart()` like the other providers, including restoring the
+  session (see Added). Internal constants for
   the print port are removed (`TIMEOUT.CURSOR_*`, `ERROR_MESSAGE.CURSOR_*`, `CURSOR_MODE`,
   `CURSOR_NDJSON_*`, `CURSOR_OUTPUT_FORMAT` and others); none were on a public entry point.
 - **Generic option keys removed:** `inputFormat`, `stream`, `resume`, `sessionId`, `verbose` and
@@ -104,6 +106,17 @@ trip for this release.
 
 ### Added
 
+- **`restart()` restores the session.** After restarting the process it sends `session/resume`
+  when the agent advertises `sessionCapabilities.resume`, else `session/load` when it advertises
+  `loadSession` (the history the agent replays is not re-emitted or persisted), else a new
+  session. An agent error moves on to the next method; a closed link or dead process propagates.
+  It returns a `RestartOutcome` (`session`: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and
+  `sessionId`); `"new"` means the agent could not restore the session and the conversation
+  context is gone. 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
+  define and kept the old id in the store; that cast is removed. `IAgentPort.restart?()` now
+  returns `Promise<RestartOutcome>`, and `IAgentPort` gains optional `resumeSession`,
+  `loadSession` and `agentCapabilities` (from the last `initialize`), which `ACPClient` implements.
+  Types `RestartOutcome` and `RestartSessionOutcome` are exported.
 - Types `ProcessEnv` (root entry) and `ConnectionEvents`, `SpawnOptions` (`/runtime`) are now
   exported; tsup 9 warns when a public API type is not re-exported.
 - **Typed errors.** `AcpCliError` and one subclass per subsystem: `ConfigError`,
@@ -126,7 +139,7 @@ trip for this release.
 
 - **SDK 1.x to 2.x.** Only matters if you pass SDK types through. Before: types imported from
   `@agentclientprotocol/sdk` 1.x. After: the 2.x types (this package depends on `^2.5.0`).
-  `IAgentPort` is unchanged.
+  `IAgentPort` is unchanged apart from `restart()`'s return value (see Breaking).
 - **Cursor config.** Before: `{ command: "cursor-agent", args: [], mode: "plan", workspacePath: dir }`.
   After: `{ command: "cursor-agent", args: ["acp"] }` (or omit `args` and resolve with
   `resolveBaseConfig`), then pass the directory as `cwd` to `newSession` and set the mode with
@@ -143,14 +156,6 @@ trip for this release.
   import { createAcpCliHarnessRuntime } from "@simpill/acp-llm-cli";
   const port = createAcpCliHarnessRuntime({ command: "gemini", args: ["--acp"], env: {} });
   ```
-
-### Known limits
-
-- `restart()` restarts the process with backoff and re-initializes. The persistence store records
-  the session id and cwd, but the conversation is not restored by this release. `restart()` sends
-  `session/new` with a `sessionId` field that `session/new` does not define, and an agent built on
-  the SDK drops it and creates a new session. Real resume (`session/resume` / `session/load`,
-  which `docs/capabilities.md` shows the agents advertise) is planned for the next phase.
 
 ## [0.4.0] - 2026-08-22
 

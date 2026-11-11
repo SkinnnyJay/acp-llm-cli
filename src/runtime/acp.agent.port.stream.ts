@@ -101,6 +101,15 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   get setSessionConfigOption() {
     return this.inner.setSessionConfigOption?.bind(this.inner);
   }
+  get resumeSession() {
+    return this.inner.resumeSession?.bind(this.inner);
+  }
+  get loadSession() {
+    return this.inner.loadSession?.bind(this.inner);
+  }
+  get agentCapabilities() {
+    return this.inner.agentCapabilities;
+  }
 
   async *streamPrompt(
     params: PromptRequest,

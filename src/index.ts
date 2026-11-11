@@ -88,6 +88,8 @@ export {
 export type {
   AgentPortCapabilities,
   IAgentPort,
+  RestartOutcome,
+  RestartSessionOutcome,
   StreamPromptOptions,
 } from "./runtime/agent.port";
 export type {

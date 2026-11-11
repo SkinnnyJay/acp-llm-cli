@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RestartOutcome, RestartSessionOutcome } from "../src/index";
 import * as root from "../src/index";
 import * as runtime from "../src/runtime/index";
 
@@ -134,6 +135,13 @@ describe("public surface", () => {
         `${name} missing from "./runtime"`
       ).toBeDefined();
     }
+  });
+
+  it("exports the restart outcome types from the root entry point", () => {
+    // Types only, so this is enforced by `npm run typecheck` rather than at run time.
+    const session: RestartSessionOutcome = "resumed";
+    const outcome: RestartOutcome = { session, sessionId: "s1" };
+    expect(outcome).toEqual({ session: "resumed", sessionId: "s1" });
   });
 
   it("exports exactly the documented runtime names from each entry point", () => {

@@ -1,8 +1,13 @@
+import type { SessionNotification } from "@agentclientprotocol/sdk";
 import type { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
-import { UnsupportedCapabilityError } from "../src/domain/errors";
+import {
+  AgentProtocolError,
+  ConnectionError,
+  UnsupportedCapabilityError,
+} from "../src/domain/errors";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { ISessionPersistence, PersistedSession } from "../src/domain/session.persistence";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -249,7 +254,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(saveSpy).not.toHaveBeenCalled();
   });
 
-  it("restart() calls inner.restart and resumes saved session when resumeOnRestart is true", async () => {
+  it("restart() calls inner.restart and restores the saved session when resumeOnRestart is true", async () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     await persistence.saveSession({
@@ -263,12 +268,12 @@ describe("wrapAgentPortWithLifecycle", () => {
       restartOptions: { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 },
     });
 
-    await wrapped.restart?.();
+    const outcome = await wrapped.restart?.();
 
     expect(inner.restart).toHaveBeenCalled();
-    expect(inner.newSession).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: "saved-sess" })
-    );
+    // Nothing advertised: a new session, never one with a sessionId cast onto session/new.
+    expect(inner.newSession).toHaveBeenCalledWith({ cwd: process.cwd(), mcpServers: [] });
+    expect(outcome).toEqual({ session: "new", sessionId: "sess-123" });
   });
 
   it("restart() does not call newSession when no persisted session exists", async () => {
@@ -448,7 +453,11 @@ describe("LifecycleAgentPort persistence key ownership", () => {
       clearSession: vi.fn(),
     };
 
-    const inner = createMockAgentPort({ restart: vi.fn().mockResolvedValue(undefined) });
+    const inner = createMockAgentPort({
+      restart: vi.fn().mockResolvedValue(undefined),
+      resumeSession: vi.fn().mockResolvedValue({}),
+      agentCapabilities: { sessionCapabilities: { resume: {} } },
+    });
     const port = wrapAgentPortWithLifecycle(inner, {
       persistence: { store, providerId: "claude-cli", workspace: "/ws" },
     });
@@ -462,5 +471,220 @@ describe("LifecycleAgentPort persistence key ownership", () => {
       sessionId: "s-restored",
       cwd: "/original",
     });
+  });
+});
+
+describe("LifecycleAgentPort restart restores the conversation", () => {
+  const PROVIDER = "restore-provider";
+  const STORED_ID = "stored-sess";
+  const STORED_CWD = "/stored/cwd";
+  const RESUME_CAPS = { sessionCapabilities: { resume: {} }, loadSession: true };
+  const LOAD_CAPS = { loadSession: true };
+  const notFound = () =>
+    new AgentProtocolError("SESSION_NOT_FOUND", "no such session", { rpcCode: -32002 });
+  const chunk = (sessionId: string, text: string) =>
+    ({
+      sessionId,
+      session_id: sessionId,
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } },
+    }) as unknown as SessionNotification;
+
+  /** A store holding STORED_ID, and every write made to it after that. */
+  const storedSession = async () => {
+    const store = createMemorySessionPersistence();
+    await store.saveSession({
+      providerId: PROVIDER,
+      sessionId: STORED_ID,
+      cwd: STORED_CWD,
+      updatedAt: Date.now(),
+    });
+    const saved: PersistedSession[] = [];
+    const save = store.saveSession.bind(store);
+    store.saveSession = async (data) => {
+      saved.push(data);
+      await save(data);
+    };
+    return { store, saved };
+  };
+
+  const supervise = (inner: IAgentPort, store: ISessionPersistence) =>
+    new LifecycleAgentPort(inner, { persistence: { store, providerId: PROVIDER } });
+
+  const restoreMocks = () => ({
+    restart: vi.fn().mockResolvedValue(undefined),
+    resumeSession: vi.fn().mockResolvedValue({}),
+    loadSession: vi.fn().mockResolvedValue({}),
+  });
+
+  it("resumes when the agent advertises session/resume", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+
+    const outcome = await supervise(inner, store).restart();
+
+    expect(mocks.resumeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: STORED_ID, cwd: STORED_CWD })
+    );
+    expect(mocks.loadSession).not.toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ session: "resumed", sessionId: STORED_ID });
+  });
+
+  it("loads when only session/load is advertised, dropping the replay for that session", async () => {
+    const { store, saved } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: LOAD_CAPS });
+    const emitInner = (update: SessionNotification) =>
+      (inner as unknown as EventEmitter).emit("sessionUpdate", update);
+    mocks.loadSession.mockImplementation(async () => {
+      emitInner(chunk(STORED_ID, "replayed"));
+      return {};
+    });
+    const port = supervise(inner, store);
+    const seen: SessionNotification[] = [];
+    port.on("sessionUpdate", (update) => seen.push(update));
+
+    const outcome = await port.restart();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mocks.loadSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: STORED_ID, cwd: STORED_CWD })
+    );
+    expect(mocks.resumeSession).not.toHaveBeenCalled();
+    expect(seen).toEqual([]);
+    expect(saved).toHaveLength(1);
+    expect(outcome).toEqual({ session: "loaded", sessionId: STORED_ID });
+
+    const live = chunk(STORED_ID, "live");
+    emitInner(live);
+    expect(seen).toEqual([live]);
+  });
+
+  it("re-emits an update for a different session while session/load is pending", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: LOAD_CAPS });
+    const other = chunk("other-sess", "unrelated");
+    mocks.loadSession.mockImplementation(async () => {
+      (inner as unknown as EventEmitter).emit("sessionUpdate", other);
+      return {};
+    });
+    const port = supervise(inner, store);
+    const seen: SessionNotification[] = [];
+    port.on("sessionUpdate", (update) => seen.push(update));
+
+    await port.restart();
+
+    expect(seen).toEqual([other]);
+  });
+
+  it("falls from resume to load to a new session when the agent cannot find the session", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    mocks.resumeSession.mockRejectedValue(notFound());
+    mocks.loadSession.mockRejectedValue(notFound());
+    const inner = createMockAgentPort({
+      ...mocks,
+      sessionId: "fresh-sess",
+      agentCapabilities: RESUME_CAPS,
+    });
+
+    const outcome = await supervise(inner, store).restart();
+
+    expect(mocks.resumeSession).toHaveBeenCalledOnce();
+    expect(mocks.loadSession).toHaveBeenCalledOnce();
+    expect(inner.newSession).toHaveBeenCalledOnce();
+    const params = (inner.newSession as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect("sessionId" in params).toBe(false);
+    expect(params).toMatchObject({ cwd: STORED_CWD });
+    expect(outcome).toEqual({ session: "new", sessionId: "fresh-sess" });
+    expect((await store.loadSession(PROVIDER))?.sessionId).toBe("fresh-sess");
+  });
+
+  it("stops dropping updates for the session once a failed load has settled", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    mocks.loadSession.mockRejectedValue(notFound());
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: LOAD_CAPS });
+    const port = supervise(inner, store);
+    const seen: SessionNotification[] = [];
+    port.on("sessionUpdate", (update) => seen.push(update));
+
+    await port.restart();
+    const live = chunk(STORED_ID, "live");
+    (inner as unknown as EventEmitter).emit("sessionUpdate", live);
+
+    expect(seen).toEqual([live]);
+  });
+
+  it("propagates an error that is not an AgentProtocolError without trying the next method", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const linkClosed = new ConnectionError("LINK_CLOSED", "link closed");
+    mocks.resumeSession.mockRejectedValue(linkClosed);
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+
+    await expect(supervise(inner, store).restart()).rejects.toBe(linkClosed);
+
+    expect(mocks.loadSession).not.toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+  });
+
+  it("creates a new session without a sessionId when nothing is advertised", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, sessionId: "fresh-sess" });
+
+    const outcome = await supervise(inner, store).restart();
+
+    expect(mocks.resumeSession).not.toHaveBeenCalled();
+    expect(mocks.loadSession).not.toHaveBeenCalled();
+    const params = (inner.newSession as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect("sessionId" in params).toBe(false);
+    expect(outcome).toEqual({ session: "new", sessionId: "fresh-sess" });
+  });
+
+  it("returns { session: 'none' } and makes no session call without persistence", async () => {
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+
+    const outcome = await new LifecycleAgentPort(inner, {}).restart();
+
+    expect(outcome).toEqual({ session: "none" });
+    expect(mocks.resumeSession).not.toHaveBeenCalled();
+    expect(mocks.loadSession).not.toHaveBeenCalled();
+    expect(inner.newSession).not.toHaveBeenCalled();
+  });
+
+  it("reuses the mcpServers of the last newSession in the restore call", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+    const port = supervise(inner, store);
+    const mcpServers = [{ name: "files", command: "mcp-files", args: [], env: [] }];
+
+    await port.newSession({ cwd: "/work", mcpServers });
+    await port.restart();
+
+    expect(mocks.resumeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: "/work", mcpServers })
+    );
+  });
+
+  it("forwards resumeSession, loadSession and agentCapabilities from the inner port", () => {
+    const mocks = restoreMocks();
+    const withRestore = new LifecycleAgentPort(
+      createMockAgentPort({ ...mocks, agentCapabilities: LOAD_CAPS }),
+      {}
+    );
+    const without = new LifecycleAgentPort(createMockAgentPort(), {});
+
+    expect(typeof withRestore.resumeSession).toBe("function");
+    expect(typeof withRestore.loadSession).toBe("function");
+    expect(withRestore.agentCapabilities).toEqual(LOAD_CAPS);
+    expect(without.resumeSession).toBeUndefined();
+    expect(without.loadSession).toBeUndefined();
+    expect(without.agentCapabilities).toBeUndefined();
   });
 });

@@ -1,12 +1,17 @@
 import type {
+  AgentCapabilities,
   AuthenticateRequest,
   AuthenticateResponse,
   InitializeRequest,
   InitializeResponse,
+  LoadSessionRequest,
+  LoadSessionResponse,
   NewSessionRequest,
   NewSessionResponse,
   PromptRequest,
   PromptResponse,
+  ResumeSessionRequest,
+  ResumeSessionResponse,
   SessionNotification,
   SetSessionConfigOptionRequest,
   SetSessionConfigOptionResponse,
@@ -137,6 +142,8 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
   private readonly clientCapabilities: ClientCapabilities;
   /** From the last successful initialize(), for AUTH_REQUIRED errors. */
   private authMethods: AuthMethods = [];
+  /** From the last successful initialize() on the current link. */
+  private initializedCapabilities: AgentCapabilities | undefined;
   /** The transport's last error during the current connect(), as re-raised by this client. */
   private transportError: Error | undefined;
 
@@ -328,6 +335,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
     this.attached = { link, stream };
     // A new link may be a different process, which may advertise different auth methods.
     this.authMethods = [];
+    this.initializedCapabilities = undefined;
     this.staleStream = undefined;
     void link.closed.then(() => this.onLinkClosed(link));
   }
@@ -351,11 +359,31 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
       name,
       ...(description == null ? {} : { description }),
     }));
+    this.initializedCapabilities = response.agentCapabilities;
     return response;
+  }
+
+  get agentCapabilities(): AgentCapabilities | undefined {
+    return this.initializedCapabilities;
   }
 
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
     return this.call(() => this.requireAgent().request(methods.agent.session.new, params));
+  }
+
+  async resumeSession(params: ResumeSessionRequest): Promise<ResumeSessionResponse> {
+    return this.call(
+      () => this.requireAgent().request(methods.agent.session.resume, params),
+      params.sessionId
+    );
+  }
+
+  /** The agent's history replay arrives as `sessionUpdate` events before this resolves. */
+  async loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse> {
+    return this.call(
+      () => this.requireAgent().request(methods.agent.session.load, params),
+      params.sessionId
+    );
   }
 
   async authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse> {

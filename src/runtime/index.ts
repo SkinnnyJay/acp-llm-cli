@@ -19,6 +19,8 @@ export type {
   AgentPortCapabilities,
   AgentPortEvents,
   IAgentPort,
+  RestartOutcome,
+  RestartSessionOutcome,
   StreamPromptOptions,
 } from "./agent.port";
 export type {

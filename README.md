@@ -143,7 +143,7 @@ The final chunk carries a `finish_reason` translated from the agent's stop reaso
 
 Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` restarts the process with an awaited, capped exponential backoff and re-initializes.
 
-A persistence store records the session id and cwd. The conversation is **not** restored by this release: `restart()` does not give you a usable session, so call `newSession()` again after it (when a session was persisted, the supervisor sends `session/new`, discards the new id and keeps the old one in the store). Real resume (`session/resume` / `session/load`, which [`docs/capabilities.md`](./docs/capabilities.md) shows the agents advertise) is planned for the next phase. To record the session, pass a persistence store:
+A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session. It tries `session/resume` when the agent advertises it, then `session/load` (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone. To record the session, pass a persistence store:
 
 ```ts
 import {
@@ -162,7 +162,11 @@ const port = getDefaultFactory().createRuntime(
 );
 
 if (port.capabilities?.restart) {
-  await port.restart?.(); // restarts the process and re-initializes; the conversation is not restored
+  const outcome = await port.restart?.();
+  if (outcome?.session === "new") {
+    // The agent could not restore the session: outcome.sessionId is a fresh one, no history.
+  }
+  // Prompt on outcome?.sessionId from here on ("resumed", "loaded" or "new").
 }
 ```
 

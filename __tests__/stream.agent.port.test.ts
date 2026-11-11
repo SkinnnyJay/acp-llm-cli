@@ -197,6 +197,25 @@ describe("StreamAgentPort", () => {
     expect(port.setSessionConfigOption).toBeUndefined();
   });
 
+  it("forwards resumeSession, loadSession and agentCapabilities only when inner has them", () => {
+    const caps = { loadSession: true };
+    const port = new StreamAgentPort(
+      createMockAgentPort({
+        resumeSession: vi.fn(),
+        loadSession: vi.fn(),
+        agentCapabilities: caps,
+      })
+    );
+    expect(typeof port.resumeSession).toBe("function");
+    expect(typeof port.loadSession).toBe("function");
+    expect(port.agentCapabilities).toBe(caps);
+
+    const bare = new StreamAgentPort(createMockPort());
+    expect(bare.resumeSession).toBeUndefined();
+    expect(bare.loadSession).toBeUndefined();
+    expect(bare.agentCapabilities).toBeUndefined();
+  });
+
   it("streamPrompt in NATIVE mode does not emit an OpenAI finish envelope", async () => {
     const inner = createMockPort();
     const port = new StreamAgentPort(inner, { envelopeMode: ENVELOPE_MODE.NATIVE });
