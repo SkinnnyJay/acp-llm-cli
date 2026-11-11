@@ -1,8 +1,10 @@
 import type {
+  LoadSessionRequest,
   NewSessionRequest,
   NewSessionResponse,
   PromptRequest,
   RequestPermissionRequest,
+  ResumeSessionRequest,
   SessionNotification,
 } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "eventemitter3";
@@ -199,12 +201,31 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     return this.inner.setSessionConfigOption?.bind(this.inner);
   }
 
-  get resumeSession() {
-    return this.inner.resumeSession?.bind(this.inner);
+  get resumeSession(): IAgentPort["resumeSession"] {
+    const resume = this.inner.resumeSession;
+    if (!resume) return undefined;
+    return async (params) => {
+      const response = await resume.call(this.inner, params);
+      await this.recordRestored(params);
+      return response;
+    };
   }
 
-  get loadSession() {
-    return this.inner.loadSession?.bind(this.inner);
+  get loadSession(): IAgentPort["loadSession"] {
+    const load = this.inner.loadSession;
+    if (!load) return undefined;
+    return async (params) => {
+      const response = await load.call(this.inner, params);
+      await this.recordRestored(params);
+      return response;
+    };
+  }
+
+  /** A session the caller resumed or loaded becomes the one the next restart() restores. */
+  private async recordRestored(params: LoadSessionRequest | ResumeSessionRequest): Promise<void> {
+    this.lastSessionCwd = params.cwd;
+    this.lastMcpServers = params.mcpServers ?? [];
+    await this.persist(params.sessionId, params.cwd);
   }
 
   get agentCapabilities() {

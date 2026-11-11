@@ -45,8 +45,8 @@ const factory = getDefaultProviderClientFactory();
 const client = factory.getClient(Provider.CLAUDE, {
   command: "claude-agent-acp",
   args: [],
-  // Any string. The enum is a convenience for autocomplete, not a constraint. For ACP
-  // providers this labels OpenAI-style stream envelopes rather than selecting
+  // Any string. The enum is a convenience for autocomplete, not a constraint. For Claude,
+  // Codex and Antigravity this labels OpenAI-style stream envelopes rather than selecting
   // the agent's model — for that use port.setSessionConfigOption(...) or pass
   // the flag your CLI expects in `args`.
   model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_5_5,
@@ -68,7 +68,7 @@ console.log(result.stopReason);
 await client.port.disconnect();
 ```
 
-Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes, except `model`, which Cursor receives as `--model` and must be a Cursor model name (`cursor-agent --list-models` lists them, for example `composer-2.5`). `factory.listProviders()` returns all of them.
+To use another provider, swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and also set `command` to that provider's binary (`codex-acp`, `cursor-agent`, `agy`; see `DEFAULT_COMMANDS`). Leave `args: []`: the default args (`acp` for Cursor and Antigravity) are filled in. Cursor also receives `model` as `--model`, so it must be a Cursor model name (`cursor-agent --list-models` lists them, for example `composer-2.5`). `factory.listProviders()` returns all of them.
 
 Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cursor-acp.ts`, `stream-prompt.ts`. Run `npm run build` first.
 
@@ -143,7 +143,7 @@ The final chunk carries a `finish_reason` translated from the agent's stop reaso
 
 Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` restarts the process with an awaited, capped exponential backoff and re-initializes.
 
-A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session; this needs `sessionPersistence`, and without it the outcome is `{ session: "none" }` and the caller creates a session. It tries `session/resume` when the agent advertises it, then `session/load` when advertised (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone, and `previousSessionId` is the stored session it could not restore. Agents report an unknown session with different errors (Codex and Antigravity with a generic internal error), so a transient failure during restore can also end in `"new"`; `previousSessionId` is the id to retry with `loadSession`. In a fresh process, pass `restoreMcpServers` so the restore call attaches your MCP servers until a `newSession` supplies its own. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two reject `restart()` and the stored session is kept. To record the session, pass a persistence store:
+A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session; this needs `sessionPersistence`, and without it the outcome is `{ session: "none" }` and the caller creates a session. It tries `session/resume` when the agent advertises it, then `session/load` when advertised (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone, and `previousSessionId` is the stored session it could not restore. Agents report an unknown session with different errors (Codex and Antigravity with a generic internal error), so a transient failure during restore can also end in `"new"`; `previousSessionId` is the id to retry with `loadSession`; a successful `loadSession` or `resumeSession` through the port becomes the stored session. Antigravity's `session/load` succeeds for an id it never had, so for Antigravity `"loaded"` does not prove the history survived. In a fresh process, pass `restoreMcpServers` so the restore call attaches your MCP servers until a `newSession` supplies its own. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two reject `restart()` and the stored session is kept. To record the session, pass a persistence store:
 
 ```ts
 import {
@@ -293,7 +293,7 @@ Then add the default command to `src/domain/default.commands.ts`, the env keys t
 
 `IProviderFactory.createRuntime` validates config against the provider schema and throws with messages from `VALIDATION_ERROR`; no raw error strings live in business logic. Pass `collectMetrics` to expose `invocations`, `lastError`, and `lastInvocationMs` through `factory.getMetrics(id)`. Logging goes through `createLogger()`, with debug output gated on `ACP_LLM_CLI_DEBUG`.
 
-This package builds on the [`@simpill`](https://www.npmjs.com/search?q=scope%3Asimpill) utilities for env reads (`env.utils`), structured logging (`logger.utils`), and async helpers (`async.utils`). `errors.utils`, `patterns.utils`, and `protocols.utils` are declared directly so packed installs resolve their transitive requirements.
+This package builds on the [`@simpill`](https://www.npmjs.com/search?q=scope%3Asimpill) utilities for env reads (`env.utils`), structured logging (`logger.utils`), and async helpers (`async.utils`).
 
 ## Contributing
 

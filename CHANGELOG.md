@@ -15,7 +15,7 @@ trip for this release.
 ### Breaking
 
 - **ACP SDK `^1.4.0` to `^2.5.0`** (stable entrypoint). `ACPClient` is rebuilt on the SDK's
-  `client()` app API; `IAgentPort` keeps its methods (see `restart()` below). The `zod` peer floor is raised from `^3.25.0` to
+  `client()` app API; `IAgentPort` keeps its methods and gains three optional members (see `restart()` below and Added). The `zod` peer floor is raised from `^3.25.0` to
   `^3.25.76 || ^4.0.0`.
 - **`IAgentPort.restart?()` returns `Promise<RestartOutcome>`** (was `Promise<void>`). A custom port
   that implements `restart` must return one, for example `{ session: "none" }`.
@@ -29,22 +29,26 @@ trip for this release.
   `ANTIGRAVITY_DEFAULT_ARGS` (`["acp"]`), and `ENV_KEY.ACP_LLM_CLI_ANTIGRAVITY_COMMAND` / `_ARGS`.
   The Gemini model id constants and the `GEMINI_API_KEY` name remain.
 - **Cursor runs over ACP (`cursor-agent acp`) on the shared runtime.** The print / `stream-json`
-  port, its helpers and the `cursor-print` example are deleted. `CursorConfig` no longer types
+  port, its helpers and the `cursor-print` example are deleted. The Cursor provider config no longer types
   `mode`, `workspacePath`, `force`, `browser`, `approveMcps` or `approvalTimeoutMs`. The config
   schema accepts and discards unknown keys, so old config still parses and the removed fields are
   dropped. `mode` is no longer turned into a flag and is discarded (use `setSessionMode`); in
   0.4.0 the print port put `--mode` on each prompt. `trust` and `model` are applied as spawn flags
-  (`cursor-agent acp --trust --model <id>`; see Changed). `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
+  (`cursor-agent acp --model <id> --trust`; see Changed). `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor
   now supports streaming and `restart()` like the other providers, including restoring the
   session (see Added). Internal constants for
   the print port are removed (`TIMEOUT.CURSOR_*`, `ERROR_MESSAGE.CURSOR_*`, `CURSOR_MODE`,
   `CURSOR_NDJSON_*`, `CURSOR_OUTPUT_FORMAT` and others); none were on a public entry point.
+- **Spawn failures are typed.** A missing or non-executable CLI now surfaces (on the `error` event,
+  from `connect()` / `restart()`, and from `extractHelp`) as `AgentProcessError` with `code`
+  `"CLI_NOT_FOUND"` / `"CLI_NOT_EXECUTABLE"` / `"SPAWN_FAILED"` instead of Node's error with `code`
+  `"ENOENT"` / `"EACCES"`; Node's error is on `cause`. Error `name`s are now the class names.
 - **Generic option keys removed:** `inputFormat`, `stream`, `resume`, `sessionId`, `verbose` and
   `print` are gone from `GENERIC_OPTION_KEY`, `genericLlmCliOptionsSchema` and
   `GenericLlmCliOptions`, and `buildGenericArgs` no longer reads them. The remaining keys are
   `model`, `outputFormat`, `trust`, `sandbox`, `workspace` and `debug`.
 - **Claude and Codex flag tables are now empty**, because those wrappers print no flag help.
-  `claudeAdapter.cliSpec.buildArgs({ model })` (and the Codex equivalent) now returns `[]`.
+  `getAdapter(getDefaultRegistry(), PROVIDER_IDS.CLAUDE_CLI_ID)?.cliSpec?.buildArgs({ model })` (and the Codex equivalent) now returns `[]`.
 - **Deprecated exports removed:** `GENERIC_OPTION_DEFAULTS` and `ANTHROPIC_MODEL_ID_LIST`,
   `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`.
 - **Model id constants changed.** Ids now come from the vendors: `npm run update-models` reads each
@@ -88,7 +92,7 @@ trip for this release.
 - Dev toolchain: Biome 2.6.6, vitest 5.1.0 and tsup 9.0.0. TypeScript stays at 5.9: 7.0.2 typechecks, but
   tsup's declaration build needs the TypeScript compiler API, which 7.0.2 does not provide.
 - **Errors raised by the package are now typed** (`AcpCliError` subclasses, see Added). Message
-  text is unchanged, and every one is still an `Error`.
+  text is unchanged except where noted below, and every one is still an `Error`.
 - **A missing agent CLI** is reported as `AgentProcessError` with code `CLI_NOT_FOUND`, the command,
   and for built-in providers the install command in `hint` and `message`, instead of Node's raw
   `spawn <cmd> ENOENT` error (now on `cause`). Other spawn failures are `CLI_NOT_EXECUTABLE`
@@ -126,7 +130,7 @@ trip for this release.
   `sessionId`); `"new"` means the agent could not restore the session and the conversation
   context is gone, and `RestartOutcome.previousSessionId` is then the stored session it could not
   restore (agents report an unknown session with different errors, some with a generic internal
-  error, so a transient failure can also end in `"new"`; retry with `loadSession`). 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
+  error, so a transient failure can also end in `"new"`; retry with `loadSession`; a successful `loadSession` or `resumeSession` through the port becomes the stored session). Antigravity's `session/load` succeeds for an id it never had, so for Antigravity `"loaded"` does not prove the history survived. 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
   define and kept the old id in the store; that cast is removed. `IAgentPort.restart?()` now
   returns `Promise<RestartOutcome>`, and `IAgentPort` gains optional `resumeSession`,
   `loadSession` and `agentCapabilities` (from the last `initialize`), which `ACPClient` implements.
@@ -141,7 +145,7 @@ trip for this release.
 - `PROVIDER_SETUP` (type `ProviderSetup`): the install and login command for each built-in
   provider, used for error hints.
 - `ACPClientOptions.providerId` and `ACPClientOptions.command`, which name the provider and
-  command on errors; `createAcpCliHarnessRuntime` sets both.
+  command on errors; the provider adapters set both.
 - `__tests__/provider.flags.drift.test.ts`, which checks each flag table against saved `--help`
   fixtures in `__tests__/fixtures/help/`, and `npm run refresh:help` to regenerate them.
 - `npm run probe` and `docs/capabilities.md`, which record what each ACP agent advertises at
@@ -153,13 +157,14 @@ trip for this release.
 
 - **SDK 1.x to 2.x.** Only matters if you pass SDK types through. Before: types imported from
   `@agentclientprotocol/sdk` 1.x. After: the 2.x types (this package depends on `^2.5.0`).
-  `IAgentPort` is unchanged apart from `restart()`'s return value (see Breaking).
+  `IAgentPort` changes only in `restart()`'s return value (breaking) and three new optional
+  members (see Added).
 - **Cursor config.** Before: `{ command: "cursor-agent", args: [], mode: "plan", workspacePath: dir }`.
   After: `{ command: "cursor-agent", args: ["acp"] }` (or omit `args` and resolve with
   `resolveBaseConfig`), then pass the directory as `cwd` to `newSession` and set the mode with
   `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`. `mode`
-  no longer becomes a flag (use `setSessionMode`); `trust: true` and `model` are appended at
-  spawn, nothing to change.
+  no longer becomes a flag (use `setSessionMode`); `model`, `trust`, `sandbox` and `workspace` are applied as spawn flags
+  (`cursor-agent acp --model <id> --trust`; see Changed), nothing to change.
 - **Gemini to Antigravity.** Before: `Provider.GEMINI` / `"gemini-cli"`, `ACP_LLM_CLI_GEMINI_COMMAND`
   and `ACP_LLM_CLI_GEMINI_ARGS`. After: `Provider.ANTIGRAVITY` / `"antigravity-cli"`,
   `ACP_LLM_CLI_ANTIGRAVITY_COMMAND` (default `agy`) and `ACP_LLM_CLI_ANTIGRAVITY_ARGS` (default

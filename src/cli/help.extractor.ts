@@ -84,14 +84,13 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
       // Node's own message is kept: callers already match on "spawn <cmd> ENOENT".
-      reject(
+      const code =
         err.code === NODE_SPAWN_ERROR.ENOENT
-          ? new AgentProcessError(ACP_ERROR_CODE.CLI_NOT_FOUND, err.message, {
-              command,
-              cause: err,
-            })
-          : err
-      );
+          ? ACP_ERROR_CODE.CLI_NOT_FOUND
+          : err.code === NODE_SPAWN_ERROR.EACCES
+            ? ACP_ERROR_CODE.CLI_NOT_EXECUTABLE
+            : undefined;
+      reject(code ? new AgentProcessError(code, err.message, { command, cause: err }) : err);
     });
 
     // Both close arguments are bound: a child killed by a signal reports code === null, and
