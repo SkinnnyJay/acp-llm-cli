@@ -63,7 +63,8 @@ trip for this release.
 - With SDK 2.x a non-JSON line on the agent's stdout gets a JSON-RPC parse-error response written
   back to the agent, and a single message over 32 MiB (the SDK's default limit) errors the input
   stream, which closes the link.
-- Dev toolchain: Biome 2.6.6 and vitest 5.1.0.
+- Dev toolchain: Biome 2.6.6, vitest 5.1.0 and tsup 9.0.0. TypeScript stays at 5.9: 7.0.2 typechecks, but
+  tsup's declaration build needs the TypeScript compiler API, which 7.0.2 does not provide.
 - **Errors raised by the package are now typed** (`AcpCliError` subclasses, see Added). Message
   text is unchanged, and every one is still an `Error`.
 - **Agent JSON-RPC errors are wrapped.** A request the agent answers with an error now rejects with
@@ -96,6 +97,8 @@ trip for this release.
 
 ### Added
 
+- Types `ProcessEnv` (root entry) and `ConnectionEvents`, `SpawnOptions` (`/runtime`) are now
+  exported; tsup 9 warns when a public API type is not re-exported.
 - **Typed errors.** `AcpCliError` and one subclass per subsystem: `ConfigError`,
   `AgentProcessError`, `ConnectionError`, `AgentProtocolError`, `UnsupportedCapabilityError`,
   `InvalidStateError`, `ToolHostError` and `TimeoutError`. Each carries a stable `code` from

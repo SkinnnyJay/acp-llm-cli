@@ -65,6 +65,7 @@ export type { OpenAIFinishReason } from "./domain/openai.compat";
 export { OPENAI_FINISH_REASON } from "./domain/openai.compat";
 export type { PortCapabilityName } from "./domain/port.capabilities";
 export { PORT_CAPABILITY } from "./domain/port.capabilities";
+export type { ProcessEnv } from "./domain/process.env";
 export { PROVIDER_VALUES, Provider, ProviderSchema } from "./domain/provider";
 export { PROVIDER_IDS } from "./domain/provider.ids";
 export type { ProviderSetup } from "./domain/provider.setup";

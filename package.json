@@ -80,7 +80,7 @@
     "@vitest/coverage-v8": "^5.1.0",
     "eventemitter3": "^5.0.1",
     "publint": "^0.3.25",
-    "tsup": "^8.3.5",
+    "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.1.0",
