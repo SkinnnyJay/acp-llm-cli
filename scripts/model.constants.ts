@@ -74,3 +74,24 @@ ${schemaValues}
 export type ModelId = z.infer<typeof ModelIdSchema>;
 `;
 }
+
+/** True when every output modality of an OpenRouter entry is text. Missing field means false. */
+export function hasTextOutput(entry: { architecture?: { output_modalities?: string[] } }): boolean {
+  const out = entry.architecture?.output_modalities;
+  return Array.isArray(out) && out.length > 0 && out.every((m) => m === "text");
+}
+
+/**
+ * Merge the ids already in a generated file with freshly fetched ones. Router variants (`:free`,
+ * `:batch`) are dropped from both. Additive unless `prune`, which makes `fetched` authoritative.
+ */
+export function selectModelIds(
+  existing: string[],
+  fetched: string[],
+  { prune }: { prune: boolean }
+): string[] {
+  const kept = (prune ? fetched : [...existing, ...fetched]).filter(
+    (id) => id && !id.includes(":")
+  );
+  return [...new Set(kept)].sort();
+}

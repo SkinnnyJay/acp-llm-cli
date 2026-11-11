@@ -13,6 +13,13 @@ export const MODEL_IDS = {
   GROK_4: "grok-4",
   GROK_4_FAST: "grok-4-fast",
   GROK_4_1_FAST: "grok-4.1-fast",
+  GROK_4_20: "grok-4.20",
+  GROK_4_20_MULTI_AGENT: "grok-4.20-multi-agent",
+  GROK_4_3: "grok-4.3",
+  GROK_4_5: "grok-4.5",
+  GROK_4_6: "grok-4.6",
+  GROK_4_7: "grok-4.7",
+  GROK_BUILD_0_1: "grok-build-0.1",
   GROK_CODE_FAST_1: "grok-code-fast-1",
 } as const;
 
@@ -24,6 +31,13 @@ export const ModelIdSchema = z.enum([
   "grok-4",
   "grok-4-fast",
   "grok-4.1-fast",
+  "grok-4.20",
+  "grok-4.20-multi-agent",
+  "grok-4.3",
+  "grok-4.5",
+  "grok-4.6",
+  "grok-4.7",
+  "grok-build-0.1",
   "grok-code-fast-1",
 ]);
 

@@ -6,21 +6,36 @@
  * Optional (with keys): Anthropic, OpenAI, Gemini, xAI provider APIs (override OpenRouter data).
  * Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY or GOOGLE_API_KEY, XAI_API_KEY
  * Optional: ACP_LLM_CLI_MODELS_DRY_RUN=1 to log only, no write.
+ * Additive by default: existing ids are kept. ACP_LLM_CLI_MODELS_PRUNE=1 makes the fetch authoritative.
+ * Router variants (ids containing ":") and non-text-output OpenRouter models are always dropped.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENV_KEY } from "../src/domain/env.keys";
-import { renderModelModule } from "./model.constants";
+import { ModelIdSchema as ANTHROPIC_SCHEMA } from "../src/domain/models/anthropic.models";
+import { ModelIdSchema as GEMINI_SCHEMA } from "../src/domain/models/gemini.models";
+import { ModelIdSchema as OPENAI_SCHEMA } from "../src/domain/models/openai.models";
+import { ModelIdSchema as XAI_SCHEMA } from "../src/domain/models/xai.models";
+import { hasTextOutput, renderModelModule, selectModelIds } from "./model.constants";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
 const MODELS_DIR = join(ROOT, "src", "domain", "models");
 const DRY_RUN = process.env[ENV_KEY.ACP_LLM_CLI_MODELS_DRY_RUN] === "1";
 
+const PRUNE = process.env[ENV_KEY.ACP_LLM_CLI_MODELS_PRUNE] === "1";
+
+const EXISTING: Record<string, readonly string[]> = {
+  anthropic: ANTHROPIC_SCHEMA.options,
+  openai: OPENAI_SCHEMA.options,
+  gemini: GEMINI_SCHEMA.options,
+  xai: XAI_SCHEMA.options,
+};
+
 function writeModelConstants(provider: string, modelIds: string[], headerComment: string): void {
-  const sorted = [...new Set(modelIds)].filter(Boolean).sort();
+  const sorted = selectModelIds([...(EXISTING[provider] ?? [])], modelIds, { prune: PRUNE });
   const content = renderModelModule(headerComment, sorted);
 
   const outPath = join(MODELS_DIR, `${provider}.models.ts`);
@@ -163,10 +178,13 @@ async function fetchOpenRouter(): Promise<Record<string, string[]>> {
       console.warn("OpenRouter models fetch failed:", res.status);
       return out;
     }
-    const data = (await res.json()) as { data?: { id?: string }[] };
+    const data = (await res.json()) as {
+      data?: ({ id?: string } & Parameters<typeof hasTextOutput>[0])[];
+    };
     const list = data.data ?? [];
     for (const m of list) {
       const id = m.id;
+      if (!hasTextOutput(m)) continue;
       if (!id || !id.includes("/")) continue;
       const [prefix, ...rest] = id.split("/");
       const slug = rest.join("/");

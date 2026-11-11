@@ -45,8 +45,9 @@ trip for this release.
 - **Claude and Codex flag tables are now empty**, because those wrappers print no flag help.
   `claudeAdapter.cliSpec.buildArgs({ model })` (and the Codex equivalent) now returns `[]`.
 - **Deprecated exports removed:** `GENERIC_OPTION_DEFAULTS` and `ANTHROPIC_MODEL_ID_LIST`,
-  `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`. Model id lists are
-  otherwise unchanged in this release.
+  `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`. Model id lists:
+  router-only variants (`:batch`, `:free`) were removed and new ids added, nothing else was
+  removed; `npm run update-models` is now additive by default (`ACP_LLM_CLI_MODELS_PRUNE=1` prunes).
 
 ### Changed
 
