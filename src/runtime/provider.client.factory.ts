@@ -1,3 +1,4 @@
+import { ACP_ERROR_CODE, ConfigError } from "../domain/errors";
 import type { Provider } from "../domain/provider";
 import { PROVIDER_VALUES } from "../domain/provider";
 import { VALIDATION_ERROR } from "../domain/validation.errors";
@@ -22,7 +23,11 @@ export class ProviderClientFactory implements IProviderClientFactory {
     runtimeOptions?: AcpSharedRuntimeOptions
   ): IProviderClient {
     if (!PROVIDER_VALUES.includes(provider)) {
-      throw new Error(VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(provider));
+      throw new ConfigError(
+        ACP_ERROR_CODE.PROVIDER_UNKNOWN,
+        VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(provider),
+        { providerId: provider }
+      );
     }
     const port = this.runtimeFactory.createRuntime(provider, config, runtimeOptions);
     return new ProviderClient(provider, port);

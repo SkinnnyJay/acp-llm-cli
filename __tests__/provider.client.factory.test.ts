@@ -57,6 +57,9 @@ describe("ProviderClientFactory", () => {
         args: [],
       })
     ).toThrow(/Unknown provider id/);
+    expect(() =>
+      factory.getClient("not-a-provider" as (typeof PROVIDER_VALUES)[number], { command: "cmd" })
+    ).toThrow(expect.objectContaining({ name: "ConfigError", code: "PROVIDER_UNKNOWN" }));
   });
 
   it("lists only providers the injected factory actually has registered", async () => {

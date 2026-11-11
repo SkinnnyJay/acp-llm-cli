@@ -6,7 +6,8 @@ export type JsonMessage = Record<string, unknown>;
 /**
  * A scripted ACP agent on the far end of in-memory pipes, for tests that run the real SDK over
  * `ndJsonStream`. It answers `initialize`; for the n-th `session/prompt` (0-based) it sends what
- * `onPrompt` returns, either as one chunk or one write per message.
+ * `onPrompt` returns, either as one chunk or one write per message. `respond`, when given, sees
+ * every request from the client first; returning messages sends them instead of the default.
  */
 export interface FakeAcpAgent {
   /** The client side of the pipes, to hand to the transport under test. */
@@ -28,7 +29,8 @@ export function createFakeAcpAgent(
   mode: WriteMode = "separate-writes",
   onPrompt: (n: number, id: unknown) => JsonMessage[] = (_n, id) => [
     { jsonrpc: "2.0", id, result: { stopReason: "end_turn" } },
-  ]
+  ],
+  respond?: (request: JsonMessage) => JsonMessage[] | undefined
 ): FakeAcpAgent {
   const clientToAgent = new TransformStream<Uint8Array, Uint8Array>();
   const agentToClient = new TransformStream<Uint8Array, Uint8Array>();
@@ -70,9 +72,12 @@ export function createFakeAcpAgent(
         newline = buffer.indexOf("\n");
         if (typeof message.method === "string") received.push(message.method);
         const resolveRequest = pending.get(message.id as number);
+        const scripted = message.method === undefined ? undefined : respond?.(message);
         if (message.method === undefined && resolveRequest) {
           pending.delete(message.id as number);
           resolveRequest(message);
+        } else if (scripted) {
+          send(scripted);
         } else if (message.method === "initialize") {
           send([
             {

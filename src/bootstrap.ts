@@ -1,3 +1,4 @@
+import { ACP_ERROR_CODE, ConfigError } from "./domain/errors";
 import { VALIDATION_ERROR } from "./domain/validation.errors";
 import type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
 import { antigravityAdapter } from "./providers/antigravity/adapter";
@@ -70,7 +71,13 @@ export function createHarness(
 ): IAgentPort {
   const adapter = registry.get(id);
   if (!adapter) {
-    throw new Error(VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id));
+    throw new ConfigError(
+      ACP_ERROR_CODE.PROVIDER_UNKNOWN,
+      VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id),
+      {
+        providerId: id,
+      }
+    );
   }
   const parsed = adapter.configSchema.parse(config);
   // Default providerId the same way ProviderFactory.createRuntime does. Without it, a custom

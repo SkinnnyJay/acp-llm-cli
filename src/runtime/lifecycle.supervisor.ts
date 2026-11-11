@@ -8,6 +8,7 @@ import type {
 import { EventEmitter } from "eventemitter3";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { ACP_ERROR_CODE, UnsupportedCapabilityError } from "../domain/errors";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import { notificationSessionId } from "../domain/session.notification";
 import type { ISessionPersistence, PersistedSession } from "../domain/session.persistence";
@@ -145,7 +146,11 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     options?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope> {
     if (!this.inner.streamPrompt) {
-      throw new Error(ERROR_MESSAGE.STREAM_PROMPT_NOT_SUPPORTED);
+      throw new UnsupportedCapabilityError(
+        ACP_ERROR_CODE.CAPABILITY_UNSUPPORTED,
+        ERROR_MESSAGE.STREAM_PROMPT_NOT_SUPPORTED,
+        { capability: PORT_CAPABILITY.STREAM_PROMPT, sessionId: params.sessionId }
+      );
     }
     yield* this.inner.streamPrompt(params, options);
   }

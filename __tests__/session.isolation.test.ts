@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { InvalidStateError } from "../src/domain/errors";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import { createAcpCliHarnessRuntime } from "../src/providers/acp.shared";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -109,6 +110,13 @@ describe("createAcpCliHarnessRuntime sessionPersistence guard", () => {
         { sessionPersistence: createMemorySessionPersistence() }
       )
     ).toThrow(ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED);
+    const create = () =>
+      createAcpCliHarnessRuntime(
+        { command: "claude-code-acp", args: [], env: {} },
+        { sessionPersistence: createMemorySessionPersistence() }
+      );
+    expect(create).toThrow(InvalidStateError);
+    expect(create).toThrow(expect.objectContaining({ code: "PERSISTENCE_MISCONFIGURED" }));
   });
 
   it("does not throw when providerId is provided with sessionPersistence", () => {

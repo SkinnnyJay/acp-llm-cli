@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { extractHelp, HELP_FLAG } from "../src/cli/help.extractor";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { AgentProcessError, TimeoutError } from "../src/domain/errors";
 import { SIGNAL } from "../src/domain/signals";
 import { TIMEOUT } from "../src/domain/timeouts";
 import { createFakeChild } from "./helpers/fake.child.process";
@@ -33,6 +34,15 @@ describe("extractHelp", () => {
     await expect(extractHelp({ command: "fake-cli", spawnFn: spawnFn })).rejects.toThrow(
       ERROR_MESSAGE.HELP_COMMAND_FAILED(2, "", "boom")
     );
+    const again = createFakeChild({ stderr: "boom", exitCode: 2 }).child;
+    const rejection = extractHelp({ command: "fake-cli", spawnFn: vi.fn().mockReturnValue(again) });
+    await expect(rejection).rejects.toBeInstanceOf(AgentProcessError);
+    await expect(rejection).rejects.toMatchObject({
+      code: "PROCESS_EXITED",
+      command: "fake-cli",
+      exitCode: 2,
+      stderr: "boom",
+    });
   });
 
   it("SIGTERM then SIGKILL on timeout", async () => {
@@ -46,6 +56,12 @@ describe("extractHelp", () => {
       spawnFn: spawnFn,
     });
     const assertion = expect(promise).rejects.toThrow(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(100));
+    const typed = expect(promise).rejects.toBeInstanceOf(TimeoutError);
+    const fields = expect(promise).rejects.toMatchObject({
+      code: "TIMEOUT",
+      operation: "help-extraction",
+      timeoutMs: 100,
+    });
 
     await vi.advanceTimersByTimeAsync(100);
     expect(child.kill).toHaveBeenCalledWith(SIGNAL.TERM);
@@ -54,6 +70,8 @@ describe("extractHelp", () => {
     expect(child.kill).toHaveBeenCalledWith(SIGNAL.KILL);
 
     await assertion;
+    await typed;
+    await fields;
     vi.useRealTimers();
   });
   it("rejects when the child is killed by a signal instead of returning partial help", async () => {

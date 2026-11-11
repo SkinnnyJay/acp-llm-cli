@@ -8,8 +8,9 @@ import type { ConnectionStatus } from "../domain/connection.status";
 import { CONNECTION_STATUS } from "../domain/connection.status";
 import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { ACP_ERROR_CODE, AgentProcessError } from "../domain/errors";
 import { LIMIT } from "../domain/limits";
-import { NODE_EVENT } from "../domain/node.events";
+import { NODE_EVENT, NODE_SPAWN_ERROR } from "../domain/node.events";
 import type { ProcessEnv } from "../domain/process.env";
 import { SIGNAL } from "../domain/signals";
 import { formatStderrForError } from "../domain/stderr.format";
@@ -94,6 +95,11 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
         cwd: this.options.cwd,
         env: mergeEnv(this.options.env),
       });
+      // A child with no pid has not started: Node reports why (ENOENT for a missing binary,
+      // EACCES) on `error` a tick later. Waiting for that tick turns it into a failed connect()
+      // the caller awaits, instead of a CONNECTED state that collapses a moment later. The failed
+      // child is never bound, so its later close is not reported as a second error.
+      if (child.pid === undefined) await this.spawnErrorOnNextTick(child);
       // Everything between spawning and recording the session is guarded together. The process
       // is already running by this point, but nothing has been stored in `current`, so
       // disconnect() would find nothing to reap and the next connect() would see no previous
@@ -115,8 +121,27 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
       this.setStatus(CONNECTION_STATUS.CONNECTED);
     } catch (error) {
       this.setStatus(CONNECTION_STATUS.ERROR);
-      this.emit(CONNECTION_EVENT.ERROR, error instanceof Error ? error : new Error(String(error)));
+      this.emit(CONNECTION_EVENT.ERROR, this.spawnFailure(error));
     }
+  }
+
+  /**
+   * Rejects with the child's `error` if it fires before the next macrotask, else resolves. Bounded
+   * on purpose: an injected spawn function may return a child with no pid that never emits
+   * `spawn` or `error`, and waiting on either event would hang connect() for it.
+   */
+  private spawnErrorOnNextTick(child: ChildProcessWithoutNullStreams): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const onError = (error: Error): void => {
+        clearImmediate(timer);
+        reject(error);
+      };
+      const timer = setImmediate(() => {
+        child.off(NODE_EVENT.ERROR, onError);
+        resolve();
+      });
+      child.once(NODE_EVENT.ERROR, onError);
+    });
   }
 
   async disconnect(): Promise<void> {
@@ -172,7 +197,10 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
         return;
       }
       this.setStatus(CONNECTION_STATUS.ERROR);
-      this.emit(CONNECTION_EVENT.ERROR, error);
+      // Node reports a spawn failure (missing binary included) here, after spawn() returned.
+      const syscall = (error as NodeJS.ErrnoException).syscall;
+      const isSpawnFailure = syscall?.startsWith(NODE_SPAWN_ERROR.SYSCALL_PREFIX) ?? false;
+      this.emit(CONNECTION_EVENT.ERROR, isSpawnFailure ? this.spawnFailure(error) : error);
     });
 
     child.on(NODE_EVENT.CLOSE, (code: number | null, signal: string | null) => {
@@ -216,12 +244,43 @@ export class StdioConnection extends EventEmitter<ConnectionEvents> implements I
     }
   }
 
-  private formatExitError(code: number | null, signal: string | null): Error {
+  private formatExitError(code: number | null, signal: string | null): AgentProcessError {
     const suffix = signal ? ` (signal ${signal})` : "";
     const rawDetails = this.stderrLines.length ? `\n${this.stderrLines.join("\n")}` : "";
     const details = rawDetails
       ? formatStderrForError(rawDetails, { debug: isDebugEnabled(this.options.env) })
       : "";
-    return new Error(ERROR_MESSAGE.AGENT_PROCESS_EXITED(code ?? "unknown", suffix, details));
+    return new AgentProcessError(
+      ACP_ERROR_CODE.PROCESS_EXITED,
+      ERROR_MESSAGE.AGENT_PROCESS_EXITED(code ?? "unknown", suffix, details),
+      {
+        command: this.options.command,
+        exitCode: code,
+        signal,
+        stderr: details ? details.trimStart() : undefined,
+      }
+    );
+  }
+
+  /** The transport does not know the provider; the ACP client adds it and the install hint. */
+  private spawnFailure(error: unknown): AgentProcessError {
+    const { command } = this.options;
+    const nodeCode = (error as NodeJS.ErrnoException | undefined)?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    if (nodeCode === NODE_SPAWN_ERROR.ENOENT) {
+      return new AgentProcessError(
+        ACP_ERROR_CODE.CLI_NOT_FOUND,
+        ERROR_MESSAGE.CLI_NOT_FOUND(command),
+        {
+          command,
+          cause: error,
+        }
+      );
+    }
+    const code =
+      nodeCode === NODE_SPAWN_ERROR.EACCES
+        ? ACP_ERROR_CODE.CLI_NOT_EXECUTABLE
+        : ACP_ERROR_CODE.SPAWN_FAILED;
+    return new AgentProcessError(code, message, { command, cause: error });
   }
 }

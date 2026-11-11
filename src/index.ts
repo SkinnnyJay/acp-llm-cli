@@ -27,6 +27,20 @@ export { DEFAULT_COMMANDS } from "./domain/default.commands";
 export { ENV_KEY } from "./domain/env.keys";
 export type { EnvelopeMode } from "./domain/envelope.mode";
 export { ENVELOPE_MODE } from "./domain/envelope.mode";
+export type { AcpErrorCode, AcpErrorSubsystem } from "./domain/errors";
+export {
+  ACP_ERROR_CODE,
+  ACP_ERROR_SUBSYSTEM,
+  AcpCliError,
+  AgentProcessError,
+  AgentProtocolError,
+  ConfigError,
+  ConnectionError,
+  InvalidStateError,
+  TimeoutError,
+  ToolHostError,
+  UnsupportedCapabilityError,
+} from "./domain/errors";
 export type { ModelId as AnthropicModelId } from "./domain/models/anthropic.models";
 export {
   MODEL_IDS as ANTHROPIC_MODEL_IDS,
@@ -53,6 +67,8 @@ export type { PortCapabilityName } from "./domain/port.capabilities";
 export { PORT_CAPABILITY } from "./domain/port.capabilities";
 export { PROVIDER_VALUES, Provider, ProviderSchema } from "./domain/provider";
 export { PROVIDER_IDS } from "./domain/provider.ids";
+export type { ProviderSetup } from "./domain/provider.setup";
+export { PROVIDER_SETUP } from "./domain/provider.setup";
 export type { ISessionPersistence, PersistedSession } from "./domain/session.persistence";
 export type {
   NativeEnvelope,

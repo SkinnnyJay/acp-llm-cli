@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHarness, getAdapter, getDefaultRegistry } from "../src/bootstrap";
+import { ConfigError } from "../src/domain/errors";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import { createAcpCliHarnessRuntime } from "../src/providers/acp.shared";
 import { baseCliConfigSchema } from "../src/runtime/config";
@@ -46,6 +47,10 @@ describe("bootstrap", () => {
   it("createHarness throws for unknown id", () => {
     const registry = getDefaultRegistry();
     expect(() => createHarness(registry, "unknown-id", {})).toThrow(/Unknown provider id/);
+    expect(() => createHarness(registry, "unknown-id", {})).toThrow(ConfigError);
+    expect(() => createHarness(registry, "unknown-id", {})).toThrow(
+      expect.objectContaining({ code: "PROVIDER_UNKNOWN", providerId: "unknown-id" })
+    );
   });
 
   it("defaults providerId so a custom registry can use session persistence", () => {

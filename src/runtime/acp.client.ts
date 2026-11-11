@@ -27,6 +27,7 @@ import {
   type ReadTextFileResponse,
   type ReleaseTerminalRequest,
   type ReleaseTerminalResponse,
+  RequestError,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type TerminalOutputRequest,
@@ -42,7 +43,16 @@ import { CONNECTION_EVENT } from "../domain/connection.events";
 import type { ConnectionStatus } from "../domain/connection.status";
 import { CONNECTION_STATUS } from "../domain/connection.status";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import {
+  ACP_ERROR_CODE,
+  AcpCliError,
+  AgentProcessError,
+  AgentProtocolError,
+  ConnectionError,
+  ToolHostError,
+} from "../domain/errors";
 import { PERMISSION_OUTCOME } from "../domain/permission.outcome";
+import { providerSetup } from "../domain/provider.setup";
 import type { AgentPortEvents, IAgentPort } from "./agent.port";
 import type { ConnectionEvents, IConnection } from "./connection.interface";
 import type { IPermissionHandler } from "./permission.handler.interface";
@@ -64,6 +74,10 @@ export interface ACPClientOptions {
   clientCapabilities?: ClientCapabilities;
   permissionHandler?: IPermissionHandler;
   toolHost?: IToolHost;
+  /** Provider id put on typed errors and used to look up setup hints, e.g. "cursor-cli". */
+  providerId?: string;
+  /** The agent command, named when the CLI cannot be found. */
+  command?: string;
 }
 
 export function createAcpAgentPort(
@@ -78,6 +92,18 @@ type AcpMessage = AcpStream["readable"] extends ReadableStream<infer T> ? T : ne
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
+
+type AuthMethods = NonNullable<AgentProtocolError["authMethods"]>;
+
+/** SDK RequestError codes (sdk dist/core/jsonrpc.js) to protocol codes; others are internal. */
+const PROTOCOL_CODE_BY_RPC_CODE: ReadonlyMap<number, AgentProtocolError["code"]> = new Map([
+  [-32000, ACP_ERROR_CODE.AUTH_REQUIRED],
+  [-32002, ACP_ERROR_CODE.SESSION_NOT_FOUND],
+  [-32800, ACP_ERROR_CODE.REQUEST_CANCELLED],
+  [-32602, ACP_ERROR_CODE.INVALID_PARAMS],
+  [-32601, ACP_ERROR_CODE.METHOD_NOT_FOUND],
+  [-32022, ACP_ERROR_CODE.UNSUPPORTED_PROTOCOL_VERSION],
+]);
 
 /** A session/update notification carrying the fields the port's consumers read. */
 function isSessionUpdateMessage(
@@ -109,6 +135,10 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
   private staleStream: AcpStream | undefined;
   private readonly toolHost: IToolHost | undefined;
   private readonly clientCapabilities: ClientCapabilities;
+  /** From the last successful initialize(), for AUTH_REQUIRED errors. */
+  private authMethods: AuthMethods = [];
+  /** The transport's last error during the current connect(), as re-raised by this client. */
+  private transportError: Error | undefined;
 
   constructor(
     private readonly connection: IACPConnectionLike,
@@ -133,7 +163,10 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
       }
       this.emit(AGENT_PORT_EVENT.STATE, status);
     });
-    this.connection.on(CONNECTION_EVENT.ERROR, (error) => this.emit(AGENT_PORT_EVENT.ERROR, error));
+    this.connection.on(CONNECTION_EVENT.ERROR, (error) => {
+      this.transportError = this.withProvider(error);
+      this.emit(AGENT_PORT_EVENT.ERROR, this.transportError);
+    });
     // The transport declares and emits EXIT; nothing used to subscribe, so the client kept a
     // link to a process that had already gone away. EXIT is announced for every child, including
     // one abandoned by an earlier reconnect, so ownership has to be checked.
@@ -252,6 +285,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
   }
 
   async connect(): Promise<void> {
+    this.transportError = undefined;
     await this.connection.connect();
     // The SDK has closed the link but its close callback has not run yet: treat it as stale now.
     if (this.attached?.link.signal.aborted) this.onLinkClosed(this.attached.link);
@@ -271,7 +305,19 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
       this.detach();
       // Do not leave a spawned child behind with no usable link to it.
       await this.connection.disconnect().catch(() => undefined);
-      throw new Error(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
+      // Set by the transport's error event during the awaits above, which TS cannot see.
+      const failure = this.transportError as Error | undefined;
+      const cliUnusable =
+        failure instanceof AgentProcessError &&
+        (failure.code === ACP_ERROR_CODE.CLI_NOT_FOUND ||
+          failure.code === ACP_ERROR_CODE.CLI_NOT_EXECUTABLE);
+      throw cliUnusable
+        ? failure
+        : new ConnectionError(
+            ACP_ERROR_CODE.STREAM_UNAVAILABLE,
+            ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE,
+            { providerId: this.options.providerId }
+          );
     }
     // Connecting a client app starts a reader loop, so re-attaching to a stream we
     // are already reading would leave two loops competing on one pipe.
@@ -280,6 +326,8 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
     }
     const link = this.buildApp().connect(this.observeInbound(stream));
     this.attached = { link, stream };
+    // A new link may be a different process, which may advertise different auth methods.
+    this.authMethods = [];
     this.staleStream = undefined;
     void link.closed.then(() => this.onLinkClosed(link));
   }
@@ -291,33 +339,114 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
   }
 
   async initialize(params?: Partial<InitializeRequest>): Promise<InitializeResponse> {
-    return this.requireAgent().request(methods.agent.initialize, {
-      protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: this.clientCapabilities,
-      ...params,
-    });
+    const response = await this.call(() =>
+      this.requireAgent().request(methods.agent.initialize, {
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: this.clientCapabilities,
+        ...params,
+      })
+    );
+    this.authMethods = (response.authMethods ?? []).map(({ id, name, description }) => ({
+      id,
+      name,
+      ...(description == null ? {} : { description }),
+    }));
+    return response;
   }
 
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
-    return this.requireAgent().request(methods.agent.session.new, params);
+    return this.call(() => this.requireAgent().request(methods.agent.session.new, params));
   }
 
   async authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse> {
-    return this.requireAgent().request(methods.agent.authenticate, params);
+    return this.call(() => this.requireAgent().request(methods.agent.authenticate, params));
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
-    return this.requireAgent().request(methods.agent.session.prompt, params);
+    return this.call(
+      () => this.requireAgent().request(methods.agent.session.prompt, params),
+      params.sessionId
+    );
   }
 
   async setSessionMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
-    return this.requireAgent().request(methods.agent.session.setMode, params);
+    return this.call(
+      () => this.requireAgent().request(methods.agent.session.setMode, params),
+      params.sessionId
+    );
   }
 
   async setSessionConfigOption(
     params: SetSessionConfigOptionRequest
   ): Promise<SetSessionConfigOptionResponse> {
-    return this.requireAgent().request(methods.agent.session.setConfigOption, params);
+    return this.call(
+      () => this.requireAgent().request(methods.agent.session.setConfigOption, params),
+      params.sessionId
+    );
+  }
+
+  /**
+   * Every outbound request goes through here, so agent JSON-RPC errors are classified once. A
+   * request still pending when its link closes (agent EOF, process exit, disconnect()) is rejected
+   * by the SDK with a plain Error; that becomes LINK_CLOSED, keeping the SDK's message.
+   */
+  private async call<T>(send: () => Promise<T>, sessionId?: string): Promise<T> {
+    const link = this.attached?.link;
+    try {
+      return await send();
+    } catch (error) {
+      if (error instanceof RequestError) throw this.toProtocolError(error, sessionId);
+      if (link?.signal.aborted && error instanceof Error && !(error instanceof AcpCliError)) {
+        throw new ConnectionError(ACP_ERROR_CODE.LINK_CLOSED, error.message, {
+          providerId: this.options.providerId,
+          sessionId,
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  }
+
+  private toProtocolError(error: RequestError, sessionId: string | undefined): AgentProtocolError {
+    const code = PROTOCOL_CODE_BY_RPC_CODE.get(error.code) ?? ACP_ERROR_CODE.AGENT_INTERNAL_ERROR;
+    const isAuth = code === ACP_ERROR_CODE.AUTH_REQUIRED;
+    const login = isAuth ? providerSetup(this.options.providerId)?.login : undefined;
+    const hint = login === undefined ? undefined : ERROR_MESSAGE.HINT_LOGIN(login);
+    return new AgentProtocolError(
+      code,
+      hint === undefined ? error.message : ERROR_MESSAGE.WITH_HINT(error.message, hint),
+      {
+        rpcCode: error.code,
+        data: error.data,
+        authMethods: isAuth ? this.authMethods : undefined,
+        providerId: this.options.providerId,
+        sessionId,
+        hint,
+        cause: error,
+      }
+    );
+  }
+
+  /** The transport does not know the provider: add it, and the install hint for a missing CLI. */
+  private withProvider(error: Error): Error {
+    const { providerId } = this.options;
+    if (!(error instanceof AgentProcessError) || providerId === undefined) return error;
+    const install =
+      error.code === ACP_ERROR_CODE.CLI_NOT_FOUND ? providerSetup(providerId)?.install : undefined;
+    const hint = install === undefined ? undefined : ERROR_MESSAGE.HINT_INSTALL(install);
+    return new AgentProcessError(
+      error.code,
+      hint === undefined ? error.message : ERROR_MESSAGE.WITH_HINT(error.message, hint),
+      {
+        command: error.command ?? this.options.command,
+        exitCode: error.exitCode,
+        signal: error.signal,
+        stderr: error.stderr,
+        providerId,
+        hint,
+        ...(error.cause === undefined ? {} : { cause: error.cause }),
+      }
+    );
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -365,10 +494,12 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
 
   private requireToolHost(kind: "file" | "terminal"): IToolHost {
     if (!this.toolHost) {
-      throw new Error(
+      throw new ToolHostError(
+        ACP_ERROR_CODE.TOOLS_NOT_CONFIGURED,
         kind === "file"
           ? ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED
-          : ERROR_MESSAGE.TERMINAL_TOOLS_NOT_CONFIGURED
+          : ERROR_MESSAGE.TERMINAL_TOOLS_NOT_CONFIGURED,
+        { kind, providerId: this.options.providerId }
       );
     }
     return this.toolHost;
@@ -376,9 +507,14 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
 
   private requireAgent(): ClientConnection["agent"] {
     if (!this.attached) {
-      throw new Error(
-        this.staleStream ? ERROR_MESSAGE.ACP_LINK_CLOSED : ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
-      );
+      const options = { providerId: this.options.providerId };
+      throw this.staleStream
+        ? new ConnectionError(ACP_ERROR_CODE.LINK_CLOSED, ERROR_MESSAGE.ACP_LINK_CLOSED, options)
+        : new ConnectionError(
+            ACP_ERROR_CODE.NOT_CONNECTED,
+            ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED,
+            options
+          );
     }
     return this.attached.link.agent;
   }

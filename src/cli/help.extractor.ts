@@ -2,11 +2,12 @@ import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { spawn as nodeSpawn } from "node:child_process";
 import { ENCODING } from "../domain/encoding";
 import { ERROR_MESSAGE } from "../domain/error.messages";
-import { NODE_EVENT } from "../domain/node.events";
+import { ACP_ERROR_CODE, AgentProcessError, TimeoutError } from "../domain/errors";
+import { NODE_EVENT, NODE_SPAWN_ERROR } from "../domain/node.events";
 import type { ProcessEnv } from "../domain/process.env";
 import { SIGNAL } from "../domain/signals";
 import { formatStderrForError } from "../domain/stderr.format";
-import { TIMEOUT } from "../domain/timeouts";
+import { TIMEOUT, TIMEOUT_OPERATION } from "../domain/timeouts";
 import { isDebugEnabled, mergeEnv } from "../runtime/env.reader";
 
 export const HELP_FLAG = "--help";
@@ -62,7 +63,12 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
         child.kill(SIGNAL.KILL);
       }, TIMEOUT.DISCONNECT_FORCE_MS);
       child.kill(SIGNAL.TERM);
-      reject(new Error(ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(timeoutMs)));
+      reject(
+        new TimeoutError(ACP_ERROR_CODE.TIMEOUT, ERROR_MESSAGE.HELP_EXTRACTION_TIMEOUT(timeoutMs), {
+          operation: TIMEOUT_OPERATION.HELP_EXTRACTION,
+          timeoutMs,
+        })
+      );
     }, timeoutMs);
 
     child.stdout?.setEncoding(ENCODING.UTF8);
@@ -74,10 +80,18 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       stderr += chunk;
     });
 
-    child.on(NODE_EVENT.ERROR, (err) => {
+    child.on(NODE_EVENT.ERROR, (err: NodeJS.ErrnoException) => {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
-      reject(err);
+      // Node's own message is kept: callers already match on "spawn <cmd> ENOENT".
+      reject(
+        err.code === NODE_SPAWN_ERROR.ENOENT
+          ? new AgentProcessError(ACP_ERROR_CODE.CLI_NOT_FOUND, err.message, {
+              command,
+              cause: err,
+            })
+          : err
+      );
     });
 
     // Both close arguments are bound: a child killed by a signal reports code === null, and
@@ -87,13 +101,16 @@ export function extractHelp(options: HelpExtractorOptions): Promise<string> {
       clearTimeout(timeout);
       clearTimeout(forceKillTimer);
       if (code !== 0) {
+        const shownStderr = formatStderrForError(stderr, { debug: isDebugEnabled(env) });
         reject(
-          new Error(
+          new AgentProcessError(
+            ACP_ERROR_CODE.PROCESS_EXITED,
             ERROR_MESSAGE.HELP_COMMAND_FAILED(
               code ?? "unknown",
               signal ? ` (signal ${signal})` : "",
-              formatStderrForError(stderr, { debug: isDebugEnabled(env) })
-            )
+              shownStderr
+            ),
+            { command, exitCode: code, signal, stderr: shownStderr }
           )
         );
         return;

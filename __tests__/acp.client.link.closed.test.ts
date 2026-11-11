@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { ConnectionError } from "../src/domain/errors";
 import { createAcpAgentPort } from "../src/runtime/acp.client";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { createFakeAcpAgent, type FakeAcpAgent } from "./helpers/fake.acp.agent";
@@ -73,6 +74,8 @@ describe("ACPClient when the SDK closes the link by itself", () => {
     expect(errors).toEqual([]);
     expect(connection.disconnect).not.toHaveBeenCalled();
     await expect(p.initialize()).rejects.toThrow(ERROR_MESSAGE.ACP_LINK_CLOSED);
+    await expect(p.initialize()).rejects.toBeInstanceOf(ConnectionError);
+    await expect(p.initialize()).rejects.toMatchObject({ code: "LINK_CLOSED" });
   });
 
   it("connect() rebuilds the transport when it still hands out the dead stream", async () => {
@@ -137,6 +140,8 @@ describe("ACPClient when the SDK closes the link by itself", () => {
     connection.getStream.mockReturnValue(undefined);
     connection.emitExit({ code: 1, signal: null });
     await expect(p.prompt(promptParams)).rejects.toThrow(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+    await expect(p.prompt(promptParams)).rejects.toBeInstanceOf(ConnectionError);
+    await expect(p.prompt(promptParams)).rejects.toMatchObject({ code: "NOT_CONNECTED" });
 
     connection.setStatus(CONNECTION_STATUS.ERROR);
     await settle();

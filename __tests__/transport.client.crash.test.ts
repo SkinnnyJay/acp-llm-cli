@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { AgentProcessError } from "../src/domain/errors";
 import { createAcpAgentPort } from "../src/runtime/acp.client";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { StdioConnection } from "../src/runtime/stdio.connection";
@@ -63,6 +64,12 @@ describe("StdioConnection + ACPClient with a real crashing child", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]?.message).toContain("exited with code 3");
     expect(errors[0]?.message).toContain("agent boom: out of tea");
+    expect(errors[0]).toBeInstanceOf(AgentProcessError);
+    const typed = errors[0] as AgentProcessError;
+    expect(typed.code).toBe("PROCESS_EXITED");
+    expect(typed.exitCode).toBe(3);
+    expect(typed.signal).toBeNull();
+    expect(typed.stderr).toContain("agent boom: out of tea");
     expect(states.at(-1)).toBe(CONNECTION_STATUS.ERROR);
     expect(connection.connectionStatus).toBe(CONNECTION_STATUS.ERROR);
   });

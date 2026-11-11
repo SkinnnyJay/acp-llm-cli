@@ -63,6 +63,24 @@ trip for this release.
   back to the agent, and a single message over 32 MiB (the SDK's default limit) errors the input
   stream, which closes the link.
 - Dev toolchain: Biome 2.6.6 and vitest 5.1.0.
+- **Errors raised by the package are now typed** (`AcpCliError` subclasses, see Added). Message
+  text is unchanged, and every one is still an `Error`.
+- **Agent JSON-RPC errors are wrapped.** A request the agent answers with an error now rejects with
+  `AgentProtocolError` (`code` from the JSON-RPC code, `rpcCode`, `data`, the agent's message)
+  instead of the SDK's `RequestError`, which is on `cause`. Callers that checked `instanceof
+  RequestError` must read `cause` or switch to `code`. For `AUTH_REQUIRED` the message also names
+  the provider's login command.
+- **A missing agent CLI** is reported as `AgentProcessError` with code `CLI_NOT_FOUND`, the command,
+  and for built-in providers the install command in `hint` and `message`, instead of Node's raw
+  `spawn <cmd> ENOENT` error (now on `cause`). Other spawn failures are `CLI_NOT_EXECUTABLE`
+  (`EACCES`) or `SPAWN_FAILED` with Node's message. `StdioConnection.connect()` now waits for the
+  child's `spawn` event when Node returns a child without a pid, so a missing or non-executable
+  CLI makes the port's `connect()` (and `restart()`) reject with `CLI_NOT_FOUND` /
+  `CLI_NOT_EXECUTABLE`; before, `connect()` resolved and the next call failed with "ACP connection
+  closed". The error is emitted once on `error`; the follow-up "exited with code -2" error is gone.
+  `extractHelp` rejects a missing binary as `CLI_NOT_FOUND` too, keeping Node's message.
+- A request still pending when its link closes now rejects with `ConnectionError` code
+  `LINK_CLOSED`, keeping the SDK's message, with the SDK's error on `cause`.
 
 ### Fixed
 
@@ -70,12 +88,22 @@ trip for this release.
   stream.** Each update is now emitted at read time, so every update that arrives before the
   response is delivered first.
 - **A link the SDK closed on its own left the client calling into a dead stream.** Calls now
-  reject with "ACP connection to the agent closed unexpectedly; call connect() to reconnect", and
+  reject with `ConnectionError` code `LINK_CLOSED` ("ACP connection to the agent closed
+  unexpectedly; call connect() to reconnect"), and
   `connect()` replaces the stale stream. `connect()` starts a fresh process, so the caller must
   `initialize()` and create a session again.
 
 ### Added
 
+- **Typed errors.** `AcpCliError` and one subclass per subsystem: `ConfigError`,
+  `AgentProcessError`, `ConnectionError`, `AgentProtocolError`, `UnsupportedCapabilityError`,
+  `InvalidStateError`, `ToolHostError` and `TimeoutError`. Each carries a stable `code` from
+  `ACP_ERROR_CODE` and its `subsystem` from `ACP_ERROR_SUBSYSTEM` (types `AcpErrorCode`,
+  `AcpErrorSubsystem`), plus `providerId`, `sessionId` and `hint` when known.
+- `PROVIDER_SETUP` (type `ProviderSetup`): the install and login command for each built-in
+  provider, used for error hints.
+- `ACPClientOptions.providerId` and `ACPClientOptions.command`, which name the provider and
+  command on errors; `createAcpCliHarnessRuntime` sets both.
 - `__tests__/provider.flags.drift.test.ts`, which checks each flag table against saved `--help`
   fixtures in `__tests__/fixtures/help/`, and `npm run refresh:help` to regenerate them.
 - `npm run probe` and `docs/capabilities.md`, which record what each ACP agent advertises at

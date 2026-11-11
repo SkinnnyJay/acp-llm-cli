@@ -8,3 +8,8 @@ export const TIMEOUT = {
   /** Max wall time for CLI help extraction. */
   HELP_EXTRACTION_MS: 10_000,
 } as const;
+
+/** Operation names carried by TimeoutError. */
+export const TIMEOUT_OPERATION = {
+  HELP_EXTRACTION: "help-extraction",
+} as const;

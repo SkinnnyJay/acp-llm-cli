@@ -168,6 +168,53 @@ if (port.capabilities?.restart) {
 
 `createMemorySessionPersistence()` is process-local. For anything durable, implement `ISessionPersistence` over a file or database.
 
+## Errors you can branch on
+
+Errors the package classifies are `AcpCliError` subclasses (still `Error`s) with a stable `code`,
+their `subsystem`, and `providerId`, `sessionId` and `hint` when known. When one wraps another
+error, the original is on `cause`. Branch on `code`; message text is for people. Not classified:
+a zod error from calling a config schema's `parse` yourself, errors thrown by your own
+`permissionHandler`, tool host or event listeners, and a child-process error that is not a spawn
+failure.
+
+| Class | Subsystem | Codes | Extra fields |
+|-------|-----------|-------|--------------|
+| `ConfigError` | `config` | `CONFIG_INVALID`, `PROVIDER_UNKNOWN` | `issues` |
+| `AgentProcessError` | `process` | `CLI_NOT_FOUND`, `CLI_NOT_EXECUTABLE`, `SPAWN_FAILED`, `PROCESS_EXITED` | `command`, `exitCode`, `signal`, `stderr` |
+| `ConnectionError` | `connection` | `NOT_CONNECTED`, `STREAM_UNAVAILABLE`, `LINK_CLOSED` | none |
+| `AgentProtocolError` | `protocol` | `AUTH_REQUIRED`, `SESSION_NOT_FOUND`, `REQUEST_CANCELLED`, `INVALID_PARAMS`, `METHOD_NOT_FOUND`, `UNSUPPORTED_PROTOCOL_VERSION`, `AGENT_INTERNAL_ERROR` | `rpcCode`, `data`, `authMethods` |
+| `UnsupportedCapabilityError` | `capability` | `CAPABILITY_UNSUPPORTED` | `capability` |
+| `InvalidStateError` | `usage` | `STREAM_IN_PROGRESS`, `PERSISTENCE_MISCONFIGURED` | none |
+| `ToolHostError` | `tool-host` | `TOOLS_NOT_CONFIGURED` | `kind` |
+| `TimeoutError` | `timeout` | `TIMEOUT` | `operation`, `timeoutMs` |
+
+A JSON-RPC error from the agent becomes an `AgentProtocolError` by its code: `-32000` is
+`AUTH_REQUIRED` (with the `authMethods` the agent advertised at `initialize()`), `-32002`
+`SESSION_NOT_FOUND`, `-32800` `REQUEST_CANCELLED`, `-32602` `INVALID_PARAMS`, `-32601`
+`METHOD_NOT_FOUND`, `-32022` `UNSUPPORTED_PROTOCOL_VERSION`, and anything else
+`AGENT_INTERNAL_ERROR`; the agent's message is kept. Rate limits, quotas and an unavailable model
+have no standard ACP code, so they arrive as `AGENT_INTERNAL_ERROR` with the agent's own message.
+
+For the built-in providers, `hint` says what to run: the install command when the CLI is missing,
+the login command when the agent wants authentication (both come from `PROVIDER_SETUP`). A missing
+or non-executable CLI makes `connect()` (and so `restart()`) reject with `CLI_NOT_FOUND` or
+`CLI_NOT_EXECUTABLE`, and the same error is emitted once on the port's `error` event. A request
+still pending when the link to the agent closes rejects with `ConnectionError` `LINK_CLOSED`,
+carrying the SDK's message.
+
+```ts
+import { AgentProcessError, AgentProtocolError } from "@simpill/acp-llm-cli";
+
+try {
+  await port.connect();
+  await port.newSession({ cwd: process.cwd(), mcpServers: [] });
+} catch (e) {
+  if (e instanceof AgentProtocolError && e.code === "AUTH_REQUIRED") console.error(e.hint);
+  else if (e instanceof AgentProcessError && e.code === "CLI_NOT_FOUND") console.error(e.hint);
+  else throw e;
+}
+```
+
 ## Building CLI arguments
 
 Every adapter carries a `cliSpec` that turns typed options into argv, so callers never hand-write flags:

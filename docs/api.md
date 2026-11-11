@@ -31,6 +31,19 @@ Curated exports from the package root. Prefer this surface for applications.
 | `baseCliConfigSchema` / `BaseCliConfig` | schema/type | Shared CLI config |
 | `ConfigSchema` / `ConfigSchemaResult` / `ConfigSchemaError` / `ConfigSchemaIssue` | type | The `parse`/`safeParse` surface an adapter config schema must provide, spelled structurally so it holds across both supported zod majors |
 
+## Errors
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `AcpCliError` | class | Base of every error the package raises: `code`, `subsystem`, `providerId?`, `sessionId?`, `hint?`, `cause` |
+| `ConfigError` / `AgentProcessError` / `ConnectionError` / `AgentProtocolError` | class | One per subsystem: config, process, connection, protocol (agent JSON-RPC errors) |
+| `UnsupportedCapabilityError` / `InvalidStateError` / `ToolHostError` / `TimeoutError` | class | One per subsystem: capability, usage, tool host, timeout |
+| `ACP_ERROR_CODE` / `AcpErrorCode` | const/type | The stable codes to branch on |
+| `ACP_ERROR_SUBSYSTEM` / `AcpErrorSubsystem` | const/type | Subsystem names |
+| `PROVIDER_SETUP` / `ProviderSetup` | const/type | Install and login command per built-in provider; the source of `hint` |
+
+See the README section "Errors you can branch on" for the codes per class and the JSON-RPC mapping.
+
 ## Streaming
 
 | Export | Kind | Purpose |

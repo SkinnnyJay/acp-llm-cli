@@ -16,4 +16,11 @@ export const ERROR_MESSAGE = {
   STREAM_PROMPT_IN_PROGRESS: "Another streamPrompt is already in progress on this port",
   AGENT_PROCESS_EXITED: (code: number | string, suffix: string, details: string) =>
     `Agent process exited with code ${code}${suffix}${details}`,
+  CLI_NOT_FOUND: (command: string) =>
+    `Agent CLI not found: "${command}" is not installed or not on PATH`,
+  /** One trailing period is dropped from `message` so it never ends up as "..". */
+  WITH_HINT: (message: string, hint: string) =>
+    `${message.endsWith(".") ? message.slice(0, -1) : message}. ${hint}`,
+  HINT_INSTALL: (install: string) => `Install it with: ${install}`,
+  HINT_LOGIN: (login: string) => `Sign in with: ${login}`,
 } as const;

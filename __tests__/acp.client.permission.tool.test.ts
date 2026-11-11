@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { ToolHostError } from "../src/domain/errors";
 import { createAcpAgentPort } from "../src/runtime/acp.client";
 import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
 
@@ -100,6 +101,9 @@ describe("ACPClient tool host handling", () => {
     await expect(
       (port as PortWithClient).readTextFile?.({ path: "/tmp/foo", offset: 0, length: 100 })
     ).rejects.toThrow(ERROR_MESSAGE.FILE_SYSTEM_TOOLS_NOT_CONFIGURED);
+    const again = (port as PortWithClient).readTextFile?.({ path: "/tmp/foo" });
+    await expect(again).rejects.toBeInstanceOf(ToolHostError);
+    await expect(again).rejects.toMatchObject({ code: "TOOLS_NOT_CONFIGURED", kind: "file" });
   });
 
   it("writeTextFile throws when toolHost not configured", async () => {
@@ -118,6 +122,9 @@ describe("ACPClient tool host handling", () => {
     await expect(
       (port as PortWithClient).createTerminal?.({ command: "bash", args: [], env: {} })
     ).rejects.toThrow(ERROR_MESSAGE.TERMINAL_TOOLS_NOT_CONFIGURED);
+    const again = (port as PortWithClient).createTerminal?.({ command: "bash" });
+    await expect(again).rejects.toBeInstanceOf(ToolHostError);
+    await expect(again).rejects.toMatchObject({ code: "TOOLS_NOT_CONFIGURED", kind: "terminal" });
   });
 
   it("delegates readTextFile to toolHost when configured", async () => {

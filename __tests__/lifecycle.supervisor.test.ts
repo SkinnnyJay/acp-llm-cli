@@ -2,6 +2,7 @@ import type { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { UnsupportedCapabilityError } from "../src/domain/errors";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import type { ISessionPersistence, PersistedSession } from "../src/domain/session.persistence";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -331,6 +332,11 @@ describe("wrapAgentPortWithLifecycle", () => {
         // consume
       }
     }).rejects.toThrow(ERROR_MESSAGE.STREAM_PROMPT_NOT_SUPPORTED);
+    const iterator = wrapped.streamPrompt(params)[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toBeInstanceOf(UnsupportedCapabilityError);
+    await expect(wrapped.streamPrompt(params)[Symbol.asyncIterator]().next()).rejects.toMatchObject(
+      { code: "CAPABILITY_UNSUPPORTED", capability: "streamPrompt" }
+    );
   });
 
   it("connectionStatus reflects inner port status", () => {

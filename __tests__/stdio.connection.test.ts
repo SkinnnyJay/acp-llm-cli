@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { Readable, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { AgentProcessError } from "../src/domain/errors";
 import { SIGNAL } from "../src/domain/signals";
 import { TIMEOUT } from "../src/domain/timeouts";
 import { StdioConnection } from "../src/runtime/stdio.connection";
@@ -54,6 +55,17 @@ describe("StdioConnection", () => {
     expect(stateChanges).toContain(CONNECTION_STATUS.CONNECTING);
     expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
     expect(conn.getStream()).toBeDefined();
+  });
+
+  it("connects a child that has no pid and emits neither spawn nor error", async () => {
+    const { child } = createFakeChild();
+    const spawnFn = vi.fn().mockReturnValue(Object.assign(child, { pid: undefined }));
+
+    const conn = new StdioConnection({ command: "fake", args: [] }, spawnFn);
+    await conn.connect();
+
+    expect(conn.connectionStatus).toBe(CONNECTION_STATUS.CONNECTED);
+    expect(child.listenerCount("error")).toBe(1);
   });
 
   it("defaults args to an empty array when options.args is omitted", async () => {
@@ -245,6 +257,14 @@ describe("StdioConnection", () => {
     await errorStatus;
 
     expect(errors[0]?.message).toMatch(/fatal: something broke/);
+    expect(errors[0]).toBeInstanceOf(AgentProcessError);
+    expect(errors[0]).toMatchObject({
+      code: "PROCESS_EXITED",
+      command: "fake",
+      exitCode: 1,
+      signal: null,
+      stderr: "fatal: something broke",
+    });
   });
 
   it("captureStderr silently ignores chunks that are all whitespace", async () => {

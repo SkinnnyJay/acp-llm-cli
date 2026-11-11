@@ -1,6 +1,7 @@
 import { EventEmitter } from "eventemitter3";
 import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
+import { ACP_ERROR_CODE, AgentProcessError } from "../src/domain/errors";
 import type { IAgentPort } from "../src/runtime/agent.port";
 import { restartWithBackoff } from "../src/runtime/restart.with.backoff";
 
@@ -40,6 +41,18 @@ function createMockPort(options: { hasRestart?: boolean } = {}): IAgentPort {
 }
 
 describe("restartWithBackoff", () => {
+  it("does not retry a missing binary", async () => {
+    const port = createMockPort({ hasRestart: true });
+    const missing = new AgentProcessError(ACP_ERROR_CODE.CLI_NOT_FOUND, "not found");
+    const restart = vi.fn().mockRejectedValue(missing);
+    (port as IAgentPort & { restart: () => Promise<void> }).restart = restart;
+
+    await expect(
+      restartWithBackoff(port, { maxRetries: 3, backoffBaseMs: 0, backoffCapMs: 0 })
+    ).rejects.toBe(missing);
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
+
   it("calls port.restart() when the port has a restart method", async () => {
     const port = createMockPort({ hasRestart: true });
     await restartWithBackoff(port, { maxRetries: 1, backoffBaseMs: 0, backoffCapMs: 0 });

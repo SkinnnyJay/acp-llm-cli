@@ -1,5 +1,6 @@
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { ACP_ERROR_CODE, InvalidStateError } from "../domain/errors";
 import type { ISessionPersistence } from "../domain/session.persistence";
 import { wrapAgentPortWithStream } from "./acp.agent.port.stream";
 import type { ACPClientOptions } from "./acp.client";
@@ -14,7 +15,8 @@ import { wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 import { StdioConnectionFactory } from "./stdio.connection.factory";
 
 /** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */
-export interface AcpSharedRuntimeOptions extends ACPClientOptions {
+/** `command` is omitted: the runtime always names `config.command` on errors. */
+export interface AcpSharedRuntimeOptions extends Omit<ACPClientOptions, "command"> {
   /** Envelope mode for streamPrompt: openai, native, or both. Default: both. */
   envelopeMode?: EnvelopeMode;
   /** Model id used in OpenAI-style stream envelopes. */
@@ -22,8 +24,8 @@ export interface AcpSharedRuntimeOptions extends ACPClientOptions {
   /** Optional session persistence. When provided, the store records the session id and cwd; restoring the conversation is not implemented in this release. */
   sessionPersistence?: ISessionPersistence;
   /**
-   * Provider id for the persistence key.
-   * Required when sessionPersistence is provided.
+   * Provider id: the persistence key, and the provider named on errors (it selects the install
+   * and login hints from PROVIDER_SETUP). Required when sessionPersistence is provided.
    */
   providerId?: string;
   /** Workspace for persistence key. */
@@ -62,10 +64,17 @@ export function createAcpCliHarnessRuntime(
   } = options ?? {};
 
   if (sessionPersistence && !providerId) {
-    throw new Error(ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED);
+    throw new InvalidStateError(
+      ACP_ERROR_CODE.PERSISTENCE_MISCONFIGURED,
+      ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED
+    );
   }
 
-  const port = createAcpAgentPort(connection, clientOptions);
+  const port = createAcpAgentPort(connection, {
+    ...clientOptions,
+    providerId,
+    command: config.command,
+  });
   const streamed = wrapAgentPortWithStream(port, { envelopeMode, modelId });
   // Always wrap with lifecycle for restart/open/close; persistence remains optional.
   // Narrowing both in one expression is what lets providerId stay a plain string inside the

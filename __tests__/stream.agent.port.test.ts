@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { InvalidStateError } from "../src/domain/errors";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import { StreamAgentPort, wrapAgentPortWithStream } from "../src/runtime/acp.agent.port.stream";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -335,6 +336,8 @@ describe("StreamAgentPort", () => {
       }
     })();
     await expect(second).rejects.toThrow(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    await expect(second).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(second).rejects.toMatchObject({ code: "STREAM_IN_PROGRESS", sessionId: "s1" });
     expect(inner.prompt).toHaveBeenCalledTimes(1);
 
     release();

@@ -65,6 +65,10 @@ describe("createAcpAgentPort contract", () => {
     const connection = createMockConnection(null);
     const port = createAcpAgentPort(connection);
     await expect(port.connect()).rejects.toThrow(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
+    await expect(port.connect()).rejects.toMatchObject({
+      name: "ConnectionError",
+      code: "STREAM_UNAVAILABLE",
+    });
   });
 
   it("throws when methods called before connect", async () => {

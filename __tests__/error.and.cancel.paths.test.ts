@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { Readable, Writable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { extractHelp } from "../src/cli/help.extractor";
+import { AgentProcessError } from "../src/domain/errors";
 
 /** A child that never exits, so only the path under test can settle the promise. */
 function createInertChild() {
@@ -28,5 +29,11 @@ describe("help extraction spawn failure", () => {
     child.emit("error", Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }));
 
     await expect(pending).rejects.toThrow("spawn ENOENT");
+    await expect(pending).rejects.toBeInstanceOf(AgentProcessError);
+    await expect(pending).rejects.toMatchObject({
+      code: "CLI_NOT_FOUND",
+      command: "does-not-exist",
+      cause: expect.objectContaining({ code: "ENOENT" }),
+    });
   });
 });
