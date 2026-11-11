@@ -15,7 +15,9 @@ Measured on 2026-11-10.
 | claude-cli | @agentclientprotocol/claude-agent-acp 0.106.0 | yes | yes | yes | yes | yes | yes | yes |
 | codex-cli | @agentclientprotocol/codex-acp 2.6.0 | yes | yes | yes | yes | yes | yes | yes |
 | cursor-cli | not reported | yes | yes | no | no | no | no | no |
-| antigravity-cli | not measured (agy not installed when this file was generated) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |
+| antigravity-cli | Antigravity ACP Server 1.5.5 | yes | yes | yes | yes | no | no | yes |
+
+Antigravity reports its capabilities under both camelCase and snake_case keys (`loadSession` and `load_session`, `sessionCapabilities` and `session_capabilities`).
 
 ## Raw output
 
@@ -137,7 +139,51 @@ Measured on 2026-11-10.
   },
   "antigravity-cli": {
     "command": "agy acp",
-    "error": "not measured: agy not installed when this file was generated"
+    "agentInfo": {
+      "name": "Antigravity ACP Server",
+      "version": "1.5.5"
+    },
+    "protocolVersion": 1,
+    "agentCapabilities": {
+      "loadSession": true,
+      "load_session": true,
+      "promptCapabilities": {
+        "image": true,
+        "audio": false,
+        "embeddedContext": true
+      },
+      "sessionCapabilities": {
+        "resume": {},
+        "close": {},
+        "load": {},
+        "list": {},
+        "additionalDirectories": {}
+      },
+      "session_capabilities": {
+        "resume": {},
+        "close": {},
+        "load": {},
+        "list": {},
+        "additionalDirectories": {}
+      },
+      "auth": {
+        "logout": {}
+      },
+      "_meta": {
+        "antigravity": {
+          "tier": true,
+          "systemPrompt": {
+            "append": true
+          }
+        }
+      }
+    },
+    "authMethods": [
+      "oauth-personal",
+      "oauth-business",
+      "gemini-api-key",
+      "agent-platform"
+    ]
   }
 }
 ```

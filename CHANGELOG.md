@@ -9,10 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - 2026-11-10
 
-Four providers now: Claude, Codex, Cursor and Antigravity. The Antigravity provider has **not yet
-been run against a real `agy` binary**: its flag table is empty and its capabilities are recorded
-as "not measured" in `docs/capabilities.md`. Claude, Codex and Cursor were each verified live with
-a prompt round trip.
+Four providers now: Claude, Codex, Cursor and Antigravity. All four completed a live prompt round
+trip for this release.
 
 ### Breaking
 
@@ -56,8 +54,8 @@ a prompt round trip.
   `@agentclientprotocol/claude-agent-acp` and `codex-acp` from `@agentclientprotocol/codex-acp`;
   the `@zed-industries/*` packages are deprecated. Default commands are unchanged.
 - Flag tables were corrected against saved `--help` output. Cursor maps `model`, `trust`, `sandbox` and
-  `workspace` (this mapping is what `cliSpec.buildArgs` produces; the runtime never calls it); Antigravity's is empty until `npm run refresh:help` has been run with `agy`
-  installed.
+  `workspace` (this mapping is what `cliSpec.buildArgs` produces; the runtime never calls it); Antigravity's is
+  filled from `agy acp --help` and maps none of them.
 - A `sessionUpdate` listener that throws now surfaces on the port's `error` event.
 - `session/update` notifications are checked structurally before being emitted, not against the
   SDK's schema.
@@ -99,7 +97,7 @@ a prompt round trip.
 - **Gemini to Antigravity.** Before: `Provider.GEMINI` / `"gemini-cli"`, `ACP_LLM_CLI_GEMINI_COMMAND`
   and `ACP_LLM_CLI_GEMINI_ARGS`. After: `Provider.ANTIGRAVITY` / `"antigravity-cli"`,
   `ACP_LLM_CLI_ANTIGRAVITY_COMMAND` (default `agy`) and `ACP_LLM_CLI_ANTIGRAVITY_ARGS` (default
-  `acp`). Antigravity has not yet been run against a real `agy` binary. Model id lists are
+  `acp`). Antigravity was verified live against `agy` 1.5.5. Model id lists are
   unchanged. To keep driving Gemini CLI (paid API key or enterprise licence), run it as a generic
   ACP command (`--acp` on Gemini CLI 0.33 or later):
   ```ts

@@ -83,7 +83,7 @@ All four providers are driven through the same ACP runtime and configured the sa
 | Claude | `Provider.CLAUDE` | `claude-agent-acp` | npm `@agentclientprotocol/claude-agent-acp` | Yes |
 | Codex | `Provider.CODEX` | `codex-acp` | npm `@agentclientprotocol/codex-acp` | Yes |
 | Cursor | `Provider.CURSOR` | `cursor-agent acp` | Cursor's `cursor-agent` CLI | Yes |
-| Antigravity | `Provider.ANTIGRAVITY` | `agy acp` | Google's Antigravity CLI (`agy`) | No. It has not been run against a real `agy` binary; its flag table is empty and its capabilities are recorded as "not measured" |
+| Antigravity | `Provider.ANTIGRAVITY` | `agy acp` | Google's Antigravity CLI (`agy`). Install with `curl -fsSL https://antigravity.google/cli/install.sh \| bash`, which places `agy` in `~/.local/bin`; `agy acp --login` signs in | Yes, `agy` 1.5.5 (live prompt round trip) |
 
 What each agent advertises at `initialize` (session load, list, resume, close, fork) is recorded in [`docs/capabilities.md`](./docs/capabilities.md). `npm run probe` regenerates it.
 

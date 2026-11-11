@@ -4,7 +4,6 @@
 export const PROVIDER_IDS = {
   CLAUDE_CLI_ID: "claude-cli",
   CLAUDE_CLI_NAME: "Claude CLI",
-  /** @experimental Has not yet been run against a real `agy` binary. */
   ANTIGRAVITY_CLI_ID: "antigravity-cli",
   ANTIGRAVITY_CLI_NAME: "Antigravity CLI",
   CODEX_CLI_ID: "codex-cli",

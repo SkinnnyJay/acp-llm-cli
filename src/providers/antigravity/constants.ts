@@ -6,11 +6,20 @@ export const ANTIGRAVITY_CONFIG_KEYS = {
   ARGS_KEY: "ACP_LLM_CLI_ANTIGRAVITY_ARGS",
 } as const satisfies Record<string, keyof typeof ENV_KEY>;
 
-/**
- * Flags `agy` accepts. Empty until `npm run refresh:help` is run on a machine with `agy`
- * installed: only flags present in the saved help fixture may be declared here.
- */
-export const ANTIGRAVITY_CLI_ARG = {} as const;
+/** Flags of the `agy acp` subcommand; they go after `acp` (`agy acp --sandbox`). */
+export const ANTIGRAVITY_CLI_ARG = {
+  ADD_DIR: "--add-dir",
+  AGENT: "--agent",
+  SANDBOX: "--sandbox",
+  DANGEROUSLY_SKIP_PERMISSIONS: "--dangerously-skip-permissions",
+  PROCESS_PER_SESSION: "--process-per-session",
+  DISABLE_TELEMETRY: "--disable-telemetry",
+  LOG_FILE: "--log-file",
+  LOGIN: "--login",
+} as const;
 
-/** Map generic option keys to Antigravity CLI flag names. Empty until the flag table is filled. */
+/**
+ * No generic key is mapped: `agy acp` has no model, trust, workspace, debug or output-format flag,
+ * and its `--sandbox` is a bare boolean while the builder emits `--sandbox <value>`.
+ */
 export const ANTIGRAVITY_GENERIC_FLAG_MAP: ProviderFlagMap<typeof ANTIGRAVITY_CLI_ARG> = {};
