@@ -169,7 +169,7 @@ Every adapter carries a `cliSpec` that turns typed options into argv, so callers
 ```ts
 import { getAdapter, getDefaultRegistry, PROVIDER_IDS } from "@simpill/acp-llm-cli";
 
-const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
+const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
 const argv = adapter?.cliSpec?.buildArgs({
   command: "gemini",
   args: [],

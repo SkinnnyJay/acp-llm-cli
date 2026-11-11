@@ -1,16 +1,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ANTIGRAVITY_CLI_ARG } from "../src/providers/antigravity/constants";
 import { CLAUDE_CLI_ARG } from "../src/providers/claude/constants";
 import { CODEX_CLI_ARG } from "../src/providers/codex/constants";
 import { CURSOR_CLI_ARG } from "../src/providers/cursor/constants";
-import { GEMINI_CLI_ARG } from "../src/providers/gemini/constants";
 
 const TABLES: Record<string, Record<string, string>> = {
   claude: CLAUDE_CLI_ARG,
   codex: CODEX_CLI_ARG,
   cursor: CURSOR_CLI_ARG,
-  gemini: GEMINI_CLI_ARG,
+  antigravity: ANTIGRAVITY_CLI_ARG,
 };
 
 /** Every flag token (`-p`, `--model`) that appears in a help text. */

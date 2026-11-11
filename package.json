@@ -1,7 +1,7 @@
 {
   "name": "@simpill/acp-llm-cli",
   "version": "0.4.0",
-  "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor)",
+  "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Antigravity, Cursor)",
   "license": "ISC",
   "author": "SkinnnyJay",
   "type": "module",
@@ -28,7 +28,7 @@
     "cli",
     "claude",
     "codex",
-    "gemini",
+    "antigravity",
     "cursor",
     "anthropic",
     "openai",

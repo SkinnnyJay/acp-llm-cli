@@ -45,10 +45,10 @@ describe("ProviderFactory", () => {
 
   it("getProvider returns adapter for registered id", () => {
     const factory = getDefaultFactory();
-    const provider = factory.getProvider(PROVIDER_IDS.GEMINI_CLI_ID);
+    const provider = factory.getProvider(PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
     expect(provider).toBeDefined();
-    expect(provider?.id).toBe(PROVIDER_IDS.GEMINI_CLI_ID);
-    expect(provider?.cliSpec?.defaultArgs).toEqual(["--acp"]);
+    expect(provider?.id).toBe(PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
+    expect(provider?.cliSpec?.defaultArgs).toEqual(["acp"]);
   });
 
   it("getMetrics returns metrics after createRuntime when collectMetrics true", () => {

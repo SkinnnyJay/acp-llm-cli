@@ -152,7 +152,7 @@ describe("wrapAgentPortWithLifecycle", () => {
           },
           async clearSession() {},
         },
-        providerId: "gemini-cli",
+        providerId: "antigravity-cli",
       },
     });
 
@@ -174,7 +174,7 @@ describe("wrapAgentPortWithLifecycle", () => {
     const inner = createMockPort();
     const persistence = createMemorySessionPersistence();
     const wrapped = wrapAgentPortWithLifecycle(inner, {
-      persistence: { store: persistence, providerId: "gemini-cli" },
+      persistence: { store: persistence, providerId: "antigravity-cli" },
     });
 
     await wrapped.sessionUpdate({
@@ -183,7 +183,7 @@ describe("wrapAgentPortWithLifecycle", () => {
       session_id: "sess-from-update",
     } as unknown as Parameters<IAgentPort["sessionUpdate"]>[0]);
 
-    const saved = await persistence.loadSession("gemini-cli");
+    const saved = await persistence.loadSession("antigravity-cli");
     expect(saved?.sessionId).toBe("sess-from-update");
     expect(inner.sessionUpdate).toHaveBeenCalled();
   });

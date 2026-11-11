@@ -8,7 +8,7 @@ const TARGETS = {
   "claude-cli": ["claude-agent-acp"],
   "codex-cli": ["codex-acp"],
   "cursor-cli": ["cursor-agent", "acp"],
-  "gemini-cli": ["gemini", "--acp"],
+  "antigravity-cli": ["agy", "acp"],
 };
 const TIMEOUT_MS = 30_000;
 

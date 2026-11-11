@@ -15,7 +15,7 @@ const TARGETS = {
   claude: { bin: "claude-agent-acp", help: [["--help"]], version: ["--version"] },
   codex: { bin: "codex-acp", help: [["--help"]], version: ["--version"] },
   cursor: { bin: "cursor-agent", help: [["--help"], ["acp", "--help"]], version: ["--version"] },
-  gemini: { bin: "gemini", help: [["--help"]], version: ["--version"] },
+  antigravity: { bin: "agy", help: [["--help"], ["acp", "--help"]], version: ["--version"] },
 };
 
 /** Returns the output, "" when the binary ran but timed out, or undefined when it cannot spawn. */

@@ -32,13 +32,13 @@ describe("ProviderClientFactory", () => {
     expect(typeof client.port.prompt).toBe("function");
   });
 
-  it("getClient(Provider.GEMINI, config) returns client with gemini port", () => {
+  it("getClient(Provider.ANTIGRAVITY, config) returns client with antigravity port", () => {
     const factory = getDefaultProviderClientFactory();
-    const client = factory.getClient(Provider.GEMINI, {
-      command: "gemini",
-      args: ["--acp"],
+    const client = factory.getClient(Provider.ANTIGRAVITY, {
+      command: "agy",
+      args: ["acp"],
     });
-    expect(client.provider).toBe(Provider.GEMINI);
+    expect(client.provider).toBe(Provider.ANTIGRAVITY);
     expect(client.port).toBeDefined();
   });
 

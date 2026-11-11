@@ -15,7 +15,7 @@ Measured on 2026-11-10.
 | claude-cli | @agentclientprotocol/claude-agent-acp 0.106.0 | yes | yes | yes | yes | yes | yes | yes |
 | codex-cli | @agentclientprotocol/codex-acp 2.6.0 | yes | yes | yes | yes | yes | yes | yes |
 | cursor-cli | not reported | yes | yes | no | no | no | no | no |
-| gemini-cli | gemini-cli 0.33.2 | yes | no | no | no | no | no | no |
+| antigravity-cli | not measured (agy not installed when this file was generated) | not measured | not measured | not measured | not measured | not measured | not measured | not measured |
 
 ## Raw output
 
@@ -135,32 +135,9 @@ Measured on 2026-11-10.
       "cursor_login"
     ]
   },
-  "gemini-cli": {
-    "command": "gemini --acp",
-    "agentInfo": {
-      "name": "gemini-cli",
-      "title": "Gemini CLI",
-      "version": "0.33.2"
-    },
-    "protocolVersion": 1,
-    "agentCapabilities": {
-      "loadSession": true,
-      "promptCapabilities": {
-        "image": true,
-        "audio": true,
-        "embeddedContext": true
-      },
-      "mcpCapabilities": {
-        "http": true,
-        "sse": true
-      }
-    },
-    "authMethods": [
-      "oauth-personal",
-      "gemini-api-key",
-      "vertex-ai",
-      "gateway"
-    ]
+  "antigravity-cli": {
+    "command": "agy acp",
+    "error": "not measured: agy not installed when this file was generated"
   }
 }
 ```

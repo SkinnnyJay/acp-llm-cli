@@ -44,24 +44,24 @@ describe("Session persistence key isolation", () => {
       persistence: { store: persistence, providerId: PROVIDER_IDS.CLAUDE_CLI_ID },
     });
 
-    const geminiPort = createMockPort("gemini-session-2");
-    const wrappedGemini = wrapAgentPortWithLifecycle(geminiPort, {
-      persistence: { store: persistence, providerId: PROVIDER_IDS.GEMINI_CLI_ID },
+    const antigravityPort = createMockPort("antigravity-session-2");
+    const wrappedAntigravity = wrapAgentPortWithLifecycle(antigravityPort, {
+      persistence: { store: persistence, providerId: PROVIDER_IDS.ANTIGRAVITY_CLI_ID },
     });
 
     await wrappedClaude.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
       IAgentPort["newSession"]
     >[0]);
-    await wrappedGemini.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
+    await wrappedAntigravity.newSession({ cwd: "/tmp", mcpServers: [] } as Parameters<
       IAgentPort["newSession"]
     >[0]);
 
     const claudeSession = await persistence.loadSession(PROVIDER_IDS.CLAUDE_CLI_ID);
-    const geminiSession = await persistence.loadSession(PROVIDER_IDS.GEMINI_CLI_ID);
+    const antigravitySession = await persistence.loadSession(PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
 
     expect(claudeSession?.sessionId).toBe("claude-session-1");
-    expect(geminiSession?.sessionId).toBe("gemini-session-2");
-    expect(claudeSession?.sessionId).not.toBe(geminiSession?.sessionId);
+    expect(antigravitySession?.sessionId).toBe("antigravity-session-2");
+    expect(claudeSession?.sessionId).not.toBe(antigravitySession?.sessionId);
   });
 
   it("isolates sessions when workspace is also provided", async () => {

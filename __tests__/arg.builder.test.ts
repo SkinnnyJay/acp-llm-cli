@@ -127,7 +127,7 @@ describe("buildGenericArgs", () => {
 
 describe("cliSpec.buildArgs through the registry", () => {
   it("accepts generic options on a spec whose config type has been erased", () => {
-    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
+    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CURSOR_CLI_ID);
     const spec = adapter?.cliSpec;
     expect(spec).toBeDefined();
 
@@ -135,27 +135,21 @@ describe("cliSpec.buildArgs through the registry", () => {
     // generic options below are the whole point of the builder, so they must
     // survive that erasure - both at the type level and at runtime.
     const argv = spec?.buildArgs({
-      command: "gemini",
+      command: "cursor-agent",
       args: [],
       model: "gemini-2.5-pro",
-      outputFormat: "stream-json",
-      debug: true,
+      trust: true,
+      workspace: "/work",
     });
 
-    expect(argv).toEqual([
-      "--model",
-      "gemini-2.5-pro",
-      "--output-format",
-      "stream-json",
-      "--debug",
-    ]);
+    expect(argv).toEqual(["--model", "gemini-2.5-pro", "--trust", "--workspace", "/work"]);
   });
 
   it("falls back to defaultArgs when args is omitted", () => {
-    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
+    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CURSOR_CLI_ID);
     const spec = adapter?.cliSpec;
     // `args` and `env` carry schema defaults, so a caller holding an unparsed
     // config has neither. Omitting args must fall back rather than fail.
-    expect(spec?.buildArgs({ command: "gemini" })).toEqual(spec?.defaultArgs);
+    expect(spec?.buildArgs({ command: "cursor-agent" })).toEqual(spec?.defaultArgs);
   });
 });

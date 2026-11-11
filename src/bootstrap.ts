@@ -1,9 +1,9 @@
 import { VALIDATION_ERROR } from "./domain/validation.errors";
 import type { AcpSharedRuntimeOptions } from "./providers/acp.shared";
+import { antigravityAdapter } from "./providers/antigravity/adapter";
 import { claudeAdapter } from "./providers/claude/adapter";
 import { codexAdapter } from "./providers/codex/adapter";
 import { cursorAdapter } from "./providers/cursor/adapter";
-import { geminiAdapter } from "./providers/gemini/adapter";
 import type { IAgentPort } from "./runtime/agent.port";
 import type { IProviderClientFactory, IProviderFactory } from "./runtime/interfaces/provider.types";
 import { ProviderClientFactory } from "./runtime/provider.client.factory";
@@ -16,14 +16,14 @@ let defaultFactory: IProviderFactory | null = null;
 let defaultClientFactory: IProviderClientFactory | null = null;
 
 /**
- * Creates HarnessRegistry, registers Claude, Codex, Gemini, Cursor adapters. Ids from PROVIDER_IDS.
+ * Creates HarnessRegistry, registers Claude, Codex, Antigravity, Cursor adapters. Ids from PROVIDER_IDS.
  */
 export function getDefaultRegistry(): HarnessRegistry {
   if (!defaultRegistry) {
     defaultRegistry = new RegistryClass();
     defaultRegistry.register(claudeAdapter);
     defaultRegistry.register(codexAdapter);
-    defaultRegistry.register(geminiAdapter);
+    defaultRegistry.register(antigravityAdapter);
     defaultRegistry.register(cursorAdapter);
   }
   return defaultRegistry;

@@ -9,8 +9,8 @@ describe("DEFAULT_COMMANDS ACPX alignment", () => {
     expect(DEFAULT_COMMANDS.CODEX_DEFAULT_ARGS).toEqual([]);
   });
 
-  it("starts Gemini in ACP mode with --acp", () => {
-    expect(DEFAULT_COMMANDS.GEMINI_DEFAULT_ARGS).toEqual(["--acp"]);
+  it("starts Antigravity in ACP mode with the acp subcommand", () => {
+    expect(DEFAULT_COMMANDS.ANTIGRAVITY_DEFAULT_ARGS).toEqual(["acp"]);
   });
 
   it("keeps Cursor on print-mode binary (ACP is via ACPX cursor-agent acp)", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { antigravityConfigSchema } from "../src/providers/antigravity/schema";
 import { claudeConfigSchema } from "../src/providers/claude/schema";
 import { codexConfigSchema } from "../src/providers/codex/schema";
 import { cursorConfigSchema } from "../src/providers/cursor/schema";
-import { geminiConfigSchema } from "../src/providers/gemini/schema";
 
 /**
  * App HarnessConfig-style shapes: command, args, env, cwd plus provider-specific options.
@@ -21,14 +21,14 @@ describe("Provider config parity with app HarnessConfig", () => {
     expect(claudeConfigSchema.parse(config).command).toBe("claude-code-acp");
   });
 
-  it("Gemini: accepts app-style config", () => {
+  it("Antigravity: accepts app-style config", () => {
     const config = {
-      command: "gemini",
-      args: ["--acp"],
+      command: "agy",
+      args: ["acp"],
       env: {},
       cwd: "/project",
     };
-    expect(() => geminiConfigSchema.parse(config)).not.toThrow();
+    expect(() => antigravityConfigSchema.parse(config)).not.toThrow();
   });
 
   it("Codex: accepts app-style config", () => {

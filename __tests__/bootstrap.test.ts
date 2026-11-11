@@ -13,7 +13,7 @@ describe("bootstrap", () => {
   it("getDefaultRegistry returns registry with adapters", () => {
     const registry = getDefaultRegistry();
     expect(registry.has(PROVIDER_IDS.CLAUDE_CLI_ID)).toBe(true);
-    expect(registry.has(PROVIDER_IDS.GEMINI_CLI_ID)).toBe(true);
+    expect(registry.has(PROVIDER_IDS.ANTIGRAVITY_CLI_ID)).toBe(true);
     expect(registry.has(PROVIDER_IDS.CODEX_CLI_ID)).toBe(true);
     expect(registry.has(PROVIDER_IDS.CURSOR_CLI_ID)).toBe(true);
     expect(registry.list().length).toBe(4);
