@@ -18,7 +18,6 @@ export type {
 export {
   buildGenericArgs,
   extractHelp,
-  GENERIC_OPTION_DEFAULTS,
   GENERIC_OPTION_KEY,
   genericLlmCliOptionsSchema,
   HELP_FLAG,
@@ -30,25 +29,21 @@ export type { EnvelopeMode } from "./domain/envelope.mode";
 export { ENVELOPE_MODE } from "./domain/envelope.mode";
 export type { ModelId as AnthropicModelId } from "./domain/models/anthropic.models";
 export {
-  MODEL_ID_LIST as ANTHROPIC_MODEL_ID_LIST,
   MODEL_IDS as ANTHROPIC_MODEL_IDS,
   ModelIdSchema as AnthropicModelIdSchema,
 } from "./domain/models/anthropic.models";
 export type { ModelId as GeminiModelId } from "./domain/models/gemini.models";
 export {
-  MODEL_ID_LIST as GEMINI_MODEL_ID_LIST,
   MODEL_IDS as GEMINI_MODEL_IDS,
   ModelIdSchema as GeminiModelIdSchema,
 } from "./domain/models/gemini.models";
 export type { ModelId as OpenAIModelId } from "./domain/models/openai.models";
 export {
-  MODEL_ID_LIST as OPENAI_MODEL_ID_LIST,
   MODEL_IDS as OPENAI_MODEL_IDS,
   ModelIdSchema as OpenAIModelIdSchema,
 } from "./domain/models/openai.models";
 export type { ModelId as XAIModelId } from "./domain/models/xai.models";
 export {
-  MODEL_ID_LIST as XAI_MODEL_ID_LIST,
   MODEL_IDS as XAI_MODEL_IDS,
   ModelIdSchema as XAIModelIdSchema,
 } from "./domain/models/xai.models";

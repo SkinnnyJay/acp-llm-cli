@@ -16,12 +16,6 @@ export const MODEL_IDS = {
   GROK_CODE_FAST_1: "grok-code-fast-1",
 } as const;
 
-/**
- * @deprecated Unread anywhere, and lossier than its source: `readonly string[]` discards the
- * literal union MODEL_IDS already carries. Use `Object.values(MODEL_IDS)`. Removed next major.
- */
-export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
-
 export const ModelIdSchema = z.enum([
   "grok-3",
   "grok-3-beta",

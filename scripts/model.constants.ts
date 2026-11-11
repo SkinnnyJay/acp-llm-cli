@@ -53,8 +53,8 @@ export function renderModelModule(headerComment: string, ids: string[]): string 
     .map(([key, id]) => `  ${key}: "${id}",`)
     .join("\n");
   const schemaValues = Object.values(entries)
-    .map((id) => `  "${id}"`)
-    .join(",\n");
+    .map((id) => `  "${id}",`)
+    .join("\n");
 
   return `/**
  * ${headerComment}
@@ -66,12 +66,6 @@ import { z } from "zod";
 export const MODEL_IDS = {
 ${body}
 } as const;
-
-/**
- * @deprecated Unread anywhere, and lossier than its source: \`readonly string[]\` discards the
- * literal union MODEL_IDS already carries. Use \`Object.values(MODEL_IDS)\`. Removed next major.
- */
-export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
 
 export const ModelIdSchema = z.enum([
 ${schemaValues}

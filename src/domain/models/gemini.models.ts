@@ -35,12 +35,6 @@ export const MODEL_IDS = {
   GEMMA_3N_E4B_IT_FREE: "gemma-3n-e4b-it:free",
 } as const;
 
-/**
- * @deprecated Unread anywhere, and lossier than its source: `readonly string[]` discards the
- * literal union MODEL_IDS already carries. Use `Object.values(MODEL_IDS)`. Removed next major.
- */
-export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
-
 export const ModelIdSchema = z.enum([
   "gemini-2.0-flash-001",
   "gemini-2.0-flash-lite-001",

@@ -28,6 +28,18 @@ describe("provider flag tables match the spawned binary's --help", () => {
     });
   }
 
+  for (const [provider, table] of Object.entries(TABLES)) {
+    if (Object.keys(table).length > 0) continue;
+    it(`${provider}: empty flag table, so its fixture must have no help body`, () => {
+      const help = readFileSync(join(__dirname, "fixtures", "help", `${provider}.txt`), "utf8");
+      const body = help
+        .split("\n")
+        .slice(1)
+        .filter((line) => line.trim() !== "" && !line.startsWith("$ "));
+      expect(body).toEqual([]);
+    });
+  }
+
   it("flagsIn does not treat hyphenated words as flags", () => {
     expect([...flagsIn("use stream-json with --output-format or -p")]).toEqual([
       "--output-format",

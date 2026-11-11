@@ -8,8 +8,8 @@ export const CURSOR_CONFIG_KEYS = {
 } as const satisfies Record<string, keyof typeof ENV_KEY>;
 
 /**
- * Flags `cursor-agent` accepts. They are global options placed before the `acp` subcommand
- * (`cursor-agent --model x acp`); `acp` itself takes none.
+ * Flags `cursor-agent` accepts. They are its global options; `acp --help` lists none of its own,
+ * and the binary answers the ACP handshake with a global flag on either side of `acp`.
  */
 export const CURSOR_CLI_ARG = {
   MODEL: "--model",

@@ -69,12 +69,6 @@ export const MODEL_IDS = {
   O4_MINI_HIGH: "o4-mini-high",
 } as const;
 
-/**
- * @deprecated Unread anywhere, and lossier than its source: `readonly string[]` discards the
- * literal union MODEL_IDS already carries. Use `Object.values(MODEL_IDS)`. Removed next major.
- */
-export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
-
 export const ModelIdSchema = z.enum([
   "gpt-3.5-turbo",
   "gpt-3.5-turbo-0613",
