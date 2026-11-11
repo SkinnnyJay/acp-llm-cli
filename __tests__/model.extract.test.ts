@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractModelIds } from "../scripts/model.constants";
+import { extractModelIds, extractRetiredModelIds } from "../scripts/model.constants";
 
 describe("extractModelIds", () => {
   it("anthropic: keeps ids from status-table rows that are not retired", () => {
@@ -76,5 +76,24 @@ describe("extractModelIds", () => {
   it("returns nothing for an unrecognised page or vendor", () => {
     expect(extractModelIds("openai", "<html>no models here</html>")).toEqual([]);
     expect(extractModelIds("other", "`claude-opus-5-5`")).toEqual([]);
+  });
+});
+
+describe("extractRetiredModelIds", () => {
+  const page = [
+    "| claude-fable-5-2           | Active        | N/A            | Not sooner than 2027      |",
+    "| claude-sonnet-4-5-20250929 | Deprecated    | September 2026 | November 30, 2026         |",
+    "| claude-opus-4-20250514     | Retired       | April 14, 2026 | June 15, 2026             |",
+  ].join("\n");
+
+  it("anthropic: returns retired ids and each undated alias", () => {
+    expect(extractRetiredModelIds("anthropic", page)).toEqual([
+      "claude-opus-4-20250514",
+      "claude-opus-4",
+    ]);
+  });
+
+  it("returns [] for another vendor", () => {
+    expect(extractRetiredModelIds("openai", page)).toEqual([]);
   });
 });

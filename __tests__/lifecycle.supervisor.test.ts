@@ -273,7 +273,11 @@ describe("wrapAgentPortWithLifecycle", () => {
     expect(inner.restart).toHaveBeenCalled();
     // Nothing advertised: a new session, never one with a sessionId cast onto session/new.
     expect(inner.newSession).toHaveBeenCalledWith({ cwd: process.cwd(), mcpServers: [] });
-    expect(outcome).toEqual({ session: "new", sessionId: "sess-123" });
+    expect(outcome).toEqual({
+      session: "new",
+      sessionId: "sess-123",
+      previousSessionId: "saved-sess",
+    });
   });
 
   it("restart() does not call newSession when no persisted session exists", async () => {
@@ -598,7 +602,11 @@ describe("LifecycleAgentPort restart restores the conversation", () => {
     const params = (inner.newSession as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect("sessionId" in params).toBe(false);
     expect(params).toMatchObject({ cwd: STORED_CWD });
-    expect(outcome).toEqual({ session: "new", sessionId: "fresh-sess" });
+    expect(outcome).toEqual({
+      session: "new",
+      sessionId: "fresh-sess",
+      previousSessionId: STORED_ID,
+    });
     expect((await store.loadSession(PROVIDER))?.sessionId).toBe("fresh-sess");
   });
 
@@ -669,7 +677,11 @@ describe("LifecycleAgentPort restart restores the conversation", () => {
     expect(mocks.loadSession).not.toHaveBeenCalled();
     const params = (inner.newSession as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect("sessionId" in params).toBe(false);
-    expect(outcome).toEqual({ session: "new", sessionId: "fresh-sess" });
+    expect(outcome).toEqual({
+      session: "new",
+      sessionId: "fresh-sess",
+      previousSessionId: STORED_ID,
+    });
   });
 
   it("returns { session: 'none' } and makes no session call without persistence", async () => {
@@ -696,6 +708,30 @@ describe("LifecycleAgentPort restart restores the conversation", () => {
 
     expect(mocks.resumeSession).toHaveBeenCalledWith(
       expect.objectContaining({ cwd: "/work", mcpServers })
+    );
+
+    const replacement = [{ name: "git", command: "mcp-git", args: [], env: [] }];
+    await port.newSession({ cwd: "/work", mcpServers: replacement });
+    await port.restart();
+
+    expect(mocks.resumeSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mcpServers: replacement })
+    );
+  });
+
+  it("restores with the configured mcpServers when no newSession came first", async () => {
+    const { store } = await storedSession();
+    const mocks = restoreMocks();
+    const inner = createMockAgentPort({ ...mocks, agentCapabilities: RESUME_CAPS });
+    const mcpServers = [{ name: "files", command: "mcp-files", args: [], env: [] }];
+    const port = new LifecycleAgentPort(inner, {
+      persistence: { store, providerId: PROVIDER, mcpServers },
+    });
+
+    await port.restart();
+
+    expect(mocks.resumeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: STORED_ID, mcpServers })
     );
   });
 

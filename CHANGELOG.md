@@ -50,9 +50,9 @@ trip for this release.
 - **Model id constants changed.** Ids now come from the vendors: `npm run update-models` reads each
   vendor's models API when its key is set, otherwise the vendor's public documentation page;
   OpenRouter is no longer used. Dotted router spellings (`claude-opus-4.8` for `claude-opus-4-8`)
-  and router variants (`:batch`, `:free`) were removed (three older ids without dots remain) and
+  and router variants (`:batch`, `:free`) were removed and
   new ids added. In `ANTHROPIC_MODEL_IDS` these keys no longer exist:
-  `CLAUDE_3_5_HAIKU`, `CLAUDE_3_5_SONNET`, `CLAUDE_3_7_SONNET`, `CLAUDE_3_7_SONNET_THINKING`,
+  `CLAUDE_3_HAIKU`, `CLAUDE_OPUS_4`, `CLAUDE_SONNET_4`, `CLAUDE_3_5_HAIKU`, `CLAUDE_3_5_SONNET`, `CLAUDE_3_7_SONNET`, `CLAUDE_3_7_SONNET_THINKING`,
   `CLAUDE_HAIKU_4_5`, `CLAUDE_OPUS_4_1`, `CLAUDE_OPUS_4_5` and `CLAUDE_SONNET_4_5` (the dated
   `CLAUDE_HAIKU_4_5_20251001`, `CLAUDE_OPUS_4_5_20251101` and `CLAUDE_SONNET_4_5_20250929`
   replace the last three), and `CLAUDE_OPUS_4_6` / `CLAUDE_SONNET_4_6` now hold `claude-opus-4-6`
@@ -115,13 +115,18 @@ trip for this release.
 
 ### Added
 
+- **`restoreMcpServers`** (`AcpSharedRuntimeOptions`, and `LifecycleSessionPersistence.mcpServers`):
+  MCP servers the restore call in `restart()` attaches in a fresh process, until a `newSession`
+  through the port supplies its own. They are not persisted.
 - **`restart()` restores the session.** After restarting the process it sends `session/resume`
   when the agent advertises `sessionCapabilities.resume`, else `session/load` when it advertises
   `loadSession` (the history the agent replays is not re-emitted or persisted), else a new
   session. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two, a closed link and a dead process propagate.
   It returns a `RestartOutcome` (`session`: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and
   `sessionId`); `"new"` means the agent could not restore the session and the conversation
-  context is gone. 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
+  context is gone, and `RestartOutcome.previousSessionId` is then the stored session it could not
+  restore (agents report an unknown session with different errors, some with a generic internal
+  error, so a transient failure can also end in `"new"`; retry with `loadSession`). 0.4.0 sent `session/new` with a `sessionId` field that `session/new` does not
   define and kept the old id in the store; that cast is removed. `IAgentPort.restart?()` now
   returns `Promise<RestartOutcome>`, and `IAgentPort` gains optional `resumeSession`,
   `loadSession` and `agentCapabilities` (from the last `initialize`), which `ACPClient` implements.

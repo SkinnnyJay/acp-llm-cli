@@ -50,6 +50,11 @@ export interface RestartOutcome {
   session: RestartSessionOutcome;
   /** The session to use from now on. Absent when `session` is "none". */
   sessionId?: string;
+  /**
+   * Set only when `session` is `"new"`: the stored session the agent could not restore. Its
+   * history may still exist on the agent; `loadSession` can be tried again later.
+   */
+  previousSessionId?: string;
 }
 
 export interface IAgentPort extends EventEmitter<AgentPortEvents> {

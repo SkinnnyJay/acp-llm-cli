@@ -120,6 +120,13 @@ export function extractModelIds(vendor: string, pageText: string): string[] {
   return [...new Set(ids)];
 }
 
+/** Anthropic ids the status table marks Retired, each with its undated alias; [] otherwise. */
+export function extractRetiredModelIds(vendor: string, pageText: string): string[] {
+  if (vendor !== "anthropic") return [];
+  const retired = matches(pageText, /^\|\s*(claude-[a-z0-9-]+)\s*\|\s*Retired\s*\|/gm);
+  return [...new Set(retired.flatMap((id) => [id, id.replace(/-\d{8}$/, "")]))];
+}
+
 /**
  * Merge the ids already in a generated file with freshly fetched ones. Router variants (`:free`,
  * `:batch`) are dropped from both. Additive unless `prune`, which makes `fetched` authoritative.

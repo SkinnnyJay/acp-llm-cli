@@ -19,6 +19,21 @@ Measured on 2026-11-10.
 
 Antigravity reports its capabilities under both camelCase and snake_case keys (`loadSession` and `load_session`, `sessionCapabilities` and `session_capabilities`).
 
+## Restoring an unknown session
+
+Measured on 2026-11-10 by asking each real agent to resume and load a session id that does not exist:
+
+| Agent | `session/resume` | `session/load` |
+| --- | --- | --- |
+| Claude | `SESSION_NOT_FOUND` (-32002) | `SESSION_NOT_FOUND` (-32002) |
+| Cursor | `METHOD_NOT_FOUND` (-32601) | `INVALID_PARAMS` (-32602) |
+| Codex | `AGENT_INTERNAL_ERROR` (-32603) | `AGENT_INTERNAL_ERROR` (-32603) |
+| Antigravity | `AGENT_INTERNAL_ERROR` (-32603) | resolves (no error) |
+
+Antigravity's `session/load` resolved for an id it had never seen. Codex and Antigravity answer an
+unknown session with the same internal error a transient failure produces, so `restart()` cannot
+tell them apart and `RestartOutcome.previousSessionId` keeps the id for a retry.
+
 ## Raw output
 
 ```json

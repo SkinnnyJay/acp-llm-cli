@@ -41,6 +41,11 @@ export interface LifecycleSessionPersistence {
   workspace?: string;
   /** Resume the persisted session after a restart. Default: true. */
   resumeOnRestart?: boolean;
+  /**
+   * MCP servers to attach when restoring a session after `restart()`. Used until a `newSession`
+   * call through this port supplies its own.
+   */
+  mcpServers?: NewSessionRequest["mcpServers"];
 }
 
 export interface LifecycleSupervisorOptions {
@@ -61,7 +66,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
   private readonly restartOptions: RestartWithBackoffOptions | undefined;
   private lastSessionCwd: string | undefined;
   /** From the last successful newSession() through this port, reused when restoring. */
-  private lastMcpServers: NewSessionRequest["mcpServers"] = [];
+  private lastMcpServers: NewSessionRequest["mcpServers"];
   /**
    * The session a pending `session/load` is replaying. Its updates are history the consumer has
    * already rendered, so they are neither re-emitted nor persisted.
@@ -74,6 +79,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
     this.persistence = options.persistence;
     this.resumeOnRestart = options.persistence?.resumeOnRestart ?? true;
     this.restartOptions = options.restartOptions;
+    this.lastMcpServers = options.persistence?.mcpServers ?? [];
 
     this.capabilities = {
       ...inner.capabilities,
@@ -265,7 +271,7 @@ export class LifecycleAgentPort extends EventEmitter<AgentPortEvents> implements
       }
     }
     const created = await this.inner.newSession({ cwd, mcpServers });
-    return { session: "new", sessionId: created.sessionId };
+    return { session: "new", sessionId: created.sessionId, previousSessionId: sessionId };
   }
 
   async open(): Promise<void> {

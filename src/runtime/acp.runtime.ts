@@ -42,6 +42,11 @@ export interface AcpSharedRuntimeOptions extends Omit<ACPClientOptions, "command
    * a new session; `restart()` returns which.
    */
   resumeOnRestart?: boolean;
+  /**
+   * MCP servers to attach when restoring a session after `restart()`. Used until a `newSession`
+   * call through the port supplies its own.
+   */
+  restoreMcpServers?: NonNullable<LifecycleSupervisorOptions["persistence"]>["mcpServers"];
 }
 
 /**
@@ -68,6 +73,7 @@ export function createAcpCliHarnessRuntime(
     workspace,
     restartOptions,
     resumeOnRestart,
+    restoreMcpServers,
     ...clientOptions
   } = options ?? {};
 
@@ -90,7 +96,13 @@ export function createAcpCliHarnessRuntime(
   return wrapAgentPortWithLifecycle(streamed, {
     persistence:
       sessionPersistence && providerId
-        ? { store: sessionPersistence, providerId, workspace, resumeOnRestart }
+        ? {
+            store: sessionPersistence,
+            providerId,
+            workspace,
+            resumeOnRestart,
+            mcpServers: restoreMcpServers,
+          }
         : undefined,
     restartOptions,
   });

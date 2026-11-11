@@ -6,7 +6,6 @@
 import { z } from "zod";
 
 export const MODEL_IDS = {
-  CLAUDE_3_HAIKU: "claude-3-haiku",
   CLAUDE_FABLE_5: "claude-fable-5",
   CLAUDE_FABLE_5_1: "claude-fable-5-1",
   CLAUDE_FABLE_5_2: "claude-fable-5-2",
@@ -16,14 +15,12 @@ export const MODEL_IDS = {
   CLAUDE_MYTHOS_5_1: "claude-mythos-5-1",
   CLAUDE_MYTHOS_5_2: "claude-mythos-5-2",
   CLAUDE_MYTHOS_PREVIEW: "claude-mythos-preview",
-  CLAUDE_OPUS_4: "claude-opus-4",
   CLAUDE_OPUS_4_5_20251101: "claude-opus-4-5-20251101",
   CLAUDE_OPUS_4_6: "claude-opus-4-6",
   CLAUDE_OPUS_4_7: "claude-opus-4-7",
   CLAUDE_OPUS_4_8: "claude-opus-4-8",
   CLAUDE_OPUS_5: "claude-opus-5",
   CLAUDE_OPUS_5_5: "claude-opus-5-5",
-  CLAUDE_SONNET_4: "claude-sonnet-4",
   CLAUDE_SONNET_4_5_20250929: "claude-sonnet-4-5-20250929",
   CLAUDE_SONNET_4_6: "claude-sonnet-4-6",
   CLAUDE_SONNET_5: "claude-sonnet-5",
@@ -31,7 +28,6 @@ export const MODEL_IDS = {
 } as const;
 
 export const ModelIdSchema = z.enum([
-  "claude-3-haiku",
   "claude-fable-5",
   "claude-fable-5-1",
   "claude-fable-5-2",
@@ -41,14 +37,12 @@ export const ModelIdSchema = z.enum([
   "claude-mythos-5-1",
   "claude-mythos-5-2",
   "claude-mythos-preview",
-  "claude-opus-4",
   "claude-opus-4-5-20251101",
   "claude-opus-4-6",
   "claude-opus-4-7",
   "claude-opus-4-8",
   "claude-opus-5",
   "claude-opus-5-5",
-  "claude-sonnet-4",
   "claude-sonnet-4-5-20250929",
   "claude-sonnet-4-6",
   "claude-sonnet-5",

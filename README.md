@@ -68,7 +68,7 @@ console.log(result.stopReason);
 await client.port.disconnect();
 ```
 
-Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes, except `model`, which Cursor receives as `--model` and must be a Cursor model name. `factory.listProviders()` returns all of them.
+Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes, except `model`, which Cursor receives as `--model` and must be a Cursor model name (`cursor-agent --list-models` lists them, for example `composer-2.5`). `factory.listProviders()` returns all of them.
 
 Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cursor-acp.ts`, `stream-prompt.ts`. Run `npm run build` first.
 
@@ -143,7 +143,7 @@ The final chunk carries a `finish_reason` translated from the agent's stop reaso
 
 Ports wrapped by the shared ACP runtime expose `restart()`, `open()`, and `close()`. `restart()` restarts the process with an awaited, capped exponential backoff and re-initializes.
 
-A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session; this needs `sessionPersistence`, and without it the outcome is `{ session: "none" }` and the caller creates a session. It tries `session/resume` when the agent advertises it, then `session/load` when advertised (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two reject `restart()` and the stored session is kept. To record the session, pass a persistence store:
+A persistence store records the session id and cwd. After restarting the process, `restart()` restores that session; this needs `sessionPersistence`, and without it the outcome is `{ session: "none" }` and the caller creates a session. It tries `session/resume` when the agent advertises it, then `session/load` when advertised (the agent replays the history; the supervisor drops those updates instead of emitting them again), then a new session. [`docs/capabilities.md`](./docs/capabilities.md) lists which agent advertises which. It returns a `RestartOutcome`: `session` is `"resumed"`, `"loaded"`, `"new"` or `"none"` (nothing persisted), and `sessionId` is the session to use from now on. `"new"` means the agent could not restore the session, so the conversation context is gone, and `previousSessionId` is the stored session it could not restore. Agents report an unknown session with different errors (Codex and Antigravity with a generic internal error), so a transient failure during restore can also end in `"new"`; `previousSessionId` is the id to retry with `loadSession`. In a fresh process, pass `restoreMcpServers` so the restore call attaches your MCP servers until a `newSession` supplies its own. An agent error other than `AUTH_REQUIRED` or `REQUEST_CANCELLED` moves on to the next method; those two reject `restart()` and the stored session is kept. To record the session, pass a persistence store:
 
 ```ts
 import {

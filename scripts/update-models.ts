@@ -18,7 +18,12 @@ import { ModelIdSchema as ANTHROPIC_SCHEMA } from "../src/domain/models/anthropi
 import { ModelIdSchema as GEMINI_SCHEMA } from "../src/domain/models/gemini.models";
 import { ModelIdSchema as OPENAI_SCHEMA } from "../src/domain/models/openai.models";
 import { ModelIdSchema as XAI_SCHEMA } from "../src/domain/models/xai.models";
-import { extractModelIds, renderModelModule, selectModelIds } from "./model.constants";
+import {
+  extractModelIds,
+  extractRetiredModelIds,
+  renderModelModule,
+  selectModelIds,
+} from "./model.constants";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -34,12 +39,19 @@ const EXISTING: Record<string, readonly string[]> = {
   xai: XAI_SCHEMA.options,
 };
 
-function writeModelConstants(provider: string, modelIds: string[], headerComment: string): void {
+function writeModelConstants(
+  provider: string,
+  modelIds: string[],
+  headerComment: string,
+  retired: readonly string[] = []
+): void {
   // Anthropic ids never contain "."; those are router spellings (claude-opus-4.8 for claude-opus-4-8).
   const valid = (id: string) => provider !== "anthropic" || !id.includes(".");
-  const sorted = selectModelIds((EXISTING[provider] ?? []).filter(valid), modelIds.filter(valid), {
+  const merged = selectModelIds((EXISTING[provider] ?? []).filter(valid), modelIds.filter(valid), {
     prune: PRUNE,
   });
+  // The refresh is additive, so ids the vendor has since retired are removed explicitly.
+  const sorted = merged.filter((id) => !retired.includes(id));
   const content = renderModelModule(headerComment, sorted);
 
   const outPath = join(MODELS_DIR, `${provider}.models.ts`);
@@ -171,7 +183,7 @@ const PAGES: Record<string, string> = {
 };
 
 /** Public documentation page, used when the vendor's API key is not set. */
-async function fetchPage(provider: string): Promise<string[]> {
+async function fetchPage(provider: string): Promise<{ ids: string[]; retired: string[] }> {
   const url = PAGES[provider] as string;
   try {
     const res = await fetch(url, {
@@ -180,12 +192,16 @@ async function fetchPage(provider: string): Promise<string[]> {
     });
     if (!res.ok) {
       console.warn(`${provider} models page fetch failed:`, res.status);
-      return [];
+      return { ids: [], retired: [] };
     }
-    return extractModelIds(provider, await res.text());
+    const text = await res.text();
+    return {
+      ids: extractModelIds(provider, text),
+      retired: extractRetiredModelIds(provider, text),
+    };
   } catch (err) {
     console.warn(`${provider} models page fetch error:`, err);
-    return [];
+    return { ids: [], retired: [] };
   }
 }
 
@@ -203,13 +219,19 @@ async function main(): Promise<void> {
 
   for (const [i, provider] of (["anthropic", "openai", "gemini", "xai"] as const).entries()) {
     const fromApi = apiLists[i] as string[];
-    const ids = fromApi.length ? fromApi : await fetchPage(provider);
+    const page = fromApi.length ? undefined : await fetchPage(provider);
+    const ids = page?.ids ?? fromApi;
     if (!ids.length) {
       console.warn(`No ${provider} model ids found, leaving its file untouched`);
       continue;
     }
     const source = fromApi.length ? "provider API" : "vendor documentation page";
-    writeModelConstants(provider, ids, `${headers[provider]} — ${source}. Run script to refresh.`);
+    writeModelConstants(
+      provider,
+      ids,
+      `${headers[provider]} — ${source}. Run script to refresh.`,
+      page?.retired
+    );
   }
 
   console.log("Done.");

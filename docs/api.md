@@ -92,7 +92,8 @@ The runtime types and classes above are re-exported here; the application conven
 |--------|------|---------|
 | `StreamAgentPort` / `wrapAgentPortWithStream` | class/fn | Adds `streamPrompt` to a port |
 | `WrapAgentPortOptions` | type | Envelope mode and model label for the stream decorator |
-| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, then restores the persisted session with `session/resume`, else `session/load` (replay dropped), else a new session, and returns a `RestartOutcome` |
+| `AcpSharedRuntimeOptions.restoreMcpServers` / `LifecycleSessionPersistence.mcpServers` | option | MCP servers the restore call in `restart()` attaches until a `newSession` through the port supplies its own (they are never persisted) |
+| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, then restores the persisted session with `session/resume`, else `session/load` (replay dropped), else a new session, and returns a `RestartOutcome` (`previousSessionId` names the stored session when the result is `"new"`) |
 | `LifecycleSupervisorOptions` / `LifecycleSessionPersistence` | type | Lifecycle tuning; persistence is grouped under `persistence` |
 
 ### Connections
