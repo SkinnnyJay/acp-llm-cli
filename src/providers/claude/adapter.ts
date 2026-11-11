@@ -5,7 +5,7 @@ import { createCliHarnessAdapter } from "../../runtime/create.cli.harness.adapte
 import type { AcpSharedRuntimeOptions } from "../acp.shared";
 import { createStandardAcpRuntime } from "../acp.shared";
 import { claudeCliSpec } from "./cli.definition";
-import { CLAUDE_CONFIG_KEYS } from "./constants";
+import { CLAUDE_CONFIG_KEYS, CLAUDE_GENERIC_FLAG_MAP } from "./constants";
 import type { ClaudeConfig } from "./schema";
 import { claudeConfigSchema } from "./schema";
 
@@ -27,7 +27,8 @@ const createRuntime = (
     {
       ...runtimeOptions,
       providerId: runtimeOptions?.providerId ?? PROVIDER_IDS.CLAUDE_CLI_ID,
-    }
+    },
+    CLAUDE_GENERIC_FLAG_MAP
   );
 
 export const claudeAdapter = createCliHarnessAdapter<ClaudeConfig>({

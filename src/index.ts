@@ -18,7 +18,6 @@ export type {
 export {
   buildGenericArgs,
   extractHelp,
-  GENERIC_OPTION_DEFAULTS,
   GENERIC_OPTION_KEY,
   genericLlmCliOptionsSchema,
   HELP_FLAG,
@@ -28,27 +27,37 @@ export { DEFAULT_COMMANDS } from "./domain/default.commands";
 export { ENV_KEY } from "./domain/env.keys";
 export type { EnvelopeMode } from "./domain/envelope.mode";
 export { ENVELOPE_MODE } from "./domain/envelope.mode";
+export type { AcpErrorCode, AcpErrorSubsystem } from "./domain/errors";
+export {
+  ACP_ERROR_CODE,
+  ACP_ERROR_SUBSYSTEM,
+  AcpCliError,
+  AgentProcessError,
+  AgentProtocolError,
+  ConfigError,
+  ConnectionError,
+  InvalidStateError,
+  TimeoutError,
+  ToolHostError,
+  UnsupportedCapabilityError,
+} from "./domain/errors";
 export type { ModelId as AnthropicModelId } from "./domain/models/anthropic.models";
 export {
-  MODEL_ID_LIST as ANTHROPIC_MODEL_ID_LIST,
   MODEL_IDS as ANTHROPIC_MODEL_IDS,
   ModelIdSchema as AnthropicModelIdSchema,
 } from "./domain/models/anthropic.models";
 export type { ModelId as GeminiModelId } from "./domain/models/gemini.models";
 export {
-  MODEL_ID_LIST as GEMINI_MODEL_ID_LIST,
   MODEL_IDS as GEMINI_MODEL_IDS,
   ModelIdSchema as GeminiModelIdSchema,
 } from "./domain/models/gemini.models";
 export type { ModelId as OpenAIModelId } from "./domain/models/openai.models";
 export {
-  MODEL_ID_LIST as OPENAI_MODEL_ID_LIST,
   MODEL_IDS as OPENAI_MODEL_IDS,
   ModelIdSchema as OpenAIModelIdSchema,
 } from "./domain/models/openai.models";
 export type { ModelId as XAIModelId } from "./domain/models/xai.models";
 export {
-  MODEL_ID_LIST as XAI_MODEL_ID_LIST,
   MODEL_IDS as XAI_MODEL_IDS,
   ModelIdSchema as XAIModelIdSchema,
 } from "./domain/models/xai.models";
@@ -56,8 +65,11 @@ export type { OpenAIFinishReason } from "./domain/openai.compat";
 export { OPENAI_FINISH_REASON } from "./domain/openai.compat";
 export type { PortCapabilityName } from "./domain/port.capabilities";
 export { PORT_CAPABILITY } from "./domain/port.capabilities";
+export type { ProcessEnv } from "./domain/process.env";
 export { PROVIDER_VALUES, Provider, ProviderSchema } from "./domain/provider";
 export { PROVIDER_IDS } from "./domain/provider.ids";
+export type { ProviderSetup } from "./domain/provider.setup";
+export { PROVIDER_SETUP } from "./domain/provider.setup";
 export type { ISessionPersistence, PersistedSession } from "./domain/session.persistence";
 export type {
   NativeEnvelope,
@@ -76,6 +88,8 @@ export {
 export type {
   AgentPortCapabilities,
   IAgentPort,
+  RestartOutcome,
+  RestartSessionOutcome,
   StreamPromptOptions,
 } from "./runtime/agent.port";
 export type {

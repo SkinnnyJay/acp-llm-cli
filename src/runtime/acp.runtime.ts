@@ -1,5 +1,8 @@
+import { appendGenericArgs } from "../cli/arg.builder";
+import type { GenericFlagMap, GenericLlmCliOptions } from "../cli/generic.options";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { ACP_ERROR_CODE, InvalidStateError } from "../domain/errors";
 import type { ISessionPersistence } from "../domain/session.persistence";
 import { wrapAgentPortWithStream } from "./acp.agent.port.stream";
 import type { ACPClientOptions } from "./acp.client";
@@ -13,25 +16,37 @@ import type { LifecycleSupervisorOptions } from "./lifecycle.supervisor";
 import { wrapAgentPortWithLifecycle } from "./lifecycle.supervisor";
 import { StdioConnectionFactory } from "./stdio.connection.factory";
 
-/** Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning. */
-export interface AcpSharedRuntimeOptions extends ACPClientOptions {
+/**
+ * Options for the shared ACP runtime: client options plus optional stream/lifecycle tuning.
+ * `command` is omitted: the runtime always names `config.command` on errors.
+ */
+export interface AcpSharedRuntimeOptions extends Omit<ACPClientOptions, "command"> {
   /** Envelope mode for streamPrompt: openai, native, or both. Default: both. */
   envelopeMode?: EnvelopeMode;
   /** Model id used in OpenAI-style stream envelopes. */
   modelId?: string;
-  /** Optional session persistence. When provided, enables save/restore on restart. */
+  /** Optional session persistence. When provided, the store records the session id and cwd, and `restart()` restores that session. */
   sessionPersistence?: ISessionPersistence;
   /**
-   * Provider id for the persistence key.
-   * Required when sessionPersistence is provided.
+   * Provider id: the persistence key, and the provider named on errors (it selects the install
+   * and login hints from PROVIDER_SETUP). Required when sessionPersistence is provided.
    */
   providerId?: string;
   /** Workspace for persistence key. */
   workspace?: string;
   /** Restart backoff options for lifecycle supervisor. */
   restartOptions?: LifecycleSupervisorOptions["restartOptions"];
-  /** If true, resume session after restart using persisted sessionId. Default: true when sessionPersistence is set. */
+  /**
+   * Default: true when sessionPersistence is set. After restart the persisted session is resumed
+   * (`session/resume`), else loaded (`session/load`, its history replay dropped), else replaced by
+   * a new session; `restart()` returns which.
+   */
   resumeOnRestart?: boolean;
+  /**
+   * MCP servers to attach when restoring a session after `restart()`. Used until a `newSession`
+   * call through the port supplies its own.
+   */
+  restoreMcpServers?: NonNullable<LifecycleSupervisorOptions["persistence"]>["mcpServers"];
 }
 
 /**
@@ -58,14 +73,22 @@ export function createAcpCliHarnessRuntime(
     workspace,
     restartOptions,
     resumeOnRestart,
+    restoreMcpServers,
     ...clientOptions
   } = options ?? {};
 
   if (sessionPersistence && !providerId) {
-    throw new Error(ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED);
+    throw new InvalidStateError(
+      ACP_ERROR_CODE.PERSISTENCE_MISCONFIGURED,
+      ERROR_MESSAGE.SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED
+    );
   }
 
-  const port = createAcpAgentPort(connection, clientOptions);
+  const port = createAcpAgentPort(connection, {
+    ...clientOptions,
+    providerId,
+    command: config.command,
+  });
   const streamed = wrapAgentPortWithStream(port, { envelopeMode, modelId });
   // Always wrap with lifecycle for restart/open/close; persistence remains optional.
   // Narrowing both in one expression is what lets providerId stay a plain string inside the
@@ -73,7 +96,13 @@ export function createAcpCliHarnessRuntime(
   return wrapAgentPortWithLifecycle(streamed, {
     persistence:
       sessionPersistence && providerId
-        ? { store: sessionPersistence, providerId, workspace, resumeOnRestart }
+        ? {
+            store: sessionPersistence,
+            providerId,
+            workspace,
+            resumeOnRestart,
+            mcpServers: restoreMcpServers,
+          }
         : undefined,
     restartOptions,
   });
@@ -88,17 +117,22 @@ export function createStandardAcpRuntime<TConfig extends BaseCliConfig>(
   defaults: Parameters<typeof resolveBaseConfig>[0],
   configKeys: Parameters<typeof resolveBaseConfig>[1],
   schema: ConfigSchema<TConfig>,
-  runtimeOptions?: AcpSharedRuntimeOptions
+  runtimeOptions?: AcpSharedRuntimeOptions,
+  flagMap: GenericFlagMap = {}
 ): IAgentPort {
   // resolveBaseConfig now returns the caller's config with the resolved base applied over it,
   // so the precedence rule lives in that function rather than in a spread here.
   const parsed = schema.parse(resolveBaseConfig(defaults, configKeys, config));
-  // ACP providers select their model over the protocol (setSessionConfigOption) or via `args`, which is
-  // passed to the process verbatim - this package never invents CLI flags for a third-party
-  // binary. A configured `model` is still meaningful as the default label on OpenAI-style stream
-  // envelopes, so it is threaded through rather than left inert.
+  // The process is spawned with the resolved args plus a flag for each of model, trust, sandbox
+  // and workspace that is set, mapped by the provider's flag map, and not already in the args
+  // (explicit args win). outputFormat and debug are never applied: they could corrupt the ACP stdout.
+  // `model` is also the default label on OpenAI-style stream envelopes.
   const configuredModel = (parsed as { model?: unknown }).model;
-  return createAcpCliHarnessRuntime(parsed, {
+  const spawnConfig = {
+    ...parsed,
+    args: appendGenericArgs(parsed as Partial<GenericLlmCliOptions>, flagMap, parsed.args),
+  };
+  return createAcpCliHarnessRuntime(spawnConfig, {
     ...runtimeOptions,
     ...(runtimeOptions?.modelId === undefined && typeof configuredModel === "string"
       ? { modelId: configuredModel }

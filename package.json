@@ -1,7 +1,7 @@
 {
   "name": "@simpill/acp-llm-cli",
-  "version": "0.4.0",
-  "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Gemini, Cursor)",
+  "version": "0.5.0",
+  "description": "Modular, extensible layer to run ACP-compatible LLM CLIs (Claude, Codex, Antigravity, Cursor)",
   "license": "ISC",
   "author": "SkinnnyJay",
   "type": "module",
@@ -28,7 +28,7 @@
     "cli",
     "claude",
     "codex",
-    "gemini",
+    "antigravity",
     "cursor",
     "anthropic",
     "openai",
@@ -44,6 +44,8 @@
   "homepage": "https://github.com/SkinnnyJay/acp-llm-cli#readme",
   "scripts": {
     "build": "tsup",
+    "refresh:help": "node scripts/refresh-help-fixtures.mjs",
+    "probe": "node scripts/probe-capabilities.mjs",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "typecheck:examples": "tsc -p tsconfig.examples.json",
@@ -62,7 +64,7 @@
     "check:docs": "node scripts/check-docs-snippets.mjs"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.4.0",
+    "@agentclientprotocol/sdk": "^2.5.0",
     "@simpill/async.utils": "^1.1.0",
     "@simpill/env.utils": "^1.1.0",
     "@simpill/logger.utils": "^1.1.0"
@@ -70,19 +72,19 @@
   "sideEffects": false,
   "peerDependencies": {
     "eventemitter3": "^5.0.1",
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.76 || ^4.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.9",
-    "@types/node": "^22.20.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@biomejs/biome": "^2.6.6",
+    "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "eventemitter3": "^5.0.1",
-    "publint": "^0.3.24",
-    "tsup": "^8.3.5",
-    "tsx": "^4.23.12",
+    "publint": "^0.3.25",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11",
-    "zod": "^3.25.0"
+    "vitest": "^5.1.0",
+    "zod": "^3.25.76"
   },
   "files": [
     "dist"

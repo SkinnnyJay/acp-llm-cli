@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { antigravityConfigSchema } from "../src/providers/antigravity/schema";
 import { claudeConfigSchema } from "../src/providers/claude/schema";
 import { codexConfigSchema } from "../src/providers/codex/schema";
-import { geminiConfigSchema } from "../src/providers/gemini/schema";
 
 const base = { command: "x", args: [], env: {} };
 
 const schemas = [
   ["claude", claudeConfigSchema],
   ["codex", codexConfigSchema],
-  ["gemini", geminiConfigSchema],
+  ["antigravity", antigravityConfigSchema],
 ] as const;
 
 describe("ACP provider config schemas: model is a free-form label, not vendor-validated", () => {

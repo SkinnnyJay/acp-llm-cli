@@ -1,13 +1,18 @@
 import type {
+  AgentCapabilities,
   AuthenticateRequest,
   AuthenticateResponse,
   InitializeRequest,
   InitializeResponse,
+  LoadSessionRequest,
+  LoadSessionResponse,
   NewSessionRequest,
   NewSessionResponse,
   PromptRequest,
   PromptResponse,
   RequestPermissionRequest,
+  ResumeSessionRequest,
+  ResumeSessionResponse,
   SessionNotification,
   SetSessionConfigOptionRequest,
   SetSessionConfigOptionResponse,
@@ -38,10 +43,29 @@ export interface StreamPromptOptions {
   envelopeMode?: EnvelopeMode;
 }
 
+/** How `restart()` re-established the session. */
+export type RestartSessionOutcome = "resumed" | "loaded" | "new" | "none";
+
+export interface RestartOutcome {
+  session: RestartSessionOutcome;
+  /** The session to use from now on. Absent when `session` is "none". */
+  sessionId?: string;
+  /**
+   * Set only when `session` is `"new"`: the stored session the agent could not restore. Its
+   * history may still exist on the agent; `loadSession` can be tried again later.
+   */
+  previousSessionId?: string;
+}
+
 export interface IAgentPort extends EventEmitter<AgentPortEvents> {
   readonly connectionStatus: ConnectionStatus;
   /** Optional: feature flags for streamPrompt, restart, open/close, session persistence. */
   readonly capabilities?: AgentPortCapabilities;
+  /**
+   * `agentCapabilities` from the most recent successful `initialize`; cleared when a new link is
+   * attached.
+   */
+  readonly agentCapabilities?: AgentCapabilities;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   initialize(params?: Partial<InitializeRequest>): Promise<InitializeResponse>;
@@ -53,13 +77,24 @@ export interface IAgentPort extends EventEmitter<AgentPortEvents> {
   setSessionConfigOption?(
     params: SetSessionConfigOptionRequest
   ): Promise<SetSessionConfigOptionResponse>;
+  /** Optional: `session/resume`, reattaching to a session without replaying its history. */
+  resumeSession?(params: ResumeSessionRequest): Promise<ResumeSessionResponse>;
+  /**
+   * Optional: `session/load`. The agent replays the session's whole history as `session/update`
+   * notifications before it responds, and this port emits each one as a `sessionUpdate` event;
+   * the replay is not hidden.
+   */
+  loadSession?(params: LoadSessionRequest): Promise<LoadSessionResponse>;
   /** Optional: stream prompt with dual envelope output (OpenAI + native). */
   streamPrompt?(
     params: PromptRequest,
     options?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope>;
-  /** Optional: restart connection (disconnect + connect + reinitialize). */
-  restart?(): Promise<void>;
+  /**
+   * Optional: restart connection (disconnect + connect + reinitialize), then restore the
+   * persisted session; the outcome says how.
+   */
+  restart?(): Promise<RestartOutcome>;
   /** Optional: alias for connect(). */
   open?(): Promise<void>;
   /** Optional: alias for disconnect(). */

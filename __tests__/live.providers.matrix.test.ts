@@ -1,14 +1,14 @@
 /**
- * Live provider matrix — Claude / Codex / Gemini / Cursor against real CLIs.
+ * Live provider matrix — Claude / Codex / Antigravity / Cursor against real CLIs.
  *
  * Skip by default. Enable:
  *   ACP_LLM_CLI_LIVE=1 npm test -- __tests__/live.providers.matrix.test.ts
- * Optional filter: ACP_LLM_CLI_PROVIDER=claude|codex|gemini|cursor
+ * Optional filter: ACP_LLM_CLI_PROVIDER=claude|codex|antigravity|cursor
  *
  * When LIVE=1, asserts connect → initialize → newSession → short prompt → disconnect.
  * Missing binaries fail the test (no soft-pass).
  *
- * Cursor in this package uses print/stream-json (not ACP). Others use ACP stdio.
+ * All four providers use ACP stdio (Cursor via `cursor-agent acp`).
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COMMANDS } from "../src/domain/default.commands.js";
@@ -24,7 +24,7 @@ type Case = {
   providerId: string;
   command: string;
   args: string[];
-  mode: "acp" | "cursor-print";
+  mode: "acp";
 };
 
 const CASES: Case[] = [
@@ -43,10 +43,10 @@ const CASES: Case[] = [
     mode: "acp" as const,
   },
   {
-    id: "gemini",
-    providerId: PROVIDER_IDS.GEMINI_CLI_ID,
-    command: DEFAULT_COMMANDS.GEMINI_DEFAULT_COMMAND,
-    args: [...DEFAULT_COMMANDS.GEMINI_DEFAULT_ARGS],
+    id: "antigravity",
+    providerId: PROVIDER_IDS.ANTIGRAVITY_CLI_ID,
+    command: DEFAULT_COMMANDS.ANTIGRAVITY_DEFAULT_COMMAND,
+    args: [...DEFAULT_COMMANDS.ANTIGRAVITY_DEFAULT_ARGS],
     mode: "acp" as const,
   },
   {
@@ -54,7 +54,7 @@ const CASES: Case[] = [
     providerId: PROVIDER_IDS.CURSOR_CLI_ID,
     command: DEFAULT_COMMANDS.CURSOR_DEFAULT_COMMAND,
     args: [...DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS],
-    mode: "cursor-print" as const,
+    mode: "acp" as const,
   },
 ].filter((c) => !FILTER || FILTER === c.id);
 
@@ -62,7 +62,7 @@ const CASES: Case[] = [
 // contacted no CLI at all.
 if (LIVE && CASES.length === 0) {
   throw new Error(
-    `${ENV_KEY.ACP_LLM_CLI_PROVIDER}="${FILTER}" matched no provider; expected one of: claude, codex, gemini, cursor`
+    `${ENV_KEY.ACP_LLM_CLI_PROVIDER}="${FILTER}" matched no provider; expected one of: claude, codex, antigravity, cursor`
   );
 }
 

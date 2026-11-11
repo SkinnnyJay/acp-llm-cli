@@ -5,31 +5,13 @@ import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
 import { PERMISSION_OUTCOME } from "../src/domain/permission.outcome";
 import { createFakeAcpConnection } from "./helpers/fake.acp.connection";
+import { createFakeAcpSdk } from "./helpers/fake.acp.sdk";
 
-const mockInitialize = vi.fn();
-const mockNewSession = vi.fn();
-const mockPrompt = vi.fn();
-const mockAuthenticate = vi.fn();
-const mockSetSessionMode = vi.fn();
-const mockSetSessionConfigOption = vi.fn();
-const mockConstructed = vi.fn();
+const sdk = createFakeAcpSdk();
 
 vi.mock("@agentclientprotocol/sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentclientprotocol/sdk")>();
-  return {
-    ...actual,
-    ClientSideConnection: class {
-      constructor() {
-        mockConstructed();
-      }
-      initialize = mockInitialize;
-      newSession = mockNewSession;
-      prompt = mockPrompt;
-      authenticate = mockAuthenticate;
-      setSessionMode = mockSetSessionMode;
-      setSessionConfigOption = mockSetSessionConfigOption;
-    },
-  };
+  return { ...actual, client: sdk.client };
 });
 
 const { createAcpAgentPort } = await import("../src/runtime/acp.client");
@@ -43,16 +25,13 @@ type PortWithPermission = Awaited<ReturnType<typeof createAcpAgentPort>> & {
 
 describe("createAcpAgentPort contract", () => {
   beforeEach(() => {
-    mockInitialize.mockReset().mockResolvedValue({
-      protocolVersion: 1,
-      agentCapabilities: {},
-    });
-    mockNewSession.mockReset().mockResolvedValue({ sessionId: "sess-contract-1" });
-    mockPrompt.mockReset().mockResolvedValue({ stopReason: "end_turn" });
-    mockAuthenticate.mockReset().mockResolvedValue({});
-    mockSetSessionMode.mockReset().mockResolvedValue({});
-    mockSetSessionConfigOption.mockReset().mockResolvedValue({ configOptions: [] });
-    mockConstructed.mockReset();
+    sdk.reset();
+    sdk.responses.set("initialize", { protocolVersion: 1, agentCapabilities: {} });
+    sdk.responses.set("session/new", { sessionId: "sess-contract-1" });
+    sdk.responses.set("session/prompt", { stopReason: "end_turn" });
+    sdk.responses.set("authenticate", {});
+    sdk.responses.set("session/set_mode", {});
+    sdk.responses.set("session/set_config_option", { configOptions: [] });
   });
 
   it("connect → initialize → newSession → prompt happy path", async () => {
@@ -64,18 +43,18 @@ describe("createAcpAgentPort contract", () => {
     expect(connection.getStream).toHaveBeenCalled();
 
     const init = await port.initialize();
-    expect(mockInitialize).toHaveBeenCalled();
+    expect(sdk.request).toHaveBeenCalledWith("initialize", expect.anything());
     expect(init.protocolVersion).toBe(1);
 
     const session = await port.newSession({ cwd: "/tmp", mcpServers: [] });
-    expect(mockNewSession).toHaveBeenCalled();
+    expect(sdk.request).toHaveBeenCalledWith("session/new", expect.anything());
     expect(session.sessionId).toBe("sess-contract-1");
 
     const promptRes = await port.prompt({
       sessionId: "sess-contract-1",
       prompt: [{ type: "text", text: "hi" }],
     });
-    expect(mockPrompt).toHaveBeenCalled();
+    expect(sdk.request).toHaveBeenCalledWith("session/prompt", expect.anything());
     expect(promptRes.stopReason).toBe("end_turn");
 
     await port.disconnect();
@@ -86,6 +65,10 @@ describe("createAcpAgentPort contract", () => {
     const connection = createMockConnection(null);
     const port = createAcpAgentPort(connection);
     await expect(port.connect()).rejects.toThrow(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
+    await expect(port.connect()).rejects.toMatchObject({
+      name: "ConnectionError",
+      code: "STREAM_UNAVAILABLE",
+    });
   });
 
   it("throws when methods called before connect", async () => {
@@ -123,7 +106,7 @@ describe("createAcpAgentPort contract", () => {
     await port.connect();
     await port.connect();
 
-    expect(mockConstructed).toHaveBeenCalledTimes(1);
+    expect(sdk.connect).toHaveBeenCalledTimes(1);
   });
 
   it("stops accepting requests once the transport reports a terminal state", async () => {
@@ -208,10 +191,13 @@ void Writable;
 
 describe("createAcpAgentPort session methods", () => {
   beforeEach(() => {
-    mockInitialize.mockReset().mockResolvedValue({ protocolVersion: 1, agentCapabilities: {} });
-    mockAuthenticate.mockReset().mockResolvedValue({});
-    mockSetSessionMode.mockReset().mockResolvedValue({});
-    mockSetSessionConfigOption.mockReset().mockResolvedValue({ configOptions: [] });
+    sdk.reset();
+    sdk.responses.set("initialize", { protocolVersion: 1, agentCapabilities: {} });
+    sdk.responses.set("session/new", { sessionId: "sess-contract-1" });
+    sdk.responses.set("session/prompt", { stopReason: "end_turn" });
+    sdk.responses.set("authenticate", {});
+    sdk.responses.set("session/set_mode", {});
+    sdk.responses.set("session/set_config_option", { configOptions: [] });
   });
 
   const connected = async () => {
@@ -224,15 +210,15 @@ describe("createAcpAgentPort session methods", () => {
     const port = await connected();
     const params = { methodId: "api-key" };
     await port.authenticate(params);
-    expect(mockAuthenticate).toHaveBeenCalledWith(params);
+    expect(sdk.request).toHaveBeenCalledWith("authenticate", params);
   });
 
   it("delegates setSessionMode to the connection", async () => {
     const port = await connected();
     const params = { sessionId: "s1", modeId: "read-only" };
     await port.setSessionMode?.(params);
-    expect(mockSetSessionMode).toHaveBeenCalledWith(params);
-    expect(mockSetSessionConfigOption).not.toHaveBeenCalled();
+    expect(sdk.request).toHaveBeenCalledWith("session/set_mode", params);
+    expect(sdk.request).not.toHaveBeenCalledWith("session/set_config_option", expect.anything());
   });
 
   // ACP 1.x replaced the removed session/set_model with the general
@@ -241,7 +227,7 @@ describe("createAcpAgentPort session methods", () => {
   it("delegates setSessionConfigOption to the connection, not setSessionMode", async () => {
     const port = await connected();
     const params = { sessionId: "s1", configId: "model", value: "claude-sonnet-4.6" };
-    mockSetSessionConfigOption.mockResolvedValue({
+    sdk.responses.set("session/set_config_option", {
       configOptions: [
         {
           id: "model",
@@ -256,8 +242,8 @@ describe("createAcpAgentPort session methods", () => {
 
     const result = await port.setSessionConfigOption?.(params);
 
-    expect(mockSetSessionConfigOption).toHaveBeenCalledWith(params);
-    expect(mockSetSessionMode).not.toHaveBeenCalled();
+    expect(sdk.request).toHaveBeenCalledWith("session/set_config_option", params);
+    expect(sdk.request).not.toHaveBeenCalledWith("session/set_mode", expect.anything());
     expect(result?.configOptions[0]?.currentValue).toBe("claude-sonnet-4.6");
   });
 
@@ -276,6 +262,55 @@ describe("createAcpAgentPort session methods", () => {
     await port.sessionUpdate(update);
 
     expect(seen).toEqual([update]);
+  });
+
+  it("routes an agent-sent session/update notification to the port's sessionUpdate event", async () => {
+    const note = {
+      sessionId: "s1",
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "x" } },
+    };
+    const message = { jsonrpc: "2.0", method: "session/update", params: note };
+    const transportStream = {
+      readable: new ReadableStream({
+        start(controller) {
+          controller.enqueue(message);
+          controller.close();
+        },
+      }),
+      writable: new WritableStream(),
+    };
+    const port = createAcpAgentPort(createMockConnection(transportStream));
+    await port.connect();
+    const seen: unknown[] = [];
+    port.on("sessionUpdate", (u) => seen.push(u));
+
+    // The update is emitted as the SDK reads it from the stream it was given, and passed on.
+    const sdkStream = sdk.connect.mock.calls[0]?.[0] as typeof transportStream;
+    const reader = sdkStream.readable.getReader();
+    const read = await reader.read();
+    await reader.cancel();
+
+    expect(read.value).toBe(message);
+    expect(seen).toEqual([note]);
+  });
+
+  it("answers an agent-sent permission request with cancelled when no handler is set", async () => {
+    const port = createAcpAgentPort(createMockConnection());
+    await port.connect();
+    const result = await sdk.callRequest("session/request_permission", {
+      sessionId: "s1",
+      toolCall: { toolCallId: "t1" },
+      options: [],
+    });
+    expect(result).toEqual({ outcome: { outcome: PERMISSION_OUTCOME.CANCELLED } });
+  });
+
+  it("closes the SDK connection when the transport reports a terminal state", async () => {
+    const connection = createMockConnection();
+    const port = createAcpAgentPort(connection);
+    await port.connect();
+    connection.setStatus(CONNECTION_STATUS.DISCONNECTED);
+    expect(sdk.close).toHaveBeenCalledTimes(1);
   });
 
   it("rejects session methods before connect", async () => {
@@ -305,7 +340,8 @@ describe("ACPClient capability advertisement", () => {
     await port.connect();
     await port.initialize();
 
-    expect(mockInitialize).toHaveBeenCalledWith(
+    expect(sdk.request).toHaveBeenCalledWith(
+      "initialize",
       expect.objectContaining({
         clientCapabilities: {
           fs: { readTextFile: true, writeTextFile: true },
@@ -321,7 +357,8 @@ describe("ACPClient capability advertisement", () => {
     await port.connect();
     await port.initialize();
 
-    expect(mockInitialize).toHaveBeenCalledWith(
+    expect(sdk.request).toHaveBeenCalledWith(
+      "initialize",
       expect.objectContaining({ clientCapabilities: {} })
     );
   });
@@ -338,7 +375,8 @@ describe("ACPClient capability advertisement", () => {
     await port.connect();
     await port.initialize();
 
-    expect(mockInitialize).toHaveBeenCalledWith(
+    expect(sdk.request).toHaveBeenCalledWith(
+      "initialize",
       expect.objectContaining({ clientCapabilities: explicit })
     );
   });

@@ -9,6 +9,7 @@ import type { ConnectionStatus } from "../domain/connection.status";
 import type { EnvelopeMode } from "../domain/envelope.mode";
 import { ENVELOPE_MODE } from "../domain/envelope.mode";
 import { ERROR_MESSAGE } from "../domain/error.messages";
+import { ACP_ERROR_CODE, InvalidStateError } from "../domain/errors";
 import { LIMIT } from "../domain/limits";
 import { PORT_CAPABILITY } from "../domain/port.capabilities";
 import { notificationSessionId } from "../domain/session.notification";
@@ -100,12 +101,27 @@ export class StreamAgentPort extends EventEmitter<AgentPortEvents> implements IA
   get setSessionConfigOption() {
     return this.inner.setSessionConfigOption?.bind(this.inner);
   }
+  get resumeSession() {
+    return this.inner.resumeSession?.bind(this.inner);
+  }
+  get loadSession() {
+    return this.inner.loadSession?.bind(this.inner);
+  }
+  get agentCapabilities() {
+    return this.inner.agentCapabilities;
+  }
 
   async *streamPrompt(
     params: PromptRequest,
     streamOptions?: StreamPromptOptions
   ): AsyncIterable<StreamEnvelope> {
-    if (this.activeStream) throw new Error(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    if (this.activeStream) {
+      throw new InvalidStateError(
+        ACP_ERROR_CODE.STREAM_IN_PROGRESS,
+        ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS,
+        { sessionId: params.sessionId }
+      );
+    }
     const streamToken = Symbol("streamPrompt");
     this.activeStream = streamToken;
     const mode = streamOptions?.envelopeMode ?? this.envelopeMode;

@@ -4,22 +4,9 @@
 export const ERROR_MESSAGE = {
   ACP_STREAM_UNAVAILABLE: "ACP stream unavailable",
   ACP_CLIENT_NOT_CONNECTED: "ACP client not connected",
+  ACP_LINK_CLOSED: "ACP connection to the agent closed unexpectedly; call connect() to reconnect",
   FILE_SYSTEM_TOOLS_NOT_CONFIGURED: "File system tools not configured",
   TERMINAL_TOOLS_NOT_CONFIGURED: "Terminal tools not configured",
-  CURSOR_CLI_CHECK_FAILED: "Cursor CLI check failed",
-  CURSOR_COMMAND_ABORTED: "Cursor CLI command aborted",
-  CURSOR_DISCONNECT_IN_PROGRESS: "Disconnection in progress; request rejected.",
-  CURSOR_COMMAND_TIMEOUT: (timeoutMs: number) =>
-    `Cursor CLI command timed out after ${timeoutMs}ms`,
-  CURSOR_RESULT_MISSING: "Cursor CLI returned no result line in output",
-  /**
-   * Same failure, with whatever the CLI actually said. cursor-agent exits 0 while
-   * printing errors like "Authentication required" to stdout, so the bare message
-   * above told a caller only that parsing failed, discarding the one line that
-   * explains why.
-   */
-  CURSOR_RESULT_MISSING_WITH_OUTPUT: (output: string) =>
-    `Cursor CLI returned no result line in output. CLI said: ${output}`,
   STREAM_PROMPT_NOT_SUPPORTED: "streamPrompt is not supported by the inner agent port",
   SESSION_PERSISTENCE_PROVIDER_ID_REQUIRED:
     "providerId is required when sessionPersistence is provided",
@@ -29,4 +16,13 @@ export const ERROR_MESSAGE = {
   STREAM_PROMPT_IN_PROGRESS: "Another streamPrompt is already in progress on this port",
   AGENT_PROCESS_EXITED: (code: number | string, suffix: string, details: string) =>
     `Agent process exited with code ${code}${suffix}${details}`,
+  CLI_NOT_FOUND: (command: string) =>
+    `Agent CLI not found: "${command}" is not installed or not on PATH`,
+  WORKING_DIRECTORY_NOT_FOUND: (cwd: string) =>
+    `Could not start the agent: working directory "${cwd}" does not exist`,
+  /** One trailing period is dropped from `message` so it never ends up as "..". */
+  WITH_HINT: (message: string, hint: string) =>
+    `${message.endsWith(".") ? message.slice(0, -1) : message}. ${hint}`,
+  HINT_INSTALL: (install: string) => `Install it with: ${install}`,
+  HINT_LOGIN: (login: string) => `Sign in with: ${login}`,
 } as const;

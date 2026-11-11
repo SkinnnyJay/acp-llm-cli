@@ -19,6 +19,8 @@ export type {
   AgentPortCapabilities,
   AgentPortEvents,
   IAgentPort,
+  RestartOutcome,
+  RestartSessionOutcome,
   StreamPromptOptions,
 } from "./agent.port";
 export type {
@@ -33,7 +35,7 @@ export { baseCliConfigSchema } from "./config";
 export { resolveBaseConfig } from "./config.resolve";
 export type { IConnectionFactory } from "./connection.factory.interface";
 // Connection abstractions (for consumers building custom connections)
-export type { IConnection } from "./connection.interface";
+export type { ConnectionEvents, IConnection } from "./connection.interface";
 export type { CreateCliHarnessAdapterParams } from "./create.cli.harness.adapter";
 // Adapter creation
 export { createCliHarnessAdapter } from "./create.cli.harness.adapter";
@@ -70,3 +72,4 @@ export type { SpawnFunction } from "./stdio.connection";
 export { StdioConnection } from "./stdio.connection";
 export { StdioConnectionFactory } from "./stdio.connection.factory";
 export type { IToolHost } from "./tool.host.interface";
+export type { SpawnOptions } from "./types";

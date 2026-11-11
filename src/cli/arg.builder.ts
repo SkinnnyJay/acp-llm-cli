@@ -20,14 +20,6 @@ export function buildGenericArgs(
     const flag = flagMap[GENERIC_OPTION_KEY.OUTPUT_FORMAT];
     if (flag) out.push(flag, options.outputFormat);
   }
-  if (options.inputFormat !== undefined) {
-    const flag = flagMap[GENERIC_OPTION_KEY.INPUT_FORMAT];
-    if (flag) out.push(flag, options.inputFormat);
-  }
-  if (options.stream === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.STREAM];
-    if (flag) out.push(flag);
-  }
   if (options.trust === true) {
     const flag = flagMap[GENERIC_OPTION_KEY.TRUST];
     if (flag) out.push(flag);
@@ -40,28 +32,40 @@ export function buildGenericArgs(
     const flag = flagMap[GENERIC_OPTION_KEY.WORKSPACE];
     if (flag) out.push(flag, options.workspace);
   }
-  if (options.resume !== undefined && options.resume !== "") {
-    const flag = flagMap[GENERIC_OPTION_KEY.RESUME];
-    if (flag) out.push(flag, options.resume);
-  }
-  if (options.sessionId !== undefined && options.sessionId !== "") {
-    const flag = flagMap[GENERIC_OPTION_KEY.SESSION_ID];
-    if (flag) out.push(flag, options.sessionId);
-  }
-  if (options.verbose === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.VERBOSE];
-    if (flag) out.push(flag);
-  }
   if (options.debug === true) {
     const flag = flagMap[GENERIC_OPTION_KEY.DEBUG];
     if (flag) out.push(flag);
   }
-  if (options.print === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.PRINT];
-    if (flag) out.push(flag);
-  }
 
   return out;
+}
+
+/** The generic options that take effect on the spawned process. Others are never applied there. */
+const SPAWN_OPTION_KEYS = [
+  GENERIC_OPTION_KEY.MODEL,
+  GENERIC_OPTION_KEY.TRUST,
+  GENERIC_OPTION_KEY.SANDBOX,
+  GENERIC_OPTION_KEY.WORKSPACE,
+] as const;
+
+const hasFlag = (args: readonly string[], flag: string): boolean =>
+  args.some((arg) => arg === flag || arg.startsWith(`${flag}=`));
+
+/**
+ * Args to spawn with: `args`, then a flag for each of model, trust, sandbox and workspace that is
+ * set, mapped by `flagMap`, and not already in `args` (as `--flag` or `--flag=value`).
+ */
+export function appendGenericArgs(
+  options: Partial<GenericLlmCliOptions>,
+  flagMap: GenericFlagMap,
+  args: string[]
+): string[] {
+  const spawnMap: GenericFlagMap = {};
+  for (const key of SPAWN_OPTION_KEYS) {
+    const flag = flagMap[key];
+    if (flag && !hasFlag(args, flag)) spawnMap[key] = flag;
+  }
+  return buildGenericArgs(options, spawnMap, args);
 }
 
 /**

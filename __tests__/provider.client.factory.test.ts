@@ -32,13 +32,13 @@ describe("ProviderClientFactory", () => {
     expect(typeof client.port.prompt).toBe("function");
   });
 
-  it("getClient(Provider.GEMINI, config) returns client with gemini port", () => {
+  it("getClient(Provider.ANTIGRAVITY, config) returns client with antigravity port", () => {
     const factory = getDefaultProviderClientFactory();
-    const client = factory.getClient(Provider.GEMINI, {
-      command: "gemini",
-      args: ["--experimental-acp"],
+    const client = factory.getClient(Provider.ANTIGRAVITY, {
+      command: "agy",
+      args: ["acp"],
     });
-    expect(client.provider).toBe(Provider.GEMINI);
+    expect(client.provider).toBe(Provider.ANTIGRAVITY);
     expect(client.port).toBeDefined();
   });
 
@@ -57,6 +57,9 @@ describe("ProviderClientFactory", () => {
         args: [],
       })
     ).toThrow(/Unknown provider id/);
+    expect(() =>
+      factory.getClient("not-a-provider" as (typeof PROVIDER_VALUES)[number], { command: "cmd" })
+    ).toThrow(expect.objectContaining({ name: "ConfigError", code: "PROVIDER_UNKNOWN" }));
   });
 
   it("lists only providers the injected factory actually has registered", async () => {

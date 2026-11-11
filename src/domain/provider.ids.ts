@@ -4,8 +4,8 @@
 export const PROVIDER_IDS = {
   CLAUDE_CLI_ID: "claude-cli",
   CLAUDE_CLI_NAME: "Claude CLI",
-  GEMINI_CLI_ID: "gemini-cli",
-  GEMINI_CLI_NAME: "Gemini CLI",
+  ANTIGRAVITY_CLI_ID: "antigravity-cli",
+  ANTIGRAVITY_CLI_NAME: "Antigravity CLI",
   CODEX_CLI_ID: "codex-cli",
   CODEX_CLI_NAME: "Codex CLI",
   CURSOR_CLI_ID: "cursor-cli",

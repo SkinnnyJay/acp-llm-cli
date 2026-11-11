@@ -34,6 +34,9 @@ describe("ProviderFactory", () => {
   it("createRuntime throws for unknown id with clear message", () => {
     const factory = getDefaultFactory();
     expect(() => factory.createRuntime("unknown-id", {})).toThrow(/Unknown provider id/);
+    expect(() => factory.createRuntime("unknown-id", {})).toThrow(
+      expect.objectContaining({ name: "ConfigError", code: "PROVIDER_UNKNOWN" })
+    );
   });
 
   it("createRuntime throws for invalid config with validation message", () => {
@@ -41,21 +44,29 @@ describe("ProviderFactory", () => {
     expect(() => factory.createRuntime(PROVIDER_IDS.CLAUDE_CLI_ID, { command: 123 })).toThrow(
       /Config validation failed|Validation error|invalid_type/
     );
+    expect(() => factory.createRuntime(PROVIDER_IDS.CLAUDE_CLI_ID, { command: 123 })).toThrow(
+      expect.objectContaining({
+        name: "ConfigError",
+        code: "CONFIG_INVALID",
+        providerId: PROVIDER_IDS.CLAUDE_CLI_ID,
+        issues: [expect.objectContaining({ path: ["command"] })],
+      })
+    );
   });
 
   it("getProvider returns adapter for registered id", () => {
     const factory = getDefaultFactory();
-    const provider = factory.getProvider(PROVIDER_IDS.GEMINI_CLI_ID);
+    const provider = factory.getProvider(PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
     expect(provider).toBeDefined();
-    expect(provider?.id).toBe(PROVIDER_IDS.GEMINI_CLI_ID);
-    expect(provider?.cliSpec?.defaultArgs).toEqual(["--experimental-acp"]);
+    expect(provider?.id).toBe(PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
+    expect(provider?.cliSpec?.defaultArgs).toEqual(["acp"]);
   });
 
   it("getMetrics returns metrics after createRuntime when collectMetrics true", () => {
     const factory = getDefaultFactory();
     factory.createRuntime(PROVIDER_IDS.CODEX_CLI_ID, {
       command: "codex",
-      args: ["--experimental-acp"],
+      args: ["--acp"],
     });
     const metrics = factory.getMetrics?.(PROVIDER_IDS.CODEX_CLI_ID);
     expect(metrics).toBeDefined();

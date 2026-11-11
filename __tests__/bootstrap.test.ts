@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHarness, getAdapter, getDefaultRegistry } from "../src/bootstrap";
+import { ConfigError } from "../src/domain/errors";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import { createAcpCliHarnessRuntime } from "../src/providers/acp.shared";
 import { baseCliConfigSchema } from "../src/runtime/config";
@@ -13,7 +14,7 @@ describe("bootstrap", () => {
   it("getDefaultRegistry returns registry with adapters", () => {
     const registry = getDefaultRegistry();
     expect(registry.has(PROVIDER_IDS.CLAUDE_CLI_ID)).toBe(true);
-    expect(registry.has(PROVIDER_IDS.GEMINI_CLI_ID)).toBe(true);
+    expect(registry.has(PROVIDER_IDS.ANTIGRAVITY_CLI_ID)).toBe(true);
     expect(registry.has(PROVIDER_IDS.CODEX_CLI_ID)).toBe(true);
     expect(registry.has(PROVIDER_IDS.CURSOR_CLI_ID)).toBe(true);
     expect(registry.list().length).toBe(4);
@@ -46,6 +47,10 @@ describe("bootstrap", () => {
   it("createHarness throws for unknown id", () => {
     const registry = getDefaultRegistry();
     expect(() => createHarness(registry, "unknown-id", {})).toThrow(/Unknown provider id/);
+    expect(() => createHarness(registry, "unknown-id", {})).toThrow(ConfigError);
+    expect(() => createHarness(registry, "unknown-id", {})).toThrow(
+      expect.objectContaining({ code: "PROVIDER_UNKNOWN", providerId: "unknown-id" })
+    );
   });
 
   it("defaults providerId so a custom registry can use session persistence", () => {

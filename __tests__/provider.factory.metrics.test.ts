@@ -41,6 +41,9 @@ describe("ProviderFactory metrics", () => {
     const metrics = factory.getMetrics?.("test-provider");
     expect(metrics?.invocations).toBe(1);
     expect(metrics?.lastError).toBeDefined();
+    expect(() => factory.createRuntime("test-provider", null)).toThrow(
+      expect.objectContaining({ name: "ConfigError", code: "CONFIG_INVALID" })
+    );
   });
 
   it("throws and records failure when config is undefined", () => {

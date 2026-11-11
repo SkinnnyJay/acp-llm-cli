@@ -20,16 +20,30 @@ Curated exports from the package root. Prefer this surface for applications.
 | Export | Kind | Purpose |
 |--------|------|---------|
 | `IAgentPort` / `AgentPortCapabilities` / `StreamPromptOptions` | type | Agent port contract |
+| `RestartOutcome` / `RestartSessionOutcome` | type | What `restart()` returns: `"resumed"`, `"loaded"`, `"new"` or `"none"`, and the session id to use |
 | `IProviderClient` / `IProviderClientFactory` / `IProviderFactory` / `IProviderMetrics` | type | Factory interfaces |
 | `ProviderMetricsCollector` | class | Holds `invocations`, `lastError`, `lastInvocationMs`; reached via `factory.getMetrics(id)` when `collectMetrics` is on |
 | `ProviderFactory` / `ProviderClientFactory` / `ProviderClient` | class | Explicit factory construction |
 | `createAcpCliHarnessRuntime` / `createStandardAcpRuntime` | fn | Build ACP ports (also on `./runtime`) |
 | `AcpSharedRuntimeOptions` | type | Persistence, permissions, envelope, lifecycle |
 | `createMemorySessionPersistence` | fn | In-memory `ISessionPersistence` |
-| `ISessionPersistence` / `PersistedSession` | type | Session save/restore |
+| `ISessionPersistence` / `PersistedSession` | type | Records session id and cwd, which `restart()` uses to restore the session |
 | `createAcpAgentPort` / `ACPClientOptions` | fn/type | Low-level ACP client over a connection |
 | `baseCliConfigSchema` / `BaseCliConfig` | schema/type | Shared CLI config |
 | `ConfigSchema` / `ConfigSchemaResult` / `ConfigSchemaError` / `ConfigSchemaIssue` | type | The `parse`/`safeParse` surface an adapter config schema must provide, spelled structurally so it holds across both supported zod majors |
+
+## Errors
+
+| Export | Kind | Purpose |
+|--------|------|---------|
+| `AcpCliError` | class | Base of every error the package raises: `code`, `subsystem`, `providerId?`, `sessionId?`, `hint?`, `cause` |
+| `ConfigError` / `AgentProcessError` / `ConnectionError` / `AgentProtocolError` | class | One per subsystem: config, process, connection, protocol (agent JSON-RPC errors) |
+| `UnsupportedCapabilityError` / `InvalidStateError` / `ToolHostError` / `TimeoutError` | class | One per subsystem: capability, usage, tool host, timeout |
+| `ACP_ERROR_CODE` / `AcpErrorCode` | const/type | The stable codes to branch on |
+| `ACP_ERROR_SUBSYSTEM` / `AcpErrorSubsystem` | const/type | Subsystem names |
+| `PROVIDER_SETUP` / `ProviderSetup` | const/type | Install and login command per built-in provider; the source of `hint` |
+
+See the README section "Errors you can branch on" for the codes per class and the JSON-RPC mapping.
 
 ## Streaming
 
@@ -43,7 +57,7 @@ Curated exports from the package root. Prefer this surface for applications.
 
 The terminal chunk carries a real `finish_reason` translated from the agent's ACP stop reason: `max_tokens` and `max_turn_requests` become `length`, `refusal` becomes `content_filter`, and `end_turn`/`cancelled` become `stop`. Switch on `OPENAI_FINISH_REASON` rather than raw strings — a truncated or refused turn is not a clean completion.
 
-`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`STREAM_PROMPT_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
+`streamPrompt` filters inbound `sessionUpdate` events by `params.sessionId` and rejects concurrent `streamPrompt` calls on the same port (`InvalidStateError`, code `STREAM_IN_PROGRESS`). The port stays busy until the underlying prompt settles, so abandoning the iterator early does not free it.
 
 ## Models
 
@@ -51,10 +65,10 @@ The terminal chunk carries a real `finish_reason` translated from the agent's AC
 |--------|------|---------|
 | `ANTHROPIC_MODEL_IDS` / `AnthropicModelIdSchema` | const/schema | Claude model enum |
 | `OPENAI_MODEL_IDS` / `OpenAIModelIdSchema` | const/schema | OpenAI / Codex |
-| `GEMINI_MODEL_IDS` / `GeminiModelIdSchema` | const/schema | Gemini |
+| `GEMINI_MODEL_IDS` / `GeminiModelIdSchema` | const/schema | Gemini model ids (there is no Gemini provider; see Antigravity) |
 | `XAI_MODEL_IDS` / `XAIModelIdSchema` | const/schema | xAI |
 
-Provider `model` config accepts **any string**. It is a label, not a constraint: ACP providers select their model over the protocol or via `args`, and the configured value is threaded through as the default model id on OpenAI-style stream envelopes. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a model id checked against a vendor catalogue.
+Provider `model` config accepts **any string**. `model` is not validated. For Claude, Codex and Antigravity it only labels OpenAI-style stream envelopes; for Cursor it is also passed as `--model <id>` at spawn. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a model id checked against a vendor catalogue.
 
 ## CLI helpers
 
@@ -78,7 +92,8 @@ The runtime types and classes above are re-exported here; the application conven
 |--------|------|---------|
 | `StreamAgentPort` / `wrapAgentPortWithStream` | class/fn | Adds `streamPrompt` to a port |
 | `WrapAgentPortOptions` | type | Envelope mode and model label for the stream decorator |
-| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close`, backoff, and session resume |
+| `AcpSharedRuntimeOptions.restoreMcpServers` / `LifecycleSessionPersistence.mcpServers` | option | MCP servers the restore call in `restart()` attaches until a `newSession` through the port supplies its own (they are never persisted) |
+| `LifecycleAgentPort` / `wrapAgentPortWithLifecycle` | class/fn | Adds `restart`/`open`/`close` and backoff; `restart()` restarts and re-initializes the process, then restores the persisted session with `session/resume`, else `session/load` (replay dropped), else a new session, and returns a `RestartOutcome` (`previousSessionId` names the stored session when the result is `"new"`) |
 | `LifecycleSupervisorOptions` / `LifecycleSessionPersistence` | type | Lifecycle tuning; persistence is grouped under `persistence` |
 
 ### Connections
@@ -109,18 +124,9 @@ The runtime types and classes above are re-exported here; the application conven
 | `IPermissionHandler` | type | Decide permission requests; **absent means cancel**, never auto-allow |
 | `IToolHost` | type | Terminal and filesystem operations an agent may request |
 
-### Deprecated
-
-Scheduled for removal together in the next major. Each carries an `@deprecated` JSDoc note that reaches editors through the shipped declarations.
-
-| Export | Why |
-|--------|-----|
-| `GENERIC_OPTION_DEFAULTS` | Unread. The arg builder never consults it, so `stream: true` here is a default that is never applied |
-| `ANTHROPIC_MODEL_ID_LIST`, `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST` | Unread, and lossier than their source — `readonly string[]` discards the literal union the `*_MODEL_IDS` objects preserve |
-
 ## Peer dependencies
 
-`zod` (`^3.25.0 || ^4.0.0`) and `eventemitter3` (`^5.0.1`) are peers. Both zod majors are typechecked and tested in CI, so either satisfies the range.
+`zod` (`^3.25.76 || ^4.0.0`) and `eventemitter3` (`^5.0.1`) are peers. Both zod majors are typechecked and tested in CI, so either satisfies the range.
 
 ## Safety defaults (0.2.0+)
 
@@ -138,5 +144,5 @@ the derived one outright and is never merged with it.
 
 
 - Permission requests without a `permissionHandler` are **cancelled** (never auto-allow).
-- Cursor `--trust` is passed only when `trust: true` in config (verified end to end by `__tests__/config.passthrough.test.ts`).
+- The ACP runtime starts `command` with the resolved `args`, then appends a flag for each of `model`, `trust`, `sandbox` and `workspace` that is set and mapped by the provider (only Cursor maps any), unless `args` already has it. `outputFormat` and `debug` are never applied.
 - Stderr in thrown errors is redacted/truncated unless `ACP_LLM_CLI_DEBUG` is set.

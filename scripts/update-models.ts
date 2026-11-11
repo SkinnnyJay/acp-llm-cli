@@ -2,25 +2,56 @@
  * Fetches available model IDs and writes src/domain/models/*.ts.
  * Run: npm run update-models
  *
- * Public source (no keys): OpenRouter GET https://openrouter.ai/api/v1/models
- * Optional (with keys): Anthropic, OpenAI, Gemini, xAI provider APIs (override OpenRouter data).
+ * Sources per vendor: its models API when its key is set, otherwise its public documentation page.
  * Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY or GOOGLE_API_KEY, XAI_API_KEY
  * Optional: ACP_LLM_CLI_MODELS_DRY_RUN=1 to log only, no write.
+ * Additive by default: existing ids are kept. ACP_LLM_CLI_MODELS_PRUNE=1 makes the fetch authoritative.
+ * Router variants (ids containing ":") and Anthropic ids containing "." are always dropped.
+ * A vendor whose page cannot be fetched or yields no ids keeps its file untouched.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENV_KEY } from "../src/domain/env.keys";
-import { renderModelModule } from "./model.constants";
+import { ModelIdSchema as ANTHROPIC_SCHEMA } from "../src/domain/models/anthropic.models";
+import { ModelIdSchema as GEMINI_SCHEMA } from "../src/domain/models/gemini.models";
+import { ModelIdSchema as OPENAI_SCHEMA } from "../src/domain/models/openai.models";
+import { ModelIdSchema as XAI_SCHEMA } from "../src/domain/models/xai.models";
+import {
+  extractModelIds,
+  extractRetiredModelIds,
+  renderModelModule,
+  selectModelIds,
+} from "./model.constants";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
 const MODELS_DIR = join(ROOT, "src", "domain", "models");
 const DRY_RUN = process.env[ENV_KEY.ACP_LLM_CLI_MODELS_DRY_RUN] === "1";
 
-function writeModelConstants(provider: string, modelIds: string[], headerComment: string): void {
-  const sorted = [...new Set(modelIds)].filter(Boolean).sort();
+const PRUNE = process.env[ENV_KEY.ACP_LLM_CLI_MODELS_PRUNE] === "1";
+
+const EXISTING: Record<string, readonly string[]> = {
+  anthropic: ANTHROPIC_SCHEMA.options,
+  openai: OPENAI_SCHEMA.options,
+  gemini: GEMINI_SCHEMA.options,
+  xai: XAI_SCHEMA.options,
+};
+
+function writeModelConstants(
+  provider: string,
+  modelIds: string[],
+  headerComment: string,
+  retired: readonly string[] = []
+): void {
+  // Anthropic ids never contain "."; those are router spellings (claude-opus-4.8 for claude-opus-4-8).
+  const valid = (id: string) => provider !== "anthropic" || !id.includes(".");
+  const merged = selectModelIds((EXISTING[provider] ?? []).filter(valid), modelIds.filter(valid), {
+    prune: PRUNE,
+  });
+  // The refresh is additive, so ids the vendor has since retired are removed explicitly.
+  const sorted = merged.filter((id) => !retired.includes(id));
   const content = renderModelModule(headerComment, sorted);
 
   const outPath = join(MODELS_DIR, `${provider}.models.ts`);
@@ -36,7 +67,7 @@ function writeModelConstants(provider: string, modelIds: string[], headerComment
 async function fetchAnthropic(): Promise<string[]> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
-    console.warn("ANTHROPIC_API_KEY not set, skipping Anthropic");
+    console.warn("ANTHROPIC_API_KEY not set, using the Anthropic documentation page instead");
     return [];
   }
   const out: string[] = [];
@@ -69,7 +100,7 @@ async function fetchAnthropic(): Promise<string[]> {
 async function fetchOpenAI(): Promise<string[]> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
-    console.warn("OPENAI_API_KEY not set, skipping OpenAI");
+    console.warn("OPENAI_API_KEY not set, using the OpenAI documentation page instead");
     return [];
   }
   const out: string[] = [];
@@ -96,7 +127,9 @@ async function fetchOpenAI(): Promise<string[]> {
 async function fetchGemini(): Promise<string[]> {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY / GOOGLE_API_KEY not set, skipping Gemini");
+    console.warn(
+      "GEMINI_API_KEY / GOOGLE_API_KEY not set, using the Gemini documentation page instead"
+    );
     return [];
   }
   const out: string[] = [];
@@ -127,7 +160,7 @@ async function fetchGemini(): Promise<string[]> {
 async function fetchXAI(): Promise<string[]> {
   const key = process.env.XAI_API_KEY;
   if (!key) {
-    console.warn("XAI_API_KEY not set, skipping xAI");
+    console.warn("XAI_API_KEY not set, using the xAI documentation page instead");
     return [];
   }
   const res = await fetch("https://api.x.ai/v1/models", {
@@ -142,109 +175,64 @@ async function fetchXAI(): Promise<string[]> {
   return list.map((m) => m.id).filter((id): id is string => Boolean(id));
 }
 
-/** OpenRouter provider prefix -> our provider key */
-const OPENROUTER_PREFIX: Record<string, string> = {
-  anthropic: "anthropic",
-  openai: "openai",
-  google: "gemini",
-  "x-ai": "xai",
-  xai: "xai",
+const PAGES: Record<string, string> = {
+  anthropic: "https://platform.claude.com/docs/en/about-claude/model-deprecations.md",
+  openai: "https://developers.openai.com/api/docs/models",
+  gemini: "https://ai.google.dev/gemini-api/docs/models.md.txt",
+  xai: "https://docs.x.ai/developers/models",
 };
 
-/**
- * Public endpoint (no API key). Returns model ids grouped by provider.
- * OpenRouter id format: "provider/slug" e.g. "anthropic/claude-sonnet-4".
- */
-async function fetchOpenRouter(): Promise<Record<string, string[]>> {
-  const out: Record<string, string[]> = { anthropic: [], openai: [], gemini: [], xai: [] };
+/** Public documentation page, used when the vendor's API key is not set. */
+async function fetchPage(provider: string): Promise<{ ids: string[]; retired: string[] }> {
+  const url = PAGES[provider] as string;
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/models");
+    const res = await fetch(url, {
+      headers: { "user-agent": "model-list-check" },
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!res.ok) {
-      console.warn("OpenRouter models fetch failed:", res.status);
-      return out;
+      console.warn(`${provider} models page fetch failed:`, res.status);
+      return { ids: [], retired: [] };
     }
-    const data = (await res.json()) as { data?: { id?: string }[] };
-    const list = data.data ?? [];
-    for (const m of list) {
-      const id = m.id;
-      if (!id || !id.includes("/")) continue;
-      const [prefix, ...rest] = id.split("/");
-      const slug = rest.join("/");
-      const provider = OPENROUTER_PREFIX[prefix?.toLowerCase() ?? ""];
-      if (provider && slug) {
-        if (!out[provider]) out[provider] = [];
-        out[provider].push(slug);
-      }
-    }
-    for (const p of Object.keys(out)) {
-      out[p] = [...new Set(out[p])].sort();
-    }
-    console.log(
-      "OpenRouter (public):",
-      Object.entries(out)
-        .map(([k, v]) => `${k}=${v.length}`)
-        .join(", ")
-    );
+    const text = await res.text();
+    return {
+      ids: extractModelIds(provider, text),
+      retired: extractRetiredModelIds(provider, text),
+    };
   } catch (err) {
-    console.warn("OpenRouter fetch error:", err);
+    console.warn(`${provider} models page fetch error:`, err);
+    return { ids: [], retired: [] };
   }
-  return out;
 }
 
-const FALLBACKS: Record<string, string[]> = {
-  anthropic: ["claude-sonnet-4-20250514", "claude-opus-4"],
-  openai: ["gpt-4o", "gpt-4o-mini", "o1"],
-  gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-  xai: ["grok-3", "grok-3-mini", "grok-4-1-fast-reasoning"],
-};
-
 async function main(): Promise<void> {
-  console.log("Fetching model lists (OpenRouter public + optional provider APIs)...");
-  const [openRouter, anthropic, openai, gemini, xai] = await Promise.all([
-    fetchOpenRouter(),
-    fetchAnthropic(),
-    fetchOpenAI(),
-    fetchGemini(),
-    fetchXAI(),
-  ]);
-
-  const pick = (
-    provider: keyof typeof FALLBACKS,
-    fromApi: string[],
-    fromOpenRouter: string[]
-  ): string[] => {
-    if (fromApi.length) return fromApi;
-    if (fromOpenRouter.length) return fromOpenRouter;
-    return FALLBACKS[provider] ?? [];
+  console.log(
+    "Fetching model lists (provider APIs when keys are set, else documentation pages)..."
+  );
+  const apiLists = await Promise.all([fetchAnthropic(), fetchOpenAI(), fetchGemini(), fetchXAI()]);
+  const headers: Record<string, string> = {
+    anthropic: "Anthropic (Claude) model IDs",
+    openai: "OpenAI model IDs",
+    gemini: "Google Gemini model IDs",
+    xai: "xAI (Grok) model IDs",
   };
 
-  const anthropicList = pick("anthropic", anthropic, openRouter.anthropic ?? []);
-  const openaiList = pick("openai", openai, openRouter.openai ?? []);
-  const geminiList = pick("gemini", gemini, openRouter.gemini ?? []);
-  const xaiList = pick("xai", xai, openRouter.xai ?? []);
-
-  const source = (api: number, or: number) =>
-    api ? "provider API" : or ? "OpenRouter (public)" : "fallback";
-  writeModelConstants(
-    "anthropic",
-    anthropicList,
-    `Anthropic (Claude) model IDs — ${source(anthropic.length, (openRouter.anthropic ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "openai",
-    openaiList,
-    `OpenAI model IDs — ${source(openai.length, (openRouter.openai ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "gemini",
-    geminiList,
-    `Google Gemini model IDs — ${source(gemini.length, (openRouter.gemini ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "xai",
-    xaiList,
-    `xAI (Grok) model IDs — ${source(xai.length, (openRouter.xai ?? []).length)}. Run script to refresh.`
-  );
+  for (const [i, provider] of (["anthropic", "openai", "gemini", "xai"] as const).entries()) {
+    const fromApi = apiLists[i] as string[];
+    const page = fromApi.length ? undefined : await fetchPage(provider);
+    const ids = page?.ids ?? fromApi;
+    if (!ids.length) {
+      console.warn(`No ${provider} model ids found, leaving its file untouched`);
+      continue;
+    }
+    const source = fromApi.length ? "provider API" : "vendor documentation page";
+    writeModelConstants(
+      provider,
+      ids,
+      `${headers[provider]} — ${source}. Run script to refresh.`,
+      page?.retired
+    );
+  }
 
   console.log("Done.");
 }

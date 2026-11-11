@@ -1,19 +1,18 @@
 /**
  * Default CLI command and args per provider. No literal command or arg strings in provider implementations.
  *
- * Aligned with ACPX built-in agent wrappers (acpx 0.5+):
- * - Claude → preferred bin `claude-agent-acp` (@agentclientprotocol/claude-agent-acp)
- * - Codex → preferred bin `codex-acp` (@zed-industries/codex-acp)
- * - Cursor → `cursor-agent` print/stream-json port (this package); ACP mode is `cursor-agent acp` via ACPX
- * - Gemini → `gemini --experimental-acp`
+ * - Claude → `claude-agent-acp` (npm: @agentclientprotocol/claude-agent-acp)
+ * - Codex → `codex-acp` (npm: @agentclientprotocol/codex-acp)
+ * - Cursor → `cursor-agent acp`
+ * - Antigravity → `agy acp`
  */
 export const DEFAULT_COMMANDS = {
   CLAUDE_DEFAULT_COMMAND: "claude-agent-acp",
   CLAUDE_DEFAULT_ARGS: [] as const,
-  GEMINI_DEFAULT_COMMAND: "gemini",
-  GEMINI_DEFAULT_ARGS: ["--experimental-acp"] as const,
+  ANTIGRAVITY_DEFAULT_COMMAND: "agy",
+  ANTIGRAVITY_DEFAULT_ARGS: ["acp"] as const,
   CODEX_DEFAULT_COMMAND: "codex-acp",
   CODEX_DEFAULT_ARGS: [] as const,
   CURSOR_DEFAULT_COMMAND: "cursor-agent",
-  CURSOR_DEFAULT_ARGS: [] as const,
+  CURSOR_DEFAULT_ARGS: ["acp"] as const,
 } as const;

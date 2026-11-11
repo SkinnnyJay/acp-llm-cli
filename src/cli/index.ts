@@ -6,7 +6,6 @@ export type {
   GenericOptionKey,
 } from "./generic.options";
 export {
-  GENERIC_OPTION_DEFAULTS,
   GENERIC_OPTION_KEY,
   genericLlmCliOptionsSchema,
 } from "./generic.options";

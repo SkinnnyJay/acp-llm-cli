@@ -39,6 +39,9 @@ export function modelIdEntries(ids: string[]): Record<string, string> {
   return byKey;
 }
 
+/** Biome's configured line width. */
+const MAX_LINE_WIDTH = 100;
+
 /**
  * Render one generated model module.
  *
@@ -50,11 +53,15 @@ export function modelIdEntries(ids: string[]): Record<string, string> {
 export function renderModelModule(headerComment: string, ids: string[]): string {
   const entries = modelIdEntries(ids);
   const body = Object.entries(entries)
-    .map(([key, id]) => `  ${key}: "${id}",`)
+    .map(([key, id]) => {
+      const line = `  ${key}: "${id}",`;
+      // Break as the formatter would, so a long id does not fail lint on the generated file.
+      return line.length > MAX_LINE_WIDTH ? `  ${key}:\n    "${id}",` : line;
+    })
     .join("\n");
   const schemaValues = Object.values(entries)
-    .map((id) => `  "${id}"`)
-    .join(",\n");
+    .map((id) => `  "${id}",`)
+    .join("\n");
 
   return `/**
  * ${headerComment}
@@ -67,16 +74,70 @@ export const MODEL_IDS = {
 ${body}
 } as const;
 
-/**
- * @deprecated Unread anywhere, and lossier than its source: \`readonly string[]\` discards the
- * literal union MODEL_IDS already carries. Use \`Object.values(MODEL_IDS)\`. Removed next major.
- */
-export const MODEL_ID_LIST: readonly string[] = Object.values(MODEL_IDS);
-
 export const ModelIdSchema = z.enum([
 ${schemaValues}
 ]);
 
 export type ModelId = z.infer<typeof ModelIdSchema>;
 `;
+}
+
+const TOKEN = "[a-z0-9.-]*";
+const NOT_TEXT =
+  /(^|-)(image|imagine|tts|voice|audio|video|transcribe|live|embedding|computer-use)(-|$)/;
+const NOT_AN_ID = /(-(models|family|texture|block)|\.(png|webp|jpe?g|svg|gif))$/;
+
+/** Ids found on each vendor's docs page, by the one signal that page offers for a real id. */
+const PAGE_IDS: Record<string, (text: string) => string[]> = {
+  // Row of the model status table that is not retired: "| claude-opus-4-8 | Active | ...".
+  anthropic: (text) =>
+    matches(text, /^\|\s*(claude-[a-z0-9-]+)\s*\|\s*(?:Active|Deprecated)\s*\|/gm),
+  // Link to the model's own page: href="/api/docs/models/gpt-6-luna". Images use src, not href.
+  openai: (text) =>
+    matches(
+      text,
+      new RegExp(`href="/api/docs/models/(gpt-[0-9]${TOKEN}|o[0-9](?:-[a-z0-9]+)*)"`, "g")
+    ),
+  // List line holding only backticked ids. Prose, links and {% id="..." %} anchors do not qualify.
+  gemini: (text) =>
+    text
+      .split("\n")
+      .filter((line) => /^\s*(?:[*-]\s+)?`[^`\s]+`(?:\s+`[^`\s]+`)*\s*$/.test(line))
+      .flatMap((line) => matches(line, new RegExp(`\`(gemini-[0-9]${TOKEN})\``, "g"))),
+  // A double-quoted string in the page's embedded model data (names and aliases). Links and
+  // utm parameters are not quoted on their own.
+  xai: (text) => matches(text, new RegExp(`"(grok-[0-9a-z]${TOKEN})"`, "g")),
+};
+
+function matches(text: string, pattern: RegExp): string[] {
+  return Array.from(text.matchAll(pattern), (m) => m[1] as string);
+}
+
+/** Text chat model ids found on a vendor's public models page; [] for an unknown vendor. */
+export function extractModelIds(vendor: string, pageText: string): string[] {
+  const found = PAGE_IDS[vendor]?.(pageText) ?? [];
+  const ids = found.filter((id) => !NOT_AN_ID.test(id) && !NOT_TEXT.test(id));
+  return [...new Set(ids)];
+}
+
+/** Anthropic ids the status table marks Retired, each with its undated alias; [] otherwise. */
+export function extractRetiredModelIds(vendor: string, pageText: string): string[] {
+  if (vendor !== "anthropic") return [];
+  const retired = matches(pageText, /^\|\s*(claude-[a-z0-9-]+)\s*\|\s*Retired\s*\|/gm);
+  return [...new Set(retired.flatMap((id) => [id, id.replace(/-\d{8}$/, "")]))];
+}
+
+/**
+ * Merge the ids already in a generated file with freshly fetched ones. Router variants (`:free`,
+ * `:batch`) are dropped from both. Additive unless `prune`, which makes `fetched` authoritative.
+ */
+export function selectModelIds(
+  existing: string[],
+  fetched: string[],
+  { prune }: { prune: boolean }
+): string[] {
+  const kept = (prune ? fetched : [...existing, ...fetched]).filter(
+    (id) => id && !id.includes(":")
+  );
+  return [...new Set(kept)].sort();
 }

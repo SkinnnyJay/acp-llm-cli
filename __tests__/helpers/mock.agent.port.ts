@@ -15,7 +15,16 @@ import type { IAgentPort } from "../../src/runtime/agent.port";
  * here matches the production model and typechecks the mocks against the real signatures.
  */
 export type MockAgentPortOptions = { sessionId?: string } & Partial<
-  Pick<IAgentPort, "restart" | "setSessionMode" | "setSessionConfigOption" | "capabilities">
+  Pick<
+    IAgentPort,
+    | "restart"
+    | "setSessionMode"
+    | "setSessionConfigOption"
+    | "capabilities"
+    | "resumeSession"
+    | "loadSession"
+    | "agentCapabilities"
+  >
 >;
 
 /** Shared mock IAgentPort for decorator / factory composition tests. */

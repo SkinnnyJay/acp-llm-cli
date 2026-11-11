@@ -7,7 +7,7 @@ import { PROVIDER_IDS } from "./provider.ids";
  */
 export const Provider = {
   CLAUDE: PROVIDER_IDS.CLAUDE_CLI_ID,
-  GEMINI: PROVIDER_IDS.GEMINI_CLI_ID,
+  ANTIGRAVITY: PROVIDER_IDS.ANTIGRAVITY_CLI_ID,
   CODEX: PROVIDER_IDS.CODEX_CLI_ID,
   CURSOR: PROVIDER_IDS.CURSOR_CLI_ID,
 } as const;
@@ -16,7 +16,7 @@ export type Provider = (typeof Provider)[keyof typeof Provider];
 
 export const ProviderSchema = z.enum([
   Provider.CLAUDE,
-  Provider.GEMINI,
+  Provider.ANTIGRAVITY,
   Provider.CODEX,
   Provider.CURSOR,
 ]);
@@ -24,7 +24,7 @@ export const ProviderSchema = z.enum([
 /** All provider values for iteration / validation. */
 export const PROVIDER_VALUES: readonly Provider[] = [
   Provider.CLAUDE,
-  Provider.GEMINI,
+  Provider.ANTIGRAVITY,
   Provider.CODEX,
   Provider.CURSOR,
 ];

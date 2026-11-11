@@ -2,9 +2,9 @@ import type { SessionNotification } from "@agentclientprotocol/sdk";
 import { describe, expect, it } from "vitest";
 import { PROVIDER_IDS } from "../src/domain/provider.ids";
 import type { ISessionPersistence, PersistedSession } from "../src/domain/session.persistence";
+import { antigravityAdapter } from "../src/providers/antigravity/adapter";
 import { claudeAdapter } from "../src/providers/claude/adapter";
 import { codexAdapter } from "../src/providers/codex/adapter";
-import { geminiAdapter } from "../src/providers/gemini/adapter";
 import { agentMessageChunk } from "./helpers/session.notification";
 
 /**
@@ -45,7 +45,11 @@ const providerIdsWritten = (p: { saved: PersistedSession[] }): string[] =>
 const adapters = [
   { name: "claude", adapter: claudeAdapter, defaultId: PROVIDER_IDS.CLAUDE_CLI_ID },
   { name: "codex", adapter: codexAdapter, defaultId: PROVIDER_IDS.CODEX_CLI_ID },
-  { name: "gemini", adapter: geminiAdapter, defaultId: PROVIDER_IDS.GEMINI_CLI_ID },
+  {
+    name: "antigravity",
+    adapter: antigravityAdapter,
+    defaultId: PROVIDER_IDS.ANTIGRAVITY_CLI_ID,
+  },
 ] as const;
 
 describe("ACP adapter providerId resolution", () => {

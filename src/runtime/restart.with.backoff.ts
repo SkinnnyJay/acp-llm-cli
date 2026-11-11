@@ -1,7 +1,13 @@
 import { delay } from "@simpill/async.utils";
+import { ACP_ERROR_CODE, AgentProcessError } from "../domain/errors";
 import { LIMIT } from "../domain/limits";
 import { TIMEOUT } from "../domain/timeouts";
 import type { IAgentPort } from "./agent.port";
+
+const UNRETRYABLE: ReadonlySet<string> = new Set([
+  ACP_ERROR_CODE.CLI_NOT_FOUND,
+  ACP_ERROR_CODE.CLI_NOT_EXECUTABLE,
+]);
 
 export interface RestartWithBackoffOptions {
   maxRetries?: number;
@@ -45,6 +51,8 @@ export async function restartWithBackoff(
       return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      // A missing or non-executable binary fails the same way on every attempt.
+      if (err instanceof AgentProcessError && UNRETRYABLE.has(err.code)) break;
       if (attempt < maxRetries) {
         const cappedMs = Math.min(
           backoffBaseMs * LIMIT.RETRY_EXPONENTIAL_BASE ** attempt,

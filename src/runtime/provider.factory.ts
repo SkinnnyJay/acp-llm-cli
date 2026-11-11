@@ -1,3 +1,4 @@
+import { ACP_ERROR_CODE, ConfigError } from "../domain/errors";
 import { VALIDATION_ERROR } from "../domain/validation.errors";
 import type { AcpSharedRuntimeOptions } from "./acp.runtime";
 import type { IAgentPort } from "./agent.port";
@@ -34,7 +35,7 @@ export class ProviderFactory implements IProviderFactory {
     if (!provider) {
       const msg = VALIDATION_ERROR.UNKNOWN_PROVIDER_ID(id);
       this.logger.warn(msg);
-      throw new Error(msg);
+      throw new ConfigError(ACP_ERROR_CODE.PROVIDER_UNKNOWN, msg, { providerId: id });
     }
 
     const metrics = this.getOrCreateMetrics(id);
@@ -45,7 +46,7 @@ export class ProviderFactory implements IProviderFactory {
       const msg = VALIDATION_ERROR.CONFIG_REQUIRED;
       this.logger.warn(msg, { providerId: id });
       metrics.recordFailure(msg);
-      throw new Error(msg);
+      throw new ConfigError(ACP_ERROR_CODE.CONFIG_INVALID, msg, { providerId: id });
     }
 
     const result = provider.configSchema.safeParse(config);
@@ -56,7 +57,11 @@ export class ProviderFactory implements IProviderFactory {
       const msg = `${VALIDATION_ERROR.PARSE_FAILED(id)} Path: ${path}. ${detail}`;
       this.logger.warn(msg, { providerId: id, issues: result.error.issues });
       metrics.recordFailure(msg);
-      throw new Error(msg);
+      throw new ConfigError(ACP_ERROR_CODE.CONFIG_INVALID, msg, {
+        providerId: id,
+        issues: result.error.issues.map(({ path, message }) => ({ path, message })),
+        cause: result.error,
+      });
     }
 
     // Only runtime errors from createHarness are caught here.

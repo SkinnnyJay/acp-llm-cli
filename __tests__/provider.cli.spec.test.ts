@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { antigravityCliSpec } from "../src/providers/antigravity/cli.definition";
 import { claudeCliSpec } from "../src/providers/claude/cli.definition";
 import { codexCliSpec } from "../src/providers/codex/cli.definition";
 import { cursorCliSpec } from "../src/providers/cursor/cli.definition";
-import { geminiCliSpec } from "../src/providers/gemini/cli.definition";
 
 const SPECS = [
   { id: "claude", spec: claudeCliSpec },
   { id: "codex", spec: codexCliSpec },
-  { id: "gemini", spec: geminiCliSpec },
+  { id: "antigravity", spec: antigravityCliSpec },
   { id: "cursor", spec: cursorCliSpec },
 ];
 

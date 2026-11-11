@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CONNECTION_STATUS } from "../src/domain/connection.status";
 import { ENVELOPE_MODE } from "../src/domain/envelope.mode";
 import { ERROR_MESSAGE } from "../src/domain/error.messages";
+import { InvalidStateError } from "../src/domain/errors";
 import { PORT_CAPABILITY } from "../src/domain/port.capabilities";
 import { StreamAgentPort, wrapAgentPortWithStream } from "../src/runtime/acp.agent.port.stream";
 import type { IAgentPort } from "../src/runtime/agent.port";
@@ -196,6 +197,25 @@ describe("StreamAgentPort", () => {
     expect(port.setSessionConfigOption).toBeUndefined();
   });
 
+  it("forwards resumeSession, loadSession and agentCapabilities only when inner has them", () => {
+    const caps = { loadSession: true };
+    const port = new StreamAgentPort(
+      createMockAgentPort({
+        resumeSession: vi.fn(),
+        loadSession: vi.fn(),
+        agentCapabilities: caps,
+      })
+    );
+    expect(typeof port.resumeSession).toBe("function");
+    expect(typeof port.loadSession).toBe("function");
+    expect(port.agentCapabilities).toBe(caps);
+
+    const bare = new StreamAgentPort(createMockPort());
+    expect(bare.resumeSession).toBeUndefined();
+    expect(bare.loadSession).toBeUndefined();
+    expect(bare.agentCapabilities).toBeUndefined();
+  });
+
   it("streamPrompt in NATIVE mode does not emit an OpenAI finish envelope", async () => {
     const inner = createMockPort();
     const port = new StreamAgentPort(inner, { envelopeMode: ENVELOPE_MODE.NATIVE });
@@ -335,6 +355,8 @@ describe("StreamAgentPort", () => {
       }
     })();
     await expect(second).rejects.toThrow(ERROR_MESSAGE.STREAM_PROMPT_IN_PROGRESS);
+    await expect(second).rejects.toBeInstanceOf(InvalidStateError);
+    await expect(second).rejects.toMatchObject({ code: "STREAM_IN_PROGRESS", sessionId: "s1" });
     expect(inner.prompt).toHaveBeenCalledTimes(1);
 
     release();
