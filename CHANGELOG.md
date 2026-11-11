@@ -89,8 +89,10 @@ trip for this release.
 - With SDK 2.x a non-JSON line on the agent's stdout gets a JSON-RPC parse-error response written
   back to the agent, and a single message over 32 MiB (the SDK's default limit) errors the input
   stream, which closes the link.
-- Dev toolchain: Biome 2.6.6, vitest 5.1.0 and tsup 9.0.0. TypeScript stays at 5.9: 7.0.2 typechecks, but
-  tsup's declaration build needs the TypeScript compiler API, which 7.0.2 does not provide.
+- Dev toolchain: Biome 2.6.6, vitest 5.1.0, TypeScript 7.0.2 and tsdown 0.23.7. tsdown replaces
+  tsup, whose declaration build needs the TypeScript compiler API that 7 no longer provides. The
+  published files keep their paths (`dist/index.js`, `dist/index.d.ts`, `dist/runtime/…`) and
+  export the same names; consumers on TypeScript 5.9 are unaffected.
 - **Errors raised by the package are now typed** (`AcpCliError` subclasses, see Added). Message
   text is unchanged except where noted below, and every one is still an `Error`.
 - **A missing agent CLI** is reported as `AgentProcessError` with code `CLI_NOT_FOUND`, the command,
@@ -136,7 +138,7 @@ trip for this release.
   `loadSession` and `agentCapabilities` (from the last `initialize`), which `ACPClient` implements.
   Types `RestartOutcome` and `RestartSessionOutcome` are exported.
 - Types `ProcessEnv` (root entry) and `ConnectionEvents`, `SpawnOptions` (`/runtime`) are now
-  exported; tsup 9 warns when a public API type is not re-exported.
+  exported; the declaration build warns when a public API type is not re-exported.
 - **Typed errors.** `AcpCliError` and one subclass per subsystem: `ConfigError`,
   `AgentProcessError`, `ConnectionError`, `AgentProtocolError`, `UnsupportedCapabilityError`,
   `InvalidStateError`, `ToolHostError` and `TimeoutError`. Each carries a stable `code` from
