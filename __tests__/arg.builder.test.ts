@@ -8,16 +8,10 @@ import { PROVIDER_IDS } from "../src/domain/provider.ids";
 const flagMap: GenericFlagMap = {
   [GENERIC_OPTION_KEY.MODEL]: "--model",
   [GENERIC_OPTION_KEY.OUTPUT_FORMAT]: "--output-format",
-  [GENERIC_OPTION_KEY.INPUT_FORMAT]: "--input-format",
-  [GENERIC_OPTION_KEY.STREAM]: "--stream",
   [GENERIC_OPTION_KEY.TRUST]: "--trust",
   [GENERIC_OPTION_KEY.SANDBOX]: "--sandbox",
   [GENERIC_OPTION_KEY.WORKSPACE]: "--workspace",
-  [GENERIC_OPTION_KEY.RESUME]: "--resume",
-  [GENERIC_OPTION_KEY.SESSION_ID]: "--session-id",
-  [GENERIC_OPTION_KEY.VERBOSE]: "--verbose",
   [GENERIC_OPTION_KEY.DEBUG]: "--debug",
-  [GENERIC_OPTION_KEY.PRINT]: "--print",
 };
 
 describe("buildGenericArgs", () => {
@@ -48,22 +42,6 @@ describe("buildGenericArgs", () => {
     expect(result).toEqual(["--output-format", "stream-json"]);
   });
 
-  it("emits --input-format with value", () => {
-    const result = buildGenericArgs({ inputFormat: "text" }, flagMap);
-    expect(result).toEqual(["--input-format", "text"]);
-  });
-
-  it("emits --stream flag (no value) when stream is true", () => {
-    const result = buildGenericArgs({ stream: true }, flagMap);
-    expect(result).toContain("--stream");
-    expect(result).toHaveLength(1);
-  });
-
-  it("does not emit --stream when stream is false", () => {
-    const result = buildGenericArgs({ stream: false }, flagMap);
-    expect(result).not.toContain("--stream");
-  });
-
   it("emits --trust flag when trust is true", () => {
     const result = buildGenericArgs({ trust: true }, flagMap);
     expect(result).toContain("--trust");
@@ -89,41 +67,16 @@ describe("buildGenericArgs", () => {
     expect(result).not.toContain("--workspace");
   });
 
-  it("emits --resume with value", () => {
-    const result = buildGenericArgs({ resume: "session-abc" }, flagMap);
-    expect(result).toEqual(["--resume", "session-abc"]);
-  });
-
-  it("emits --session-id with value", () => {
-    const result = buildGenericArgs({ sessionId: "sid-123" }, flagMap);
-    expect(result).toEqual(["--session-id", "sid-123"]);
-  });
-
-  it("omits --session-id when sessionId is empty string", () => {
-    const result = buildGenericArgs({ sessionId: "" }, flagMap);
-    expect(result).not.toContain("--session-id");
-  });
-
-  it("emits --verbose when verbose is true", () => {
-    const result = buildGenericArgs({ verbose: true }, flagMap);
-    expect(result).toContain("--verbose");
-  });
-
   it("emits --debug when debug is true", () => {
     const result = buildGenericArgs({ debug: true }, flagMap);
     expect(result).toContain("--debug");
   });
 
-  it("emits --print when print is true", () => {
-    const result = buildGenericArgs({ print: true }, flagMap);
-    expect(result).toContain("--print");
-  });
-
   it("skips flags not in flagMap", () => {
     const partialMap: GenericFlagMap = { [GENERIC_OPTION_KEY.MODEL]: "--model" };
-    const result = buildGenericArgs({ model: "gpt-4o", verbose: true }, partialMap);
+    const result = buildGenericArgs({ model: "gpt-4o", debug: true }, partialMap);
     expect(result).toEqual(["--model", "gpt-4o"]);
-    expect(result).not.toContain("--verbose");
+    expect(result).not.toContain("--debug");
   });
 
   it("combines multiple flags in order with baseArgs first", () => {
@@ -141,18 +94,15 @@ describe("buildGenericArgs", () => {
   });
 
   it("returns baseArgs unmodified when no flagMap keys match", () => {
-    const result = buildGenericArgs({ verbose: true }, {}, ["--x", "--y"]);
+    const result = buildGenericArgs({ debug: true }, {}, ["--x", "--y"]);
     expect(result).toEqual(["--x", "--y"]);
   });
 
-  it("skips workspace/resume/sessionId/debug/print when flags are absent from flagMap", () => {
+  it("skips workspace/debug when flags are absent from flagMap", () => {
     const result = buildGenericArgs(
       {
         workspace: "/tmp",
-        resume: "sess",
-        sessionId: "id",
         debug: true,
-        print: true,
       },
       {},
       ["--base"]
@@ -160,13 +110,11 @@ describe("buildGenericArgs", () => {
     expect(result).toEqual(["--base"]);
   });
 
-  it("skips model/output/input/stream/trust/sandbox when flags are absent from flagMap", () => {
+  it("skips model/output/trust/sandbox when flags are absent from flagMap", () => {
     const result = buildGenericArgs(
       {
         model: "m",
         outputFormat: "json",
-        inputFormat: "text",
-        stream: true,
         trust: true,
         sandbox: "enabled",
       },
@@ -179,7 +127,7 @@ describe("buildGenericArgs", () => {
 
 describe("cliSpec.buildArgs through the registry", () => {
   it("accepts generic options on a spec whose config type has been erased", () => {
-    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CLAUDE_CLI_ID);
+    const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
     const spec = adapter?.cliSpec;
     expect(spec).toBeDefined();
 
@@ -187,19 +135,19 @@ describe("cliSpec.buildArgs through the registry", () => {
     // generic options below are the whole point of the builder, so they must
     // survive that erasure - both at the type level and at runtime.
     const argv = spec?.buildArgs({
-      command: "claude-agent-acp",
+      command: "gemini",
       args: [],
-      model: "claude-sonnet-4-20250514",
+      model: "gemini-2.5-pro",
       outputFormat: "stream-json",
-      print: true,
+      debug: true,
     });
 
     expect(argv).toEqual([
       "--model",
-      "claude-sonnet-4-20250514",
+      "gemini-2.5-pro",
       "--output-format",
       "stream-json",
-      "--print",
+      "--debug",
     ]);
   });
 

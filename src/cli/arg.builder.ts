@@ -20,14 +20,6 @@ export function buildGenericArgs(
     const flag = flagMap[GENERIC_OPTION_KEY.OUTPUT_FORMAT];
     if (flag) out.push(flag, options.outputFormat);
   }
-  if (options.inputFormat !== undefined) {
-    const flag = flagMap[GENERIC_OPTION_KEY.INPUT_FORMAT];
-    if (flag) out.push(flag, options.inputFormat);
-  }
-  if (options.stream === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.STREAM];
-    if (flag) out.push(flag);
-  }
   if (options.trust === true) {
     const flag = flagMap[GENERIC_OPTION_KEY.TRUST];
     if (flag) out.push(flag);
@@ -40,24 +32,8 @@ export function buildGenericArgs(
     const flag = flagMap[GENERIC_OPTION_KEY.WORKSPACE];
     if (flag) out.push(flag, options.workspace);
   }
-  if (options.resume !== undefined && options.resume !== "") {
-    const flag = flagMap[GENERIC_OPTION_KEY.RESUME];
-    if (flag) out.push(flag, options.resume);
-  }
-  if (options.sessionId !== undefined && options.sessionId !== "") {
-    const flag = flagMap[GENERIC_OPTION_KEY.SESSION_ID];
-    if (flag) out.push(flag, options.sessionId);
-  }
-  if (options.verbose === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.VERBOSE];
-    if (flag) out.push(flag);
-  }
   if (options.debug === true) {
     const flag = flagMap[GENERIC_OPTION_KEY.DEBUG];
-    if (flag) out.push(flag);
-  }
-  if (options.print === true) {
-    const flag = flagMap[GENERIC_OPTION_KEY.PRINT];
     if (flag) out.push(flag);
   }
 

@@ -8,17 +8,19 @@ export const CURSOR_CONFIG_KEYS = {
 } as const satisfies Record<string, keyof typeof ENV_KEY>;
 
 /**
- * Cursor CLI subcommands and flags. No magic strings in cursor code.
+ * Flags `cursor-agent` accepts. They are global options placed before the `acp` subcommand
+ * (`cursor-agent --model x acp`); `acp` itself takes none.
  */
 export const CURSOR_CLI_ARG = {
-  PRINT: "-p",
-  OUTPUT_FORMAT: "--output-format",
-  STREAM_PARTIAL_OUTPUT: "--stream-partial-output",
-  RESUME: "--resume",
   MODEL: "--model",
   MODE: "--mode",
   SANDBOX: "--sandbox",
   WORKSPACE: "--workspace",
+  ADD_DIR: "--add-dir",
+  WORKTREE: "--worktree",
+  WORKTREE_BASE: "--worktree-base",
+  PLUGIN_DIR: "--plugin-dir",
+  APPROVE_MCPS: "--approve-mcps",
   TRUST: "--trust",
   VERSION: "--version",
 } as const;
@@ -35,10 +37,7 @@ export const CURSOR_CLI_SUBCOMMAND = {
 /** Map generic option keys to Cursor CLI flag names. */
 export const CURSOR_GENERIC_FLAG_MAP: ProviderFlagMap<typeof CURSOR_CLI_ARG> = {
   [GENERIC_OPTION_KEY.MODEL]: CURSOR_CLI_ARG.MODEL,
-  [GENERIC_OPTION_KEY.OUTPUT_FORMAT]: CURSOR_CLI_ARG.OUTPUT_FORMAT,
   [GENERIC_OPTION_KEY.TRUST]: CURSOR_CLI_ARG.TRUST,
   [GENERIC_OPTION_KEY.SANDBOX]: CURSOR_CLI_ARG.SANDBOX,
   [GENERIC_OPTION_KEY.WORKSPACE]: CURSOR_CLI_ARG.WORKSPACE,
-  [GENERIC_OPTION_KEY.RESUME]: CURSOR_CLI_ARG.RESUME,
-  [GENERIC_OPTION_KEY.PRINT]: CURSOR_CLI_ARG.PRINT,
 };

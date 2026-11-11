@@ -44,6 +44,7 @@
   "homepage": "https://github.com/SkinnnyJay/acp-llm-cli#readme",
   "scripts": {
     "build": "tsup",
+    "refresh:help": "node scripts/refresh-help-fixtures.mjs",
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "typecheck:examples": "tsc -p tsconfig.examples.json",

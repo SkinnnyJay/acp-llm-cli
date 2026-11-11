@@ -169,18 +169,18 @@ Every adapter carries a `cliSpec` that turns typed options into argv, so callers
 ```ts
 import { getAdapter, getDefaultRegistry, PROVIDER_IDS } from "@simpill/acp-llm-cli";
 
-const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CLAUDE_CLI_ID);
+const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.GEMINI_CLI_ID);
 const argv = adapter?.cliSpec?.buildArgs({
-  command: "claude-agent-acp",
+  command: "gemini",
   args: [],
-  model: "claude-sonnet-4-20250514",
+  model: "gemini-2.5-pro",
   outputFormat: "stream-json",
-  print: true,
+  debug: true,
 });
-// ["--model", "claude-sonnet-4-20250514", "--output-format", "stream-json", "--print"]
+// ["--model", "gemini-2.5-pro", "--output-format", "stream-json", "--debug"]
 ```
 
-The generic options — `model`, `outputFormat`, `inputFormat`, `stream`, `trust`, `sandbox`, `workspace`, `resume`, `sessionId`, `verbose`, `debug`, `print` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted: `trust` reaches only Cursor, `sessionId` only Claude, and `stream`/`debug` are not currently mapped by any bundled provider, so they affect argv only for a custom flag map you supply. `buildGenericArgs` is exported for custom builders.
+The generic options — `model`, `outputFormat`, `trust`, `sandbox`, `workspace`, `debug` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted: `trust`, `sandbox` and `workspace` reach only Cursor, `outputFormat` and `debug` only Gemini, and Claude and Codex map none, because `claude-agent-acp` and `codex-acp` take no flags. `buildGenericArgs` is exported for custom builders.
 
 `cliSpec.getHelp()` shells out to the CLI's `--help` and returns stdout, which is useful for discovery and for checking that an installed CLI supports what you are about to send:
 
