@@ -2,12 +2,12 @@
  * Fetches available model IDs and writes src/domain/models/*.ts.
  * Run: npm run update-models
  *
- * Public source (no keys): OpenRouter GET https://openrouter.ai/api/v1/models
- * Optional (with keys): Anthropic, OpenAI, Gemini, xAI provider APIs (override OpenRouter data).
+ * Sources per vendor: its models API when its key is set, otherwise its public documentation page.
  * Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY or GOOGLE_API_KEY, XAI_API_KEY
  * Optional: ACP_LLM_CLI_MODELS_DRY_RUN=1 to log only, no write.
  * Additive by default: existing ids are kept. ACP_LLM_CLI_MODELS_PRUNE=1 makes the fetch authoritative.
- * Router variants (ids containing ":") and non-text-output OpenRouter models are always dropped.
+ * Router variants (ids containing ":") and Anthropic ids containing "." are always dropped.
+ * A vendor whose page cannot be fetched or yields no ids keeps its file untouched.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -18,7 +18,7 @@ import { ModelIdSchema as ANTHROPIC_SCHEMA } from "../src/domain/models/anthropi
 import { ModelIdSchema as GEMINI_SCHEMA } from "../src/domain/models/gemini.models";
 import { ModelIdSchema as OPENAI_SCHEMA } from "../src/domain/models/openai.models";
 import { ModelIdSchema as XAI_SCHEMA } from "../src/domain/models/xai.models";
-import { hasTextOutput, renderModelModule, selectModelIds } from "./model.constants";
+import { extractModelIds, renderModelModule, selectModelIds } from "./model.constants";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -35,7 +35,11 @@ const EXISTING: Record<string, readonly string[]> = {
 };
 
 function writeModelConstants(provider: string, modelIds: string[], headerComment: string): void {
-  const sorted = selectModelIds([...(EXISTING[provider] ?? [])], modelIds, { prune: PRUNE });
+  // Anthropic ids never contain "."; those are router spellings (claude-opus-4.8 for claude-opus-4-8).
+  const valid = (id: string) => provider !== "anthropic" || !id.includes(".");
+  const sorted = selectModelIds((EXISTING[provider] ?? []).filter(valid), modelIds.filter(valid), {
+    prune: PRUNE,
+  });
   const content = renderModelModule(headerComment, sorted);
 
   const outPath = join(MODELS_DIR, `${provider}.models.ts`);
@@ -157,112 +161,54 @@ async function fetchXAI(): Promise<string[]> {
   return list.map((m) => m.id).filter((id): id is string => Boolean(id));
 }
 
-/** OpenRouter provider prefix -> our provider key */
-const OPENROUTER_PREFIX: Record<string, string> = {
-  anthropic: "anthropic",
-  openai: "openai",
-  google: "gemini",
-  "x-ai": "xai",
-  xai: "xai",
+const PAGES: Record<string, string> = {
+  anthropic: "https://platform.claude.com/docs/en/about-claude/model-deprecations.md",
+  openai: "https://developers.openai.com/api/docs/models",
+  gemini: "https://ai.google.dev/gemini-api/docs/models.md.txt",
+  xai: "https://docs.x.ai/developers/models",
 };
 
-/**
- * Public endpoint (no API key). Returns model ids grouped by provider.
- * OpenRouter id format: "provider/slug" e.g. "anthropic/claude-sonnet-4".
- */
-async function fetchOpenRouter(): Promise<Record<string, string[]>> {
-  const out: Record<string, string[]> = { anthropic: [], openai: [], gemini: [], xai: [] };
+/** Public documentation page, used when the vendor's API key is not set. */
+async function fetchPage(provider: string): Promise<string[]> {
+  const url = PAGES[provider] as string;
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/models");
+    const res = await fetch(url, {
+      headers: { "user-agent": "model-list-check" },
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!res.ok) {
-      console.warn("OpenRouter models fetch failed:", res.status);
-      return out;
+      console.warn(`${provider} models page fetch failed:`, res.status);
+      return [];
     }
-    const data = (await res.json()) as {
-      data?: ({ id?: string } & Parameters<typeof hasTextOutput>[0])[];
-    };
-    const list = data.data ?? [];
-    for (const m of list) {
-      const id = m.id;
-      if (!hasTextOutput(m)) continue;
-      if (!id || !id.includes("/")) continue;
-      const [prefix, ...rest] = id.split("/");
-      const slug = rest.join("/");
-      const provider = OPENROUTER_PREFIX[prefix?.toLowerCase() ?? ""];
-      if (provider && slug) {
-        if (!out[provider]) out[provider] = [];
-        out[provider].push(slug);
-      }
-    }
-    for (const p of Object.keys(out)) {
-      out[p] = [...new Set(out[p])].sort();
-    }
-    console.log(
-      "OpenRouter (public):",
-      Object.entries(out)
-        .map(([k, v]) => `${k}=${v.length}`)
-        .join(", ")
-    );
+    return extractModelIds(provider, await res.text());
   } catch (err) {
-    console.warn("OpenRouter fetch error:", err);
+    console.warn(`${provider} models page fetch error:`, err);
+    return [];
   }
-  return out;
 }
 
-const FALLBACKS: Record<string, string[]> = {
-  anthropic: ["claude-sonnet-4-20250514", "claude-opus-4"],
-  openai: ["gpt-4o", "gpt-4o-mini", "o1"],
-  gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-  xai: ["grok-3", "grok-3-mini", "grok-4-1-fast-reasoning"],
-};
-
 async function main(): Promise<void> {
-  console.log("Fetching model lists (OpenRouter public + optional provider APIs)...");
-  const [openRouter, anthropic, openai, gemini, xai] = await Promise.all([
-    fetchOpenRouter(),
-    fetchAnthropic(),
-    fetchOpenAI(),
-    fetchGemini(),
-    fetchXAI(),
-  ]);
-
-  const pick = (
-    provider: keyof typeof FALLBACKS,
-    fromApi: string[],
-    fromOpenRouter: string[]
-  ): string[] => {
-    if (fromApi.length) return fromApi;
-    if (fromOpenRouter.length) return fromOpenRouter;
-    return FALLBACKS[provider] ?? [];
+  console.log(
+    "Fetching model lists (provider APIs when keys are set, else documentation pages)..."
+  );
+  const apiLists = await Promise.all([fetchAnthropic(), fetchOpenAI(), fetchGemini(), fetchXAI()]);
+  const headers: Record<string, string> = {
+    anthropic: "Anthropic (Claude) model IDs",
+    openai: "OpenAI model IDs",
+    gemini: "Google Gemini model IDs",
+    xai: "xAI (Grok) model IDs",
   };
 
-  const anthropicList = pick("anthropic", anthropic, openRouter.anthropic ?? []);
-  const openaiList = pick("openai", openai, openRouter.openai ?? []);
-  const geminiList = pick("gemini", gemini, openRouter.gemini ?? []);
-  const xaiList = pick("xai", xai, openRouter.xai ?? []);
-
-  const source = (api: number, or: number) =>
-    api ? "provider API" : or ? "OpenRouter (public)" : "fallback";
-  writeModelConstants(
-    "anthropic",
-    anthropicList,
-    `Anthropic (Claude) model IDs — ${source(anthropic.length, (openRouter.anthropic ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "openai",
-    openaiList,
-    `OpenAI model IDs — ${source(openai.length, (openRouter.openai ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "gemini",
-    geminiList,
-    `Google Gemini model IDs — ${source(gemini.length, (openRouter.gemini ?? []).length)}. Run script to refresh.`
-  );
-  writeModelConstants(
-    "xai",
-    xaiList,
-    `xAI (Grok) model IDs — ${source(xai.length, (openRouter.xai ?? []).length)}. Run script to refresh.`
-  );
+  for (const [i, provider] of (["anthropic", "openai", "gemini", "xai"] as const).entries()) {
+    const fromApi = apiLists[i] as string[];
+    const ids = fromApi.length ? fromApi : await fetchPage(provider);
+    if (!ids.length) {
+      console.warn(`No ${provider} model ids found, leaving its file untouched`);
+      continue;
+    }
+    const source = fromApi.length ? "provider API" : "vendor documentation page";
+    writeModelConstants(provider, ids, `${headers[provider]} — ${source}. Run script to refresh.`);
+  }
 
   console.log("Done.");
 }

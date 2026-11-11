@@ -49,7 +49,7 @@ const client = factory.getClient(Provider.CLAUDE, {
   // providers this labels OpenAI-style stream envelopes rather than selecting
   // the agent's model — for that use port.setSessionConfigOption(...) or pass
   // the flag your CLI expects in `args`.
-  model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
+  model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_5_5,
 });
 
 await client.port.connect();
@@ -252,14 +252,14 @@ const helpText = await adapter?.cliSpec?.getHelp({
 
 Model IDs are exported as const objects — `ANTHROPIC_MODEL_IDS`, `OPENAI_MODEL_IDS`, `GEMINI_MODEL_IDS`, `XAI_MODEL_IDS` — so editors autocomplete them and typos fail to compile. Provider config schemas accept any string for `model`, so a model released this morning is never blocked by this package's release cadence. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a vendor catalogue enforced.
 
-Refresh them from live provider catalogues:
+Refresh them from the vendors themselves:
 
 ```bash
-npm run update-models                              # OpenRouter's public endpoint, no key needed
+npm run update-models                              # each vendor's public models page, no key needed
 ACP_LLM_CLI_MODELS_DRY_RUN=1 npm run update-models # preview the diff
 ```
 
-Setting `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `XAI_API_KEY` makes the script use that provider's own API instead.
+Setting `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `XAI_API_KEY` makes the script use that provider's own API instead of its page. The refresh only adds ids; `ACP_LLM_CLI_MODELS_PRUNE=1` makes the fetched list authoritative.
 
 ## Package entry points
 

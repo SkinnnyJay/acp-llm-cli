@@ -25,7 +25,7 @@ async function main(): Promise<void> {
     {
       // `model` labels OpenAI-style stream envelopes. ACP agents select the model over the
       // protocol (setSessionConfigOption, below) - this package does not invent CLI flags for the binary.
-      model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
+      model: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_5_5,
     }
   );
   const client = factory.getClient(Provider.CLAUDE, config);
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     await client.port.setSessionConfigOption?.({
       sessionId: session.sessionId,
       configId: "model",
-      value: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_4_6,
+      value: ANTHROPIC_MODEL_IDS.CLAUDE_SONNET_5_5,
     });
 
     const result = await client.port.prompt({
