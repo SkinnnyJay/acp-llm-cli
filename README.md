@@ -5,11 +5,11 @@
 [![node](https://img.shields.io/node/v/@simpill/acp-llm-cli)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/@simpill/acp-llm-cli)](./LICENSE)
 
-One typed TypeScript client for the coding-agent CLIs — Claude, Codex, Gemini, and Cursor — behind a single interface.
+One typed TypeScript client for the coding-agent CLIs — Claude, Codex, Cursor, and Antigravity — behind a single interface.
 
 ## Why
 
-Every coding-agent vendor ships a CLI, and every CLI wants to be driven differently. Some speak the [Agent Client Protocol](https://agentclientprotocol.com) over stdio; Cursor streams NDJSON and exits per prompt. Their flags disagree, their streaming formats disagree, and each one fails in its own way when the subprocess dies mid-turn.
+Every coding-agent vendor ships a CLI, and every CLI wants to be driven differently. All four are driven through the same [Agent Client Protocol](https://agentclientprotocol.com) runtime, but their flags disagree, their capabilities differ, and each one fails in its own way when the subprocess dies mid-turn.
 
 Talking to them directly means writing that plumbing once per vendor, then maintaining it. This package writes it once:
 
@@ -68,22 +68,28 @@ console.log(result.stopReason);
 await client.port.disconnect();
 ```
 
-Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.GEMINI`, or `Provider.CURSOR` and nothing else changes. `factory.listProviders()` returns all of them.
+Swap `Provider.CLAUDE` for `Provider.CODEX`, `Provider.CURSOR`, or `Provider.ANTIGRAVITY` and nothing else changes. `factory.listProviders()` returns all of them.
 
-Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cursor-print.ts`, `stream-prompt.ts`. Run `npm run build` first.
+Runnable versions live in [`examples/`](./examples) — `minimal-claude.ts`, `cursor-acp.ts`, `stream-prompt.ts`. Run `npm run build` first.
 
 ## Providers
 
-| Provider | `Provider` value | Default command | Transport |
-|---|---|---|---|
-| Claude | `Provider.CLAUDE` | `claude-agent-acp` | ACP over stdio |
-| Codex | `Provider.CODEX` | `codex-acp` | ACP over stdio |
-| Gemini | `Provider.GEMINI` | `gemini --experimental-acp` | ACP over stdio |
-| Cursor | `Provider.CURSOR` | `cursor-agent` | NDJSON, process per prompt |
+All four providers are driven through the same ACP runtime and configured the same way; see the table below for which have been run against the real binary.
 
-Defaults live in `DEFAULT_COMMANDS` and can be overridden per provider through config or environment. The Claude and Codex bins match the wrappers ACPX prefers, so the two can front the same installation.
+### Supported agents
 
-Cursor is the outlier: it spawns a process per prompt, so it supports neither streaming nor lifecycle. Its `capabilities` report `streamPrompt`, `restart`, `openClose`, and `sessionPersistence` as `false` — check them rather than assuming. Runtime options that have no meaning for it (`sessionPersistence`, `workspace`, `resumeOnRestart`, `restartOptions`, `envelopeMode`, `modelId`, `clientCapabilities`, `permissionHandler`, `toolHost`) are ignored, and the adapter logs a warning naming them — `capabilities` covers only the first four of those concerns.
+| Provider | `Provider` value | Command spawned | Binary comes from | Verified live in 0.5.0 |
+|---|---|---|---|---|
+| Claude | `Provider.CLAUDE` | `claude-agent-acp` | npm `@agentclientprotocol/claude-agent-acp` | Yes |
+| Codex | `Provider.CODEX` | `codex-acp` | npm `@agentclientprotocol/codex-acp` | Handshake only: it answered `initialize`; no prompt round trip was run |
+| Cursor | `Provider.CURSOR` | `cursor-agent acp` | Cursor's `cursor-agent` CLI | Yes |
+| Antigravity | `Provider.ANTIGRAVITY` | `agy acp` | Google's Antigravity CLI (`agy`) | No. It has not been run against a real `agy` binary; its flag table is empty and its capabilities are recorded as "not measured" |
+
+What each agent advertises at `initialize` (session load, list, resume, close, fork) is recorded in [`docs/capabilities.md`](./docs/capabilities.md). `npm run probe` regenerates it.
+
+Defaults live in `DEFAULT_COMMANDS` and can be overridden per provider through config or environment. The Claude and Codex bins match the wrappers ACPX prefers, so the two can front the same installation. Google has replaced the Gemini CLI with the Antigravity CLI for consumer accounts, so the Gemini provider is removed and Antigravity takes its place; Gemini model ids remain available as constants.
+
+Cursor needs the `cursor-agent` binary with its `acp` subcommand. Set its mode with `port.setSessionMode(...)` and its model with `port.setSessionConfigOption(...)`.
 
 ## Configuration
 
@@ -95,22 +101,22 @@ DEFAULT_COMMANDS  →  environment (ENV_KEY)  →  config you pass
 
 The result is validated against the provider's Zod schema before a process is spawned.
 
-That arrow is a simplification worth unpacking, because the env layer is narrower than it looks. `command` is required by the config schema, so a config you pass always supplies it — which means `ACP_LLM_CLI_*_COMMAND` only takes effect when you call `resolveBaseConfig` yourself (exported from `@simpill/acp-llm-cli/runtime`). `ACP_LLM_CLI_*_ARGS` applies whenever `args` is empty. Provider-specific fields you pass — `model`, `trust`, `mode` — survive resolution untouched and reach the provider.
+That arrow is a simplification worth unpacking, because the env layer is narrower than it looks. `command` is required by the config schema, so a config you pass always supplies it — which means `ACP_LLM_CLI_*_COMMAND` only takes effect when you call `resolveBaseConfig` yourself (exported from `@simpill/acp-llm-cli/runtime`). `ACP_LLM_CLI_*_ARGS` applies whenever `args` is empty. Provider-specific fields you pass, such as `model`, survive resolution untouched on the validated config. The runtime does not turn them into flags.
 
 Copy `.env.sample` to `.env`. Every key this package reads is declared in `ENV_KEY` (`src/domain/env.keys.ts`):
 
 | Variable | Purpose |
 |---|---|
 | `ACP_LLM_CLI_DEBUG` | Truthy enables debug logging |
-| `ACP_LLM_CLI_CLAUDE_COMMAND` | Override the Claude binary — same pattern for `GEMINI`, `CODEX`, `CURSOR` |
-| `ACP_LLM_CLI_CLAUDE_ARGS` | Override the Claude default args |
+| `ACP_LLM_CLI_<PROVIDER>_COMMAND` | Override a provider's binary. `<PROVIDER>` is `CLAUDE`, `CODEX`, `CURSOR` or `ANTIGRAVITY` |
+| `ACP_LLM_CLI_<PROVIDER>_ARGS` | Override that provider's default args |
 | `ACP_LLM_CLI_LIVE` | Set to `1` to run tests that spawn real CLIs |
 
 The provider CLIs read their own credentials — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `CURSOR_API_KEY`. This package never reads or forwards them.
 
 ## Streaming
 
-Claude, Codex, and Gemini stream. Feature-detect, then iterate. Narrow each envelope with the
+Every provider streams. Feature-detect, then iterate. Narrow each envelope with the
 exported `isOpenAIEnvelope` / `isNativeEnvelope` guards -- `StreamEnvelope` is a union, so
 `object` is not present on every member and reading it directly does not type-check:
 
@@ -169,18 +175,21 @@ Every adapter carries a `cliSpec` that turns typed options into argv, so callers
 ```ts
 import { getAdapter, getDefaultRegistry, PROVIDER_IDS } from "@simpill/acp-llm-cli";
 
-const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.ANTIGRAVITY_CLI_ID);
+const adapter = getAdapter(getDefaultRegistry(), PROVIDER_IDS.CURSOR_CLI_ID);
 const argv = adapter?.cliSpec?.buildArgs({
-  command: "gemini",
-  args: [],
-  model: "gemini-2.5-pro",
-  outputFormat: "stream-json",
-  debug: true,
+  command: "cursor-agent",
+  args: ["acp"],
+  model: "gpt-5",
+  trust: true,
+  sandbox: "enabled",
+  workspace: "/path/to/project",
 });
-// ["--model", "gemini-2.5-pro", "--output-format", "stream-json", "--debug"]
+// ["acp", "--model", "gpt-5", "--trust", "--sandbox", "enabled", "--workspace", "/path/to/project"]
 ```
 
-The generic options — `model`, `outputFormat`, `trust`, `sandbox`, `workspace`, `debug` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted: `trust`, `sandbox` and `workspace` reach only Cursor, `outputFormat` and `debug` only Gemini, and Claude and Codex map none, because `claude-agent-acp` and `codex-acp` take no flags. `buildGenericArgs` is exported for custom builders.
+The generic options — `model`, `outputFormat`, `trust`, `sandbox`, `workspace`, `debug` — are the shared vocabulary for flag maps. Each provider maps the subset its binary actually supports, and an option the provider does not map is skipped rather than emitted. Only Cursor maps any of them (`model`, `trust`, `sandbox`, `workspace`); Claude, Codex and Antigravity map none. The flag tables are checked against saved `--help` output in `__tests__/fixtures/help/` by a drift test, and `npm run refresh:help` regenerates those fixtures from the installed binaries. `buildGenericArgs` is exported for custom builders.
+
+The runtime does not call `buildArgs`. It starts `command` with `args` exactly as resolved, so `trust`, `sandbox`, `workspace` and `model` change the spawned process only if you build `args` with `buildArgs` yourself and pass them in. Without that, `model` is used as the default model label on OpenAI-style stream envelopes.
 
 `cliSpec.getHelp()` shells out to the CLI's `--help` and returns stdout, which is useful for discovery and for checking that an installed CLI supports what you are about to send:
 
@@ -227,7 +236,7 @@ Create `src/providers/<name>/` with four files:
 | `cli.definition.ts` | `ICliSpec` — `defaultArgs`, `genericFlagMap`, `knownFlags`, `buildArgs`, `getHelp` |
 | `adapter.ts` | Ties them together and exposes `createRuntime(config)` |
 
-Then add the default command to `src/domain/default.commands.ts`, the env keys to `src/domain/env.keys.ts`, and register the adapter in `src/bootstrap.ts`. If the CLI speaks ACP over stdio, `createAcpCliHarnessRuntime(config)` is the whole runtime. If it does not, `src/providers/cursor/` is the reference for a fully custom port.
+Then add the default command to `src/domain/default.commands.ts`, the env keys to `src/domain/env.keys.ts`, and register the adapter in `src/bootstrap.ts`. If the CLI speaks ACP over stdio, `createAcpCliHarnessRuntime(config)` is the whole runtime. If it does not, you need a custom port that implements `IAgentPort`.
 
 ### Architecture notes
 

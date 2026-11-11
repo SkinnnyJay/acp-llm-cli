@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10
+
+Four providers now: Claude, Codex, Cursor and Antigravity. The Antigravity provider has **not yet
+been run against a real `agy` binary**: its flag table is empty and its capabilities are recorded
+as "not measured" in `docs/capabilities.md`. Codex was verified for the `initialize` handshake
+only; no prompt round trip was run. Claude and Cursor were verified live.
+
+### Breaking
+
+- **ACP SDK `^1.4.0` to `^2.5.0`** (stable entrypoint). `ACPClient` is rebuilt on the SDK's
+  `client()` app API; `IAgentPort` is unchanged. The `zod` peer floor is raised from `^3.25.0` to
+  `^3.25.76 || ^4.0.0`.
+- **The Gemini provider is removed and replaced by Antigravity.** Google has replaced the Gemini CLI
+  with the Antigravity CLI for consumer accounts. Removed: `Provider.GEMINI`
+  (and `"gemini-cli"` from `Provider`, `ProviderSchema` and `PROVIDER_VALUES`),
+  `PROVIDER_IDS.GEMINI_CLI_ID` and `GEMINI_CLI_NAME`, `DEFAULT_COMMANDS.GEMINI_DEFAULT_COMMAND`
+  and `GEMINI_DEFAULT_ARGS`, and `ENV_KEY.ACP_LLM_CLI_GEMINI_COMMAND` / `_ARGS`. Added:
+  `Provider.ANTIGRAVITY` (`"antigravity-cli"`), `PROVIDER_IDS.ANTIGRAVITY_CLI_ID` and
+  `ANTIGRAVITY_CLI_NAME`, `DEFAULT_COMMANDS.ANTIGRAVITY_DEFAULT_COMMAND` (`agy`) and
+  `ANTIGRAVITY_DEFAULT_ARGS` (`["acp"]`), and `ENV_KEY.ACP_LLM_CLI_ANTIGRAVITY_COMMAND` / `_ARGS`.
+  The Gemini model id constants and the `GEMINI_API_KEY` name remain.
+- **Cursor runs over ACP (`cursor-agent acp`) on the shared runtime.** The print / `stream-json`
+  port, its helpers and the `cursor-print` example are deleted. `CursorConfig` no longer types
+  `mode`, `workspacePath`, `force`, `browser`, `approveMcps` or `approvalTimeoutMs`. The config
+  schema keeps unknown keys, so old config that still sets them parses but they do nothing.
+  `DEFAULT_COMMANDS.CURSOR_DEFAULT_ARGS` is now `["acp"]` (was `[]`). Cursor now supports
+  streaming, `restart()` and session persistence like the other providers. Internal constants for
+  the print port are removed (`TIMEOUT.CURSOR_*`, `ERROR_MESSAGE.CURSOR_*`, `CURSOR_MODE`,
+  `CURSOR_NDJSON_*`, `CURSOR_OUTPUT_FORMAT` and others); none were on a public entry point.
+- **Generic option keys removed:** `inputFormat`, `stream`, `resume`, `sessionId`, `verbose` and
+  `print` are gone from `GENERIC_OPTION_KEY`, `genericLlmCliOptionsSchema` and
+  `GenericLlmCliOptions`, and `buildGenericArgs` no longer reads them. The remaining keys are
+  `model`, `outputFormat`, `trust`, `sandbox`, `workspace` and `debug`.
+- **Deprecated exports removed:** `GENERIC_OPTION_DEFAULTS` and `ANTHROPIC_MODEL_ID_LIST`,
+  `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST`. Model id lists are
+  otherwise unchanged in this release.
+
+### Changed
+
+- The wrapper packages were renamed upstream. `claude-agent-acp` now comes from npm
+  `@agentclientprotocol/claude-agent-acp` and `codex-acp` from `@agentclientprotocol/codex-acp`;
+  the `@zed-industries/*` packages are deprecated. Default commands are unchanged.
+- Flag tables were corrected against saved `--help` output. Claude's and Codex's tables are now
+  empty, because those wrappers print no flag help; Cursor maps `model`, `trust`, `sandbox` and
+  `workspace`; Antigravity's is empty until `npm run refresh:help` has been run with `agy`
+  installed.
+- Dev toolchain: Biome 2.6.6 and vitest 5.1.0.
+
+### Fixed
+
+- **`prompt()` could resolve ahead of its `session/update` notifications, losing the tail of a
+  stream.** Each update is now emitted at read time, so every update that arrives before the
+  response is delivered first.
+- **A link the SDK closed on its own left the client calling into a dead stream.** Calls now
+  reject with `ERROR_MESSAGE.ACP_LINK_CLOSED`, and `connect()` replaces the stale stream.
+
+### Added
+
+- `__tests__/provider.flags.drift.test.ts`, which checks each flag table against saved `--help`
+  fixtures in `__tests__/fixtures/help/`, and `npm run refresh:help` to regenerate them.
+- `npm run probe` and `docs/capabilities.md`, which record what each ACP agent advertises at
+  `initialize`.
+- `examples/cursor-acp.ts`. `examples/minimal-claude.ts` now resolves its command through
+  `resolveBaseConfig`, so `ACP_LLM_CLI_CLAUDE_COMMAND` / `_ARGS` take effect.
+
+### Migration
+
+- **SDK 1.x to 2.x.** Only matters if you pass SDK types through. Before: types imported from
+  `@agentclientprotocol/sdk` 1.x. After: the 2.x types (this package depends on `^2.5.0`).
+  `IAgentPort` is unchanged.
+- **Cursor config.** Before: `{ command: "cursor-agent", args: [], mode: "plan", workspacePath: dir }`.
+  After: `{ command: "cursor-agent", args: ["acp"] }` (or omit `args` and resolve with
+  `resolveBaseConfig`), then pass the directory as `cwd` to `newSession` and set the mode with
+  `port.setSessionMode(...)` and the model with `port.setSessionConfigOption(...)`.
+- **Gemini to Antigravity.** Before: `Provider.GEMINI` / `"gemini-cli"`, `ACP_LLM_CLI_GEMINI_COMMAND`
+  and `ACP_LLM_CLI_GEMINI_ARGS`. After: `Provider.ANTIGRAVITY` / `"antigravity-cli"`,
+  `ACP_LLM_CLI_ANTIGRAVITY_COMMAND` (default `agy`) and `ACP_LLM_CLI_ANTIGRAVITY_ARGS` (default
+  `acp`). Antigravity has not yet been run against a real `agy` binary. Model id lists are
+  unchanged.
+
 ## [0.4.0] - 2026-08-22
 
 A minor bump, not a patch: several changes below alter behaviour a consumer can observe, and one

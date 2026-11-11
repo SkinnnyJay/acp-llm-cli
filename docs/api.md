@@ -51,7 +51,7 @@ The terminal chunk carries a real `finish_reason` translated from the agent's AC
 |--------|------|---------|
 | `ANTHROPIC_MODEL_IDS` / `AnthropicModelIdSchema` | const/schema | Claude model enum |
 | `OPENAI_MODEL_IDS` / `OpenAIModelIdSchema` | const/schema | OpenAI / Codex |
-| `GEMINI_MODEL_IDS` / `GeminiModelIdSchema` | const/schema | Gemini |
+| `GEMINI_MODEL_IDS` / `GeminiModelIdSchema` | const/schema | Gemini model ids (there is no Gemini provider; see Antigravity) |
 | `XAI_MODEL_IDS` / `XAIModelIdSchema` | const/schema | xAI |
 
 Provider `model` config accepts **any string**. It is a label, not a constraint: ACP providers select their model over the protocol or via `args`, and the configured value is threaded through as the default model id on OpenAI-style stream envelopes. The exported `*ModelIdSchema` are strict opt-in validators - parse with one explicitly if you want a model id checked against a vendor catalogue.
@@ -109,18 +109,9 @@ The runtime types and classes above are re-exported here; the application conven
 | `IPermissionHandler` | type | Decide permission requests; **absent means cancel**, never auto-allow |
 | `IToolHost` | type | Terminal and filesystem operations an agent may request |
 
-### Deprecated
-
-Scheduled for removal together in the next major. Each carries an `@deprecated` JSDoc note that reaches editors through the shipped declarations.
-
-| Export | Why |
-|--------|-----|
-| `GENERIC_OPTION_DEFAULTS` | Unread. The arg builder never consults it, so `stream: true` here is a default that is never applied |
-| `ANTHROPIC_MODEL_ID_LIST`, `OPENAI_MODEL_ID_LIST`, `GEMINI_MODEL_ID_LIST`, `XAI_MODEL_ID_LIST` | Unread, and lossier than their source — `readonly string[]` discards the literal union the `*_MODEL_IDS` objects preserve |
-
 ## Peer dependencies
 
-`zod` (`^3.25.0 || ^4.0.0`) and `eventemitter3` (`^5.0.1`) are peers. Both zod majors are typechecked and tested in CI, so either satisfies the range.
+`zod` (`^3.25.76 || ^4.0.0`) and `eventemitter3` (`^5.0.1`) are peers. Both zod majors are typechecked and tested in CI, so either satisfies the range.
 
 ## Safety defaults (0.2.0+)
 
@@ -138,5 +129,5 @@ the derived one outright and is never merged with it.
 
 
 - Permission requests without a `permissionHandler` are **cancelled** (never auto-allow).
-- Cursor `--trust` is passed only when `trust: true` in config (verified end to end by `__tests__/config.passthrough.test.ts`).
+- No flag is added to a spawned binary for you: the ACP runtime starts `command` with `args` exactly as resolved, so `--trust` reaches `cursor-agent` only if you put it in `args`.
 - Stderr in thrown errors is redacted/truncated unless `ACP_LLM_CLI_DEBUG` is set.
