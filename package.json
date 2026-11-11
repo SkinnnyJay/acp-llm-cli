@@ -62,7 +62,7 @@
     "check:docs": "node scripts/check-docs-snippets.mjs"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.4.0",
+    "@agentclientprotocol/sdk": "^2.5.0",
     "@simpill/async.utils": "^1.1.0",
     "@simpill/env.utils": "^1.1.0",
     "@simpill/logger.utils": "^1.1.0"
@@ -70,7 +70,7 @@
   "sideEffects": false,
   "peerDependencies": {
     "eventemitter3": "^5.0.1",
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.76 || ^4.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
@@ -82,7 +82,7 @@
     "tsx": "^4.23.12",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
-    "zod": "^3.25.0"
+    "zod": "^3.25.76"
   },
   "files": [
     "dist"

@@ -4,6 +4,7 @@
 export const ERROR_MESSAGE = {
   ACP_STREAM_UNAVAILABLE: "ACP stream unavailable",
   ACP_CLIENT_NOT_CONNECTED: "ACP client not connected",
+  ACP_LINK_CLOSED: "ACP connection to the agent closed unexpectedly; call connect() to reconnect",
   FILE_SYSTEM_TOOLS_NOT_CONFIGURED: "File system tools not configured",
   TERMINAL_TOOLS_NOT_CONFIGURED: "Terminal tools not configured",
   CURSOR_CLI_CHECK_FAILED: "Cursor CLI check failed",

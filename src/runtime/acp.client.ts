@@ -14,13 +14,14 @@ import type {
   SetSessionModeResponse,
 } from "@agentclientprotocol/sdk";
 import {
-  type Client,
   type ClientCapabilities,
-  ClientSideConnection,
+  type ClientConnection,
   type CreateTerminalRequest,
   type CreateTerminalResponse,
+  client,
   type KillTerminalRequest,
   type KillTerminalResponse,
+  methods,
   PROTOCOL_VERSION,
   type ReadTextFileRequest,
   type ReadTextFileResponse,
@@ -73,14 +74,39 @@ export function createAcpAgentPort(
 }
 
 type AcpStream = NonNullable<ReturnType<IConnection["getStream"]>>;
+type AcpMessage = AcpStream["readable"] extends ReadableStream<infer T> ? T : never;
 
-class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Client {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+/** A session/update notification carrying the fields the port's consumers read. */
+function isSessionUpdateMessage(
+  message: unknown
+): message is { method: string; params: SessionNotification } {
+  if (!isRecord(message) || "id" in message) return false;
+  if (message.method !== methods.client.session.update) return false;
+  const params = message.params;
+  return (
+    isRecord(params) &&
+    typeof params.sessionId === "string" &&
+    isRecord(params.update) &&
+    typeof params.update.sessionUpdate === "string"
+  );
+}
+
+class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort {
   /**
-   * The live RPC link and the stream it was built on, held together so "am I usable" has exactly
-   * one representation. Keeping the stream lets connect() recognise that it is already attached
-   * to it, instead of stacking a second reader loop on the same pipe.
+   * The live SDK connection and the stream it was built on, held together so "am I usable" has
+   * exactly one representation. Keeping the stream lets connect() recognise that it is already
+   * attached to it, instead of stacking a second reader loop on the same pipe.
    */
-  private attached: { rpc: ClientSideConnection; stream: AcpStream } | undefined;
+  private attached: { link: ClientConnection; stream: AcpStream } | undefined;
+  /**
+   * The stream of a link the SDK closed by itself (EOF, failed write, broken input) while the
+   * transport reported nothing. The process may still be alive, so connect() must not reuse it.
+   * Cleared whenever detach() runs or a new link is attached.
+   */
+  private staleStream: AcpStream | undefined;
   private readonly toolHost: IToolHost | undefined;
   private readonly clientCapabilities: ClientCapabilities;
 
@@ -118,15 +144,107 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     // exit was ours and the link is dead. The test reads inverted at a glance - keep the
     // ordering contract in connection.interface.ts in mind when changing either side.
     this.connection.on(CONNECTION_EVENT.EXIT, () => {
-      if (this.attached && this.connection.getStream() === this.attached.stream) {
+      // A link the SDK already closed still owns its stream for this check.
+      const ownStream = this.attached?.stream ?? this.staleStream;
+      if (ownStream && this.connection.getStream() === ownStream) {
         return;
       }
       this.detach();
     });
   }
 
-  private detach(): void {
+  /** One app per attach: handlers are bound to this client and delegate to its own methods. */
+  private buildApp() {
+    return client()
+      .onRequest(methods.client.session.requestPermission, ({ params }) =>
+        this.requestPermission(params)
+      )
+      .onRequest(methods.client.fs.readTextFile, ({ params }) => this.readTextFile(params))
+      .onRequest(methods.client.fs.writeTextFile, ({ params }) => this.writeTextFile(params))
+      .onRequest(methods.client.terminal.create, ({ params }) => this.createTerminal(params))
+      .onRequest(methods.client.terminal.output, ({ params }) => this.terminalOutput(params))
+      .onRequest(methods.client.terminal.waitForExit, ({ params }) =>
+        this.waitForTerminalExit(params)
+      )
+      .onRequest(methods.client.terminal.release, ({ params }) => this.releaseTerminal(params))
+      .onRequest(methods.client.terminal.kill, ({ params }) => this.killTerminal(params));
+    // session/update is deliberately not registered here: observeInbound() emits it.
+  }
+
+  /**
+   * Wraps the inbound side so each session/update is emitted at the moment the SDK reads it.
+   *
+   * The SDK settles a request's promise synchronously when it reads the response, but runs each
+   * notification through an async handler chain. Emitting from an onNotification handler let
+   * prompt() resolve before the updates read just ahead of its response had been emitted, and
+   * streamPrompt() closed its queue on them. The SDK reads one message at a time, and pull()
+   * runs only when it asks for the next one, so every update is emitted before the SDK can even
+   * see the message after it.
+   */
+  private observeInbound(stream: AcpStream): AcpStream {
+    let reader: ReadableStreamDefaultReader<AcpMessage> | undefined;
+    const readable = new ReadableStream<AcpMessage>(
+      {
+        pull: async (controller) => {
+          reader ??= stream.readable.getReader();
+          const { value, done } = await reader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          this.emitIfSessionUpdate(value);
+          controller.enqueue(value);
+        },
+        cancel: (reason) => (reader ?? stream.readable).cancel(reason),
+      },
+      // Zero, so nothing is read from the transport before the SDK asks for it.
+      { highWaterMark: 0 }
+    );
+    return { readable, writable: stream.writable };
+  }
+
+  /**
+   * The SDK still parses every session/update with its schema (and logs ones that fail), but
+   * that runs after this point and cannot gate it, so this checks the shape consumers rely on.
+   * A listener that throws is reported on `error` rather than allowed to break the read loop.
+   */
+  private emitIfSessionUpdate(message: AcpMessage): void {
+    if (!isSessionUpdateMessage(message)) return;
+    try {
+      this.emit(AGENT_PORT_EVENT.SESSION_UPDATE, message.params);
+    } catch (error) {
+      this.emitError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  private emitError(error: Error): void {
+    try {
+      this.emit(AGENT_PORT_EVENT.ERROR, error);
+    } catch {
+      // An error listener that throws has nowhere further to report to.
+    }
+  }
+
+  /**
+   * The SDK closes a link by itself on EOF, a failed write or a broken input stream. Only a link
+   * that is still attached counts: one we closed in detach(), or one replaced by a reconnect, is
+   * ignored. Nothing is reported or torn down here: when the process has died, the transport
+   * reports the exit (code and stderr) moments later, and acting first would pre-empt that.
+   * Calls fail with ACP_LINK_CLOSED meanwhile, and connect() replaces the stale stream.
+   */
+  private onLinkClosed(link: ClientConnection): void {
+    if (this.attached?.link !== link) return;
+    this.staleStream = this.attached.stream;
     this.attached = undefined;
+  }
+
+  private detach(): void {
+    const attached = this.attached;
+    this.attached = undefined;
+    this.staleStream = undefined;
+    // Closing rejects requests still pending on a link whose process is gone, so callers
+    // waiting on prompt() see an error rather than hanging.
+    attached?.link.close();
   }
 
   get connectionStatus(): ConnectionStatus {
@@ -135,19 +253,33 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
 
   async connect(): Promise<void> {
     await this.connection.connect();
-    const stream = this.connection.getStream();
+    let stream = this.connection.getStream();
+    const staleStream = this.staleStream;
+    if (staleStream && stream === staleStream) {
+      // The link on this stream is dead but the process has not exited, so the transport still
+      // reports itself connected. Restart it to get a stream that is actually readable.
+      await this.connection.disconnect();
+      await this.connection.connect();
+      stream = this.connection.getStream();
+      if (stream === staleStream) {
+        stream = undefined;
+      }
+    }
     if (!stream) {
       this.detach();
       // Do not leave a spawned child behind with no usable link to it.
       await this.connection.disconnect().catch(() => undefined);
       throw new Error(ERROR_MESSAGE.ACP_STREAM_UNAVAILABLE);
     }
-    // Constructing a ClientSideConnection starts a reader loop, so re-attaching to a stream we
+    // Connecting a client app starts a reader loop, so re-attaching to a stream we
     // are already reading would leave two loops competing on one pipe.
     if (this.attached?.stream === stream) {
       return;
     }
-    this.attached = { rpc: new ClientSideConnection(() => this, stream), stream };
+    const link = this.buildApp().connect(this.observeInbound(stream));
+    this.attached = { link, stream };
+    this.staleStream = undefined;
+    void link.closed.then(() => this.onLinkClosed(link));
   }
 
   async disconnect(): Promise<void> {
@@ -157,7 +289,7 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
   }
 
   async initialize(params?: Partial<InitializeRequest>): Promise<InitializeResponse> {
-    return this.requireConnection().initialize({
+    return this.requireAgent().request(methods.agent.initialize, {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: this.clientCapabilities,
       ...params,
@@ -165,25 +297,25 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
   }
 
   async newSession(params: NewSessionRequest): Promise<NewSessionResponse> {
-    return this.requireConnection().newSession(params);
+    return this.requireAgent().request(methods.agent.session.new, params);
   }
 
   async authenticate(params: AuthenticateRequest): Promise<AuthenticateResponse> {
-    return this.requireConnection().authenticate(params);
+    return this.requireAgent().request(methods.agent.authenticate, params);
   }
 
   async prompt(params: PromptRequest): Promise<PromptResponse> {
-    return this.requireConnection().prompt(params);
+    return this.requireAgent().request(methods.agent.session.prompt, params);
   }
 
   async setSessionMode(params: SetSessionModeRequest): Promise<SetSessionModeResponse> {
-    return this.requireConnection().setSessionMode(params);
+    return this.requireAgent().request(methods.agent.session.setMode, params);
   }
 
   async setSessionConfigOption(
     params: SetSessionConfigOptionRequest
   ): Promise<SetSessionConfigOptionResponse> {
-    return this.requireConnection().setSessionConfigOption(params);
+    return this.requireAgent().request(methods.agent.session.setConfigOption, params);
   }
 
   async requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -240,10 +372,12 @@ class ACPClient extends EventEmitter<AgentPortEvents> implements IAgentPort, Cli
     return this.toolHost;
   }
 
-  private requireConnection(): ClientSideConnection {
+  private requireAgent(): ClientConnection["agent"] {
     if (!this.attached) {
-      throw new Error(ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED);
+      throw new Error(
+        this.staleStream ? ERROR_MESSAGE.ACP_LINK_CLOSED : ERROR_MESSAGE.ACP_CLIENT_NOT_CONNECTED
+      );
     }
-    return this.attached.rpc;
+    return this.attached.link.agent;
   }
 }
